@@ -80,10 +80,10 @@
                             <span class="user-status status-online">Çevrimiçi</span>
                         </div>
                     </div>
-                    <button id="logout-btn" class="btn-icon" title="Çıkış Yap">
-                        <!-- Çıkış yap ikonu için basit bir sembol -->
-                        🚪
-                    </button>
+                    <div class="sidebar-header-actions">
+                        <button id="open-settings-btn" class="btn-icon" title="Profil Ayarları">⚙️</button>
+                        <button id="logout-btn" class="btn-icon" title="Çıkış Yap">🚪</button>
+                    </div>
                 </div>
                 
                 <!-- Arkadaş Arama/Ekleme Bölümü -->
@@ -158,6 +158,25 @@
                 </div>
             </main>
 
+        </div>
+    </div>
+
+    <!-- 3. EKRAN: PROFİL AYARLARI MODALI (Varsayılan olarak gizli) -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Profil Ayarları</h3>
+                <span id="close-settings" class="close-btn" title="Kapat">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="settings-form">
+                    <div class="input-group">
+                        <label for="settings-username">Kullanıcı Adı</label>
+                        <input type="text" id="settings-username" required autocomplete="off" placeholder="Yeni kullanıcı adı">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Değişiklikleri Kaydet</button>
+                </form>
+            </div>
         </div>
     </div>
 

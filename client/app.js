@@ -35,6 +35,13 @@ const pendingRequestsSection = document.getElementById('pending-requests-section
 const pendingCount = document.getElementById('pending-count');
 const pendingRequestsList = document.getElementById('pending-requests-list');
 
+// PROFİL AYARLARI ELEMENTLERİ
+const settingsModal = document.getElementById('settings-modal');
+const openSettingsBtn = document.getElementById('open-settings-btn');
+const closeSettings = document.getElementById('close-settings');
+const settingsForm = document.getElementById('settings-form');
+const settingsUsername = document.getElementById('settings-username');
+
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
 let token = localStorage.getItem('token') || null;
@@ -224,6 +231,58 @@ btnBlock.addEventListener('click', async () => {
     }
 });
 
+// Ayarlar Modalini Aç
+openSettingsBtn.addEventListener('click', () => {
+    settingsUsername.value = currentUser.username;
+    settingsModal.classList.remove('hidden');
+});
+
+// Ayarlar Modalini Kapat
+closeSettings.addEventListener('click', () => {
+    settingsModal.classList.add('hidden');
+});
+
+// Modal dışına tıklandığında kapat
+window.addEventListener('click', (e) => {
+    if (e.target === settingsModal) {
+        settingsModal.classList.add('hidden');
+    }
+});
+
+// Ayarları Kaydet (Kullanıcı Adı Güncelleme)
+settingsForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newUsername = settingsUsername.value.trim();
+    if (!newUsername || newUsername === currentUser.username) {
+        settingsModal.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const res = await apiCall('/profile/update-username', 'POST', { newUsername });
+        alert(res.message);
+        
+        // Token ve Kullanıcı bilgisini güncelle
+        token = res.token;
+        currentUser = res.user;
+        localStorage.setItem('token', token);
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+        // Kendi arayüzümüzü güncelle
+        myUsernameEl.textContent = currentUser.username;
+        myAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+
+        settingsModal.classList.add('hidden');
+        
+        // Soket bağlantısını yeni token ile tazelemek için (isteğe bağlı)
+        if (socket) {
+            socket.auth.token = token;
+        }
+    } catch (err) {
+        // Hata zaten apiCall içinde alert ediliyor
+    }
+});
+
 // --- UYGULAMAYI BAŞLATMA VE VERİ ÇEKME ---
 
 async function initApp() {
@@ -309,6 +368,25 @@ async function initApp() {
                 noChatSelectedScreen.classList.remove('hidden');
             }
             await loadUsers();
+        });
+
+        // KULLANICI ADI DEĞİŞTİĞİNDE çalışan olay
+        socket.on('username_changed', (data) => {
+            console.log('Kullanıcı adı değişti:', data);
+            
+            // 1. Arkadaşlarımız arasındaysa ismini güncelle
+            const friend = users.find(u => u.id === data.userId);
+            if (friend) {
+                friend.username = data.newUsername;
+                renderUsersList();
+            }
+
+            // 2. Eğer şu an sohbet ettiğimiz partner ise başlık bilgisini güncelle
+            if (activeChatPartnerId === data.userId) {
+                activeChatPartner = data.newUsername;
+                activeChatName.textContent = data.newUsername;
+                activeChatAvatar.textContent = data.newUsername.substring(0, 2).toUpperCase();
+            }
         });
         
     } catch (err) {

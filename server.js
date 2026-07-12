@@ -368,6 +368,53 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
+// 2.1 KULLANICI ADI GÜNCELLEME
+app.post('/api/profile/update-username', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const oldUsername = req.user.username;
+    const { newUsername } = req.body;
+
+    if (!newUsername || newUsername.trim() === '') {
+        return res.status(400).json({ message: 'Yeni kullanıcı adı boş olamaz.' });
+    }
+
+    const trimmedUsername = newUsername.trim();
+
+    try {
+        // Kullanıcı adının benzersizliğini kontrol et
+        const existingUser = await dbQueries.findUserByUsername(trimmedUsername);
+        if (existingUser && existingUser.id !== userId) {
+            return res.status(400).json({ message: 'Bu kullanıcı adı zaten alınmış.' });
+        }
+
+        // Güncelle
+        await dbQueries.updateUsername(userId, trimmedUsername);
+
+        // Yeni JWT Token üret (Kullanıcı adını güncellemek için)
+        const token = jwt.sign(
+            { id: userId, username: trimmedUsername, profile_pic: req.user.profile_pic }, 
+            JWT_SECRET, 
+            { expiresIn: '7d' }
+        );
+
+        // Soket üzerinden diğer tüm kullanıcılara duyuru yap (böylece sol menüler ve aktif sohbet başlıkları güncellenir)
+        io.emit('username_changed', {
+            userId: userId,
+            oldUsername: oldUsername,
+            newUsername: trimmedUsername
+        });
+
+        res.json({
+            message: 'Kullanıcı adınız başarıyla güncellendi!',
+            token: token,
+            user: { id: userId, username: trimmedUsername, email: req.user.email, profile_pic: req.user.profile_pic }
+        });
+    } catch (error) {
+        console.error('Kullanıcı adı güncelleme hatası:', error);
+        res.status(500).json({ message: 'Kullanıcı adı güncellenirken sunucu hatası oluştu.' });
+    }
+});
+
 // 3. SADECE ONAYLI ARKADAŞLARI LİSTELEME
 app.get('/api/users', authenticateToken, async (req, res) => {
     const userId = req.user.id;
