@@ -61,6 +61,17 @@ async function initDatabase() {
                     UNIQUE(user_id, friend_id)
                 )
             `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS blocks (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    blocked_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id),
+                    FOREIGN KEY(blocked_id) REFERENCES users(id),
+                    UNIQUE(user_id, blocked_id)
+                )
+            `);
             
             // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(100) UNIQUE`);
@@ -144,6 +155,18 @@ async function initDatabase() {
                 FOREIGN KEY(user_id) REFERENCES users(id),
                 FOREIGN KEY(friend_id) REFERENCES users(id),
                 UNIQUE(user_id, friend_id)
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS blocks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                blocked_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(blocked_id) REFERENCES users(id),
+                UNIQUE(user_id, blocked_id)
             )
         `);
 
@@ -424,6 +447,109 @@ const dbQueries = {
                  WHERE (user_id = ? AND friend_id = ?) 
                     OR (user_id = ? AND friend_id = ?)`,
                 [user1Id, user2Id, user2Id, user1Id]
+            );
+        }
+    },
+
+    // Arkadaşlıktan Çıkar (Arkadaşlık kaydını sil)
+    async removeFriendship(userId, friendId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'DELETE FROM friendships WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)',
+                [userId, friendId]
+            );
+        } else {
+            await dbSqlite.run(
+                'DELETE FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)',
+                [userId, friendId, friendId, userId]
+            );
+        }
+    },
+
+    // Kullanıcı Engelle
+    async blockUser(userId, blockedId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'INSERT INTO blocks (user_id, blocked_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                [userId, blockedId]
+            );
+        } else {
+            await dbSqlite.run(
+                'INSERT OR IGNORE INTO blocks (user_id, blocked_id) VALUES (?, ?)',
+                [userId, blockedId]
+            );
+        }
+        // Engelledikten sonra aralarındaki arkadaşlığı da sil
+        await this.removeFriendship(userId, blockedId);
+    },
+
+    // Engeli Kaldır
+    async unblockUser(userId, blockedId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'DELETE FROM blocks WHERE user_id = $1 AND blocked_id = $2',
+                [userId, blockedId]
+            );
+        } else {
+            await dbSqlite.run(
+                'DELETE FROM blocks WHERE user_id = ? AND blocked_id = ?',
+                [userId, blockedId]
+            );
+        }
+    },
+
+    // İki kullanıcı arasında engelleme durumu var mı kontrol et (Herhangi biri engellediyse true döner)
+    async isBlocked(userId, targetId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                'SELECT * FROM blocks WHERE (user_id = $1 AND blocked_id = $2) OR (user_id = $3 AND blocked_id = $4)',
+                [userId, targetId, targetId, userId]
+            );
+            return res.rows.length > 0;
+        } else {
+            const res = await dbSqlite.get(
+                'SELECT * FROM blocks WHERE (user_id = ? AND blocked_id = ?) OR (user_id = ? AND blocked_id = ?)',
+                [userId, targetId, targetId, userId]
+            );
+            return !!res;
+        }
+    },
+
+    // Belirli bir kullanıcı tarafından engellenip engellenmediğini sorgula (Sadece blockerId mi engelledi?)
+    async isUserBlockedBy(userId, blockerId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                'SELECT * FROM blocks WHERE user_id = $1 AND blocked_id = $2',
+                [blockerId, userId]
+            );
+            return res.rows.length > 0;
+        } else {
+            const res = await dbSqlite.get(
+                'SELECT * FROM blocks WHERE user_id = ? AND blocked_id = ?',
+                [blockerId, userId]
+            );
+            return !!res;
+        }
+    },
+
+    // Engellenen kullanıcıları listele
+    async getBlockedUsers(userId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                `SELECT users.id, users.username, users.profile_pic 
+                 FROM blocks 
+                 JOIN users ON users.id = blocks.blocked_id 
+                 WHERE blocks.user_id = $1`,
+                [userId]
+            );
+            return res.rows;
+        } else {
+            return await dbSqlite.all(
+                `SELECT users.id, users.username, users.profile_pic 
+                 FROM blocks 
+                 JOIN users ON users.id = blocks.blocked_id 
+                 WHERE blocks.user_id = ?`,
+                [userId]
             );
         }
     }

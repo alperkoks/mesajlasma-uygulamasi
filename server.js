@@ -398,6 +398,23 @@ app.get('/api/friends/search', authenticateToken, async (req, res) => {
         if (!targetUser) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
         if (targetUser.id === currentUserId) return res.status(400).json({ message: 'Kendinizi arkadaş olarak ekleyemezsiniz.' });
 
+        // Engellenme durumlarını kontrol et
+        const isBlockedByTarget = await dbQueries.isUserBlockedBy(currentUserId, targetUser.id);
+        if (isBlockedByTarget) {
+            // Karşı taraf beni engellediyse gizlilik için "Kullanıcı bulunamadı" dönüyoruz
+            return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
+        }
+
+        const isBlockedByMe = await dbQueries.isUserBlockedBy(targetUser.id, currentUserId);
+        if (isBlockedByMe) {
+            return res.json({
+                id: targetUser.id,
+                username: targetUser.username,
+                profile_pic: targetUser.profile_pic,
+                friendshipStatus: 'blocked' // Benim tarafımdan engellenmiş
+            });
+        }
+
         // Arkadaşlık durumunu kontrol et
         const friendship = await dbQueries.checkFriendshipStatus(currentUserId, targetUser.id);
         
@@ -436,6 +453,11 @@ app.post('/api/friends/request', authenticateToken, async (req, res) => {
     try {
         const targetUser = await dbQueries.findUserById(friendId);
         if (!targetUser) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
+
+        const isBlocked = await dbQueries.isBlocked(currentUserId, friendId);
+        if (isBlocked) {
+            return res.status(400).json({ message: 'Bu kullanıcıyla bağlantı kurulamaz.' });
+        }
 
         const friendship = await dbQueries.checkFriendshipStatus(currentUserId, friendId);
         if (friendship) {
@@ -515,6 +537,99 @@ app.post('/api/friends/accept', authenticateToken, async (req, res) => {
     }
 });
 
+// 3.5 ARKADAŞLIKTAN ÇIKAR
+app.post('/api/friends/remove', authenticateToken, async (req, res) => {
+    const currentUserId = req.user.id;
+    const friendId = parseInt(req.body.friendId);
+
+    if (!friendId) return res.status(400).json({ message: 'Arkadaş ID zorunludur.' });
+
+    try {
+        await dbQueries.removeFriendship(currentUserId, friendId);
+
+        // Her iki tarafın açık sekmelerine arkadaşlıktan çıkarıldığı haberini uçur (listeler yenilensin)
+        const sockets1 = userSockets.get(currentUserId);
+        const sockets2 = userSockets.get(friendId);
+
+        if (sockets1 && sockets1.size > 0) {
+            sockets1.forEach(socketId => {
+                io.to(socketId).emit('friendship_removed', { friendId });
+            });
+        }
+        if (sockets2 && sockets2.size > 0) {
+            sockets2.forEach(socketId => {
+                io.to(socketId).emit('friendship_removed', { friendId: currentUserId });
+            });
+        }
+
+        res.json({ message: 'Arkadaşlıktan başarıyla çıkarıldı.' });
+    } catch (error) {
+        console.error('Arkadaşlıktan çıkarma hatası:', error);
+        res.status(500).json({ message: 'Arkadaşlıktan çıkarılırken hata oluştu.' });
+    }
+});
+
+// 3.6 KULLANICIYI ENGELLE
+app.post('/api/friends/block', authenticateToken, async (req, res) => {
+    const currentUserId = req.user.id;
+    const blockedId = parseInt(req.body.blockedId);
+
+    if (!blockedId) return res.status(400).json({ message: 'Engellenecek kullanıcı ID zorunludur.' });
+    if (blockedId === currentUserId) return res.status(400).json({ message: 'Kendinizi engelleyemezsiniz.' });
+
+    try {
+        await dbQueries.blockUser(currentUserId, blockedId);
+
+        // Arkadaş listelerinden birbirlerini sildirmek için socket duyurusu yap
+        const sockets1 = userSockets.get(currentUserId);
+        const sockets2 = userSockets.get(blockedId);
+
+        if (sockets1 && sockets1.size > 0) {
+            sockets1.forEach(socketId => {
+                io.to(socketId).emit('friendship_removed', { friendId: blockedId });
+            });
+        }
+        if (sockets2 && sockets2.size > 0) {
+            sockets2.forEach(socketId => {
+                io.to(socketId).emit('friendship_removed', { friendId: currentUserId });
+            });
+        }
+
+        res.json({ message: 'Kullanıcı başarıyla engellendi.' });
+    } catch (error) {
+        console.error('Engelleme hatası:', error);
+        res.status(500).json({ message: 'Kullanıcı engellenirken hata oluştu.' });
+    }
+});
+
+// 3.7 ENGELİ KALDIR
+app.post('/api/friends/unblock', authenticateToken, async (req, res) => {
+    const currentUserId = req.user.id;
+    const blockedId = parseInt(req.body.blockedId);
+
+    if (!blockedId) return res.status(400).json({ message: 'Engeli kaldırılacak kullanıcı ID zorunludur.' });
+
+    try {
+        await dbQueries.unblockUser(currentUserId, blockedId);
+        res.json({ message: 'Engel başarıyla kaldırıldı.' });
+    } catch (error) {
+        console.error('Engeli kaldırma hatası:', error);
+        res.status(500).json({ message: 'Engel kaldırılırken hata oluştu.' });
+    }
+});
+
+// 3.8 ENGELLENEN KULLANICILARI LİSTELE
+app.get('/api/friends/blocked', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const blockedUsers = await dbQueries.getBlockedUsers(userId);
+        res.json(blockedUsers);
+    } catch (error) {
+        console.error('Engelli listesi getirme hatası:', error);
+        res.status(500).json({ message: 'Engelli listesi getirilirken hata oluştu.' });
+    }
+});
+
 // 4. İKİ KULLANICI ARASINDAKİ MESAJ GEÇMİŞİ
 app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
     const senderId = req.user.id;
@@ -531,23 +646,33 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
 // 5. YENİ MESAJ GÖNDERME VE ANLIK İLETME
 app.post('/api/messages', authenticateToken, async (req, res) => {
     const senderId = req.user.id;
-    const { receiverId, message } = req.body;
+    const receiverId = parseInt(req.body.receiverId);
+    const { message } = req.body;
 
     if (!receiverId || !message) return res.status(400).json({ message: 'Alıcı ve mesaj içeriği zorunludur.' });
 
     try {
+        // Engelleme durumunu kontrol et
+        const isBlocked = await dbQueries.isBlocked(senderId, receiverId);
+        if (isBlocked) {
+            return res.status(403).json({ message: 'Bu kullanıcıyla aranızda engelleme bulunduğu için mesaj gönderilemez.' });
+        }
+
         // Mesajı veritabanına kaydet
-        const savedMessage = await dbQueries.saveMessage(senderId, parseInt(receiverId), message);
+        const savedMessage = await dbQueries.saveMessage(senderId, receiverId, message);
         
         // --- GERÇEK ZAMANLI SOKET İLETİMİ ---
-        // Alıcı çevrimiçi ise onun soketine mesajı anında fırlat
-        const receiverSocketId = userSockets.get(parseInt(receiverId));
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit('receive_message', savedMessage);
+        // Alıcı çevrimiçi ise onun tüm aktif sekmelerine mesajı anında fırlat
+        const receiverSockets = userSockets.get(receiverId);
+        if (receiverSockets && receiverSockets.size > 0) {
+            receiverSockets.forEach(socketId => {
+                io.to(socketId).emit('receive_message', savedMessage);
+            });
         }
 
         res.status(201).json(savedMessage);
     } catch (error) {
+        console.error('Mesaj gönderme hatası:', error);
         res.status(500).json({ message: 'Mesaj kaydedilirken hata oluştu.' });
     }
 });

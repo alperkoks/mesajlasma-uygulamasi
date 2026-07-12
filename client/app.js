@@ -24,6 +24,8 @@ const activeChatStatus = document.getElementById('active-chat-status');
 const messagesHistory = document.getElementById('messages-history');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
+const btnUnfriend = document.getElementById('btn-unfriend');
+const btnBlock = document.getElementById('btn-block');
 
 // ARKADAŞLIK SİSTEMİ ELEMENTLERİ
 const friendSearchForm = document.getElementById('friend-search-form');
@@ -184,6 +186,44 @@ logoutBtn.addEventListener('click', () => {
     showScreen('auth');
 });
 
+// Arkadaşlıktan Çıkarma Butonunu Dinle
+btnUnfriend.addEventListener('click', async () => {
+    if (!activeChatPartnerId) return;
+    const confirmRemove = confirm(`"${activeChatPartner}" adlı kullanıcıyı arkadaşlarınızdan çıkarmak istediğinize emin misiniz?`);
+    if (!confirmRemove) return;
+
+    try {
+        const res = await apiCall('/friends/remove', 'POST', { friendId: activeChatPartnerId });
+        alert(res.message);
+        activeChatPartner = null;
+        activeChatPartnerId = null;
+        chatActiveScreen.classList.add('hidden');
+        noChatSelectedScreen.classList.remove('hidden');
+        await loadUsers();
+    } catch (err) {
+        console.error('Arkadaşlıktan çıkarılamadı', err);
+    }
+});
+
+// Engelleme Butonunu Dinle
+btnBlock.addEventListener('click', async () => {
+    if (!activeChatPartnerId) return;
+    const confirmBlock = confirm(`"${activeChatPartner}" adlı kullanıcıyı engellemek istediğinize emin misiniz? Bu işlem arkadaşlığınızı sonlandıracak ve size mesaj atmasını engelleyecektir.`);
+    if (!confirmBlock) return;
+
+    try {
+        const res = await apiCall('/friends/block', 'POST', { blockedId: activeChatPartnerId });
+        alert(res.message);
+        activeChatPartner = null;
+        activeChatPartnerId = null;
+        chatActiveScreen.classList.add('hidden');
+        noChatSelectedScreen.classList.remove('hidden');
+        await loadUsers();
+    } catch (err) {
+        console.error('Kullanıcı engellenemedi', err);
+    }
+});
+
 // --- UYGULAMAYI BAŞLATMA VE VERİ ÇEKME ---
 
 async function initApp() {
@@ -256,6 +296,19 @@ async function initApp() {
             if (!searchResultBox.classList.contains('hidden') && friendSearchInput.value.trim() !== '') {
                 friendSearchForm.dispatchEvent(new Event('submit'));
             }
+        });
+
+        // ARKADAŞLIKTAN ÇIKARILDIĞINDA VEYA ENGELLENDİĞİNDE çalışan olay
+        socket.on('friendship_removed', async (data) => {
+            console.log('Arkadaşlık ilişkisi silindi:', data);
+            if (activeChatPartnerId === data.friendId) {
+                alert('Bu kullanıcıyla olan arkadaşlık ilişkiniz sonlandırıldı.');
+                activeChatPartner = null;
+                activeChatPartnerId = null;
+                chatActiveScreen.classList.add('hidden');
+                noChatSelectedScreen.classList.remove('hidden');
+            }
+            await loadUsers();
         });
         
     } catch (err) {
@@ -400,6 +453,8 @@ function renderSearchResult(user) {
         actionBtnHTML = `<button class="btn-add-friend btn-accept" id="btn-action-accept" data-id="${user.id}">Onayla</button>`;
     } else if (user.friendshipStatus === 'friends') {
         actionBtnHTML = `<span class="search-result-status-text" style="color: #10B981; font-weight: bold;">Arkadaşsınız</span>`;
+    } else if (user.friendshipStatus === 'blocked') {
+        actionBtnHTML = `<button class="btn-add-friend" style="background-color: #EF4444;" id="btn-action-unblock" data-id="${user.id}">Engeli Kaldır</button>`;
     }
 
     searchResultBox.innerHTML = `
@@ -441,6 +496,20 @@ function renderSearchResult(user) {
                 await loadUsers();
             } catch (err) {
                 console.error('İstek onaylanamadı', err);
+            }
+        });
+    }
+
+    const unblockBtn = document.getElementById('btn-action-unblock');
+    if (unblockBtn) {
+        unblockBtn.addEventListener('click', async () => {
+            try {
+                const res = await apiCall('/friends/unblock', 'POST', { blockedId: user.id });
+                alert(res.message);
+                user.friendshipStatus = 'none';
+                renderSearchResult(user);
+            } catch (err) {
+                console.error('Engel kaldırılamadı', err);
             }
         });
     }
