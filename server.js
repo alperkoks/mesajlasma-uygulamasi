@@ -19,6 +19,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client')));
 
+// Test rotası (Sunucuya ulaşıp ulaşamadığımızı anlamak için)
+app.get('/api/test', (req, res) => {
+    res.send('Sunucu basariyla calisiyor!');
+});
+
+// Ana sayfa isteği geldiğinde doğrudan index.html dosyasını gönder
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'client', 'index.html'));
+});
+
 // Çevrimiçi kullanıcıların ID'lerini tutan küme
 const onlineUsers = new Set();
 // Hangi kullanıcının (ID) hangi sokette (Socket ID) olduğunu tutan harita
