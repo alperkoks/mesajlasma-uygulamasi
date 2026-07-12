@@ -48,7 +48,7 @@ async function sendEmailViaBrevo(toEmail, toName, subject, htmlContent) {
             body: JSON.stringify({
                 sender: {
                     name: "Hızlı Mesajlaşma",
-                    email: "noreply@mesajlasma-uygulamasi.com"
+                    email: process.env.SMTP_USER || "noreply@mesajlasma-uygulamasi.com"
                 },
                 to: [
                     {
