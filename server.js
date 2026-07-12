@@ -16,19 +16,63 @@ const JWT_SECRET = 'mesajlasma-gizli-anahtar-12345';
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
-// E-posta SMTP Taşıyıcısı Kurulumu (Brevo için)
-let transporter = null;
-if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-    transporter = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com',
-        port: 587,
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-        }
-    });
+// E-posta Gönderme Sistemi Kurulumu (Brevo API v3)
+// Render.com gibi bulut sunucuları SMTP portlarını (587/465) engellediği için e-postaları doğrudan HTTPS (REST API) üzerinden gönderiyoruz.
+const hasBrevoKey = !!process.env.SMTP_PASS;
+if (hasBrevoKey) {
+    console.log('✅ Brevo E-posta REST API anahtarı yüklendi, gerçek mailler gönderilecek.');
 } else {
-    console.log('⚠️ E-posta SMTP bilgileri eksik (SMTP_USER/SMTP_PASS). E-postalar konsola yazdırılacak.');
+    console.log('⚠️ E-posta API anahtarı eksik (SMTP_PASS). E-postalar konsola yazdırılacak (Simülasyon Modu).');
+}
+
+// Brevo API üzerinden e-posta gönderen genel yardımcı fonksiyon
+async function sendEmailViaBrevo(toEmail, toName, subject, htmlContent) {
+    if (!hasBrevoKey) {
+        console.log(`\n==================================================`);
+        console.log(`📧 [E-POSTA SİMÜLASYONU]`);
+        console.log(`Kime: ${toEmail} (${toName})`);
+        console.log(`Konu: ${subject}`);
+        console.log(`İçerik: (Simülasyon aktif, mail gönderilmedi)`);
+        console.log(`==================================================\n`);
+        return true;
+    }
+
+    try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': process.env.SMTP_PASS, // Brevo SMTP şifresi aynı zamanda geçerli bir API Key'dir.
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: {
+                    name: "Hızlı Mesajlaşma",
+                    email: "noreply@mesajlasma-uygulamasi.com"
+                },
+                to: [
+                    {
+                        email: toEmail,
+                        name: toName
+                    }
+                ],
+                subject: subject,
+                htmlContent: htmlContent
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            console.log(`📧 E-posta başarıyla gönderildi: ${toEmail}`);
+            return true;
+        } else {
+            console.error('❌ Brevo API Gönderim Hatası:', data);
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ E-posta gönderim sırasında HTTP hatası:', error);
+        return false;
+    }
 }
 
 // Hesap Doğrulama E-postası Gönder
@@ -36,39 +80,29 @@ async function sendVerificationEmail(email, username, token) {
     const domain = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
     const verifyLink = `${domain}/api/auth/verify?token=${token}`;
 
-    console.log(`\n==================================================`);
-    console.log(`📧 [E-POSTA SİMÜLASYONU]`);
-    console.log(`Kime: ${email}`);
-    console.log(`Konu: Hesap Doğrulama - Hızlı Mesajlaşma`);
-    console.log(`Doğrulama Linki: ${verifyLink}`);
-    console.log(`==================================================\n`);
+    const htmlContent = `
+        <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 500px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #4F46E5; text-align: center;">💬 Hızlı Mesajlaşma</h2>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+            <p>Merhaba <strong>${username}</strong>,</p>
+            <p>Hızlı Mesajlaşma uygulamasına kayıt olduğunuz için teşekkürler!</p>
+            <p>Hesabınızı doğrulamak ve hemen sohbet etmeye başlamak için lütfen aşağıdaki butona tıklayın:</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="${verifyLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Hesabımı Doğrula</a>
+            </div>
+            <p style="font-size: 13px; color: #6B7280;">Eğer butona tıklayamıyorsanız, aşağıdaki linki kopyalayıp tarayıcınızın adres çubuğuna yapıştırabilirsiniz:</p>
+            <p style="font-size: 13px; word-break: break-all;"><a href="${verifyLink}" style="color: #4F46E5;">${verifyLink}</a></p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+            <p style="font-size: 11px; color: #9CA3AF; text-align: center;">Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</p>
+        </div>
+    `;
 
-    if (transporter) {
-        try {
-            await transporter.sendMail({
-                from: '"Hızlı Mesajlaşma" <noreply@mesajlasma-uygulamasi.com>',
-                to: email,
-                subject: 'Hesap Doğrulama - Hızlı Mesajlaşma',
-                html: `
-                    <div style="font-family: sans-serif; padding: 20px; color: #333;">
-                        <h2>Merhaba ${username},</h2>
-                        <p>Hızlı Mesajlaşma uygulamasına kayıt olduğunuz için teşekkürler!</p>
-                        <p>Hesabınızı doğrulamak ve kullanmaya başlamak için lütfen aşağıdaki butona tıklayın:</p>
-                        <p style="margin: 30px 0;">
-                            <a href="${verifyLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Hesabımı Doğrula</a>
-                        </p>
-                        <p>Eğer butona tıklayamıyorsanız, şu linki tarayıcınıza kopyalayabilirsiniz:</p>
-                        <p><a href="${verifyLink}">${verifyLink}</a></p>
-                        <hr style="border: none; border-top: 1px solid #eee; margin-top: 30px;" />
-                        <p style="font-size: 12px; color: #777;">Bu e-posta otomatik olarak gönderilmiştir. Lütfen cevaplamayınız.</p>
-                    </div>
-                `
-            });
-            console.log(`Doğrulama e-postası başarıyla gönderildi: ${email}`);
-        } catch (error) {
-            console.error('E-posta gönderim hatası:', error);
-        }
+    // Simülasyon modunda konsola da yazdır (kolaylık olsun)
+    if (!hasBrevoKey) {
+        console.log(`🔗 Doğrulama Linki: ${verifyLink}`);
     }
+
+    await sendEmailViaBrevo(email, username, 'Hesap Doğrulama - Hızlı Mesajlaşma', htmlContent);
 }
 
 // Şifre Sıfırlama E-postası Gönder
@@ -76,39 +110,29 @@ async function sendResetPasswordEmail(email, username, token) {
     const domain = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
     const resetLink = `${domain}/reset-password.html?token=${token}`;
 
-    console.log(`\n==================================================`);
-    console.log(`📧 [E-POSTA SİMÜLASYONU]`);
-    console.log(`Kime: ${email}`);
-    console.log(`Konu: Şifre Sıfırlama Talebi - Hızlı Mesajlaşma`);
-    console.log(`Sıfırlama Linki: ${resetLink}`);
-    console.log(`==================================================\n`);
+    const htmlContent = `
+        <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 500px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">
+            <h2 style="color: #4F46E5; text-align: center;">💬 Hızlı Mesajlaşma</h2>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+            <p>Merhaba <strong>${username}</strong>,</p>
+            <p>Hesabınız için şifre sıfırlama talebinde bulundunuz.</p>
+            <p>Şifrenizi sıfırlamak için lütfen aşağıdaki butona tıklayın (Bu link 1 saat boyunca geçerlidir):</p>
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetLink}" style="background-color: #EF4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Şifremi Sıfırla</a>
+            </div>
+            <p style="font-size: 13px; color: #6B7280;">Eğer butona tıklayamıyorsanız, aşağıdaki linki kopyalayıp tarayıcınızın adres çubuğuna yapıştırabilirsiniz:</p>
+            <p style="font-size: 13px; word-break: break-all;"><a href="${resetLink}" style="color: #4F46E5;">${resetLink}</a></p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+            <p style="font-size: 11px; color: #9CA3AF; text-align: center;">Bu işlemi siz gerçekleştirmediyseniz lütfen bu e-postayı dikkate almayınız.</p>
+        </div>
+    `;
 
-    if (transporter) {
-        try {
-            await transporter.sendMail({
-                from: '"Hızlı Mesajlaşma" <noreply@mesajlasma-uygulamasi.com>',
-                to: email,
-                subject: 'Şifre Sıfırlama Talebi - Hızlı Mesajlaşma',
-                html: `
-                    <div style="font-family: sans-serif; padding: 20px; color: #333;">
-                        <h2>Merhaba ${username},</h2>
-                        <p>Hesabınız için şifre sıfırlama talebinde bulundunuz.</p>
-                        <p>Şifrenizi sıfırlamak için lütfen aşağıdaki butona tıklayın (bu link 1 saat boyunca geçerlidir):</p>
-                        <p style="margin: 30px 0;">
-                            <a href="${resetLink}" style="background-color: #EF4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Şifremi Sıfırla</a>
-                        </p>
-                        <p>Eğer butona tıklayamıyorsanız, şu linki tarayıcınıza kopyalayabilirsiniz:</p>
-                        <p><a href="${resetLink}">${resetLink}</a></p>
-                        <hr style="border: none; border-top: 1px solid #eee; margin-top: 30px;" />
-                        <p style="font-size: 12px; color: #777;">Bu işlemi siz yapmadıysanız lütfen bu e-postayı dikkate almayınız.</p>
-                    </div>
-                `
-            });
-            console.log(`Şifre sıfırlama e-postası başarıyla gönderildi: ${email}`);
-        } catch (error) {
-            console.error('Şifre sıfırlama e-postası gönderim hatası:', error);
-        }
+    // Simülasyon modunda konsola da yazdır (kolaylık olsun)
+    if (!hasBrevoKey) {
+        console.log(`🔗 Şifre Sıfırlama Linki: ${resetLink}`);
     }
+
+    await sendEmailViaBrevo(email, username, 'Şifre Sıfırlama Talebi - Hızlı Mesajlaşma', htmlContent);
 }
 
 // Ara Katmanlar
