@@ -11,7 +11,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server); // Soket sunucusunu başlattık
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // Buluttaki dinamik portu veya lokalde 3000'i kullan
 const JWT_SECRET = 'mesajlasma-gizli-anahtar-12345';
 
 // Ara Katmanlar
