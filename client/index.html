@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hızlı Mesajlaşma</title>
+    <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- 1. EKRAN: GİRİŞ VE KAYIT EKRANI -->
+    <div id="auth-screen" class="screen">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h2>Hoş Geldiniz</h2>
+                <p>Mesajlaşmaya başlamak için giriş yapın veya kayıt olun.</p>
+            </div>
+            
+            <!-- Giriş Formu -->
+            <form id="login-form" class="auth-form">
+                <h3>Giriş Yap</h3>
+                <div class="input-group">
+                    <label for="login-username">Kullanıcı Adı</label>
+                    <input type="text" id="login-username" required placeholder="kullanıcıadınız">
+                </div>
+                <div class="input-group">
+                    <label for="login-password">Şifre</label>
+                    <input type="password" id="login-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn btn-primary">Giriş Yap</button>
+                <p class="auth-toggle">Hesabınız yok mu? <a href="#" id="show-register">Kayıt Ol</a></p>
+            </form>
+
+            <!-- Kayıt Formu (Varsayılan olarak gizli) -->
+            <form id="register-form" class="auth-form hidden">
+                <h3>Kayıt Ol</h3>
+                <div class="input-group">
+                    <label for="register-username">Kullanıcı Adı</label>
+                    <input type="text" id="register-username" required placeholder="Yeni kullanıcı adı">
+                </div>
+                <div class="input-group">
+                    <label for="register-password">Şifre</label>
+                    <input type="password" id="register-password" required placeholder="Güçlü bir şifre">
+                </div>
+                <button type="submit" class="btn btn-primary">Kayıt Ol</button>
+                <p class="auth-toggle">Zaten üye misiniz? <a href="#" id="show-login">Giriş Yap</a></p>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. EKRAN: MESAJLAŞMA (SOHBET) EKRANI (Varsayılan olarak gizli) -->
+    <div id="chat-screen" class="screen hidden">
+        <div class="chat-container">
+            
+            <!-- SOL PANEL: Kullanıcılar ve Profil -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <div class="user-profile">
+                        <div class="avatar" id="my-avatar">U</div>
+                        <div class="user-info">
+                            <span class="user-name" id="my-username">Kullanıcı Adı</span>
+                            <span class="user-status status-online">Çevrimiçi</span>
+                        </div>
+                    </div>
+                    <button id="logout-btn" class="btn-icon" title="Çıkış Yap">
+                        <!-- Çıkış yap ikonu için basit bir sembol -->
+                        🚪
+                    </button>
+                </div>
+                
+                <!-- Kullanıcı Listesi Alanı -->
+                <div class="users-section">
+                    <h4>Kişiler</h4>
+                    <ul id="users-list" class="users-list">
+                        <!-- Burası JavaScript ile dinamik olarak dolacak -->
+                        <li class="user-item placeholder">Yükleniyor...</li>
+                    </ul>
+                </div>
+            </aside>
+
+            <!-- SAĞ PANEL: Sohbet Alanı -->
+            <main class="chat-area">
+                <!-- Sohbet Seçilmemişse Gösterilecek Ekran -->
+                <div id="no-chat-selected" class="chat-state-screen">
+                    <div class="welcome-box">
+                        <div class="welcome-icon">💬</div>
+                        <h3>Sohbete Başla!</h3>
+                        <p>Mesajlaşmak için sol taraftaki menüden bir kullanıcı seçin.</p>
+                    </div>
+                </div>
+
+                <!-- Sohbet Seçildiğinde Gösterilecek Ekran -->
+                <div id="chat-active" class="chat-state-screen hidden">
+                    <!-- Sohbet Başlığı -->
+                    <header class="chat-header">
+                        <div class="active-user-info">
+                            <div class="avatar" id="active-chat-avatar">A</div>
+                            <div>
+                                <span class="active-chat-name" id="active-chat-name">Ahmet</span>
+                                <span class="active-chat-status" id="active-chat-status">çevrimiçi</span>
+                            </div>
+                        </div>
+                    </header>
+
+                    <!-- Mesaj Geçmişi -->
+                    <div class="messages-history" id="messages-history">
+                        <!-- Mesajlar buraya eklenecek -->
+                    </div>
+
+                    <!-- Mesaj Gönderme Kutusu -->
+                    <footer class="chat-footer">
+                        <form id="message-form">
+                            <input type="text" id="message-input" autocomplete="off" placeholder="Mesajınızı yazın..." required>
+                            <button type="submit" class="btn btn-send">Gönder</button>
+                        </form>
+                    </footer>
+                </div>
+            </main>
+
+        </div>
+    </div>
+
+    <!-- JavaScript Kodlarımızı bağlıyoruz -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
