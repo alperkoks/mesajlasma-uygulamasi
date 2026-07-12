@@ -31,8 +31,8 @@ let users = [];
 let messages = [];
 let socket = null; // Soket bağlantı nesnemiz
 
-// API Sunucu Adresi
-const API_URL = 'http://localhost:3000/api';
+// API Sunucu Adresi (Hem lokalde hem bulutta otomatik çalışması için bağıl yol yapıyoruz)
+const API_URL = '/api';
 
 // --- ARAYÜZ GEÇİŞLERİ ---
 
