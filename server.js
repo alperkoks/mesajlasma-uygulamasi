@@ -193,8 +193,11 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
     const userId = socket.user.id;
     
-    // Kullanıcıyı çevrimiçi listelerine ekle
-    userSockets.set(userId, socket.id);
+    // Kullanıcıyı çevrimiçi listelerine ekle (Çoklu sekme/sayfa yenileme desteği için Set kullanıyoruz)
+    if (!userSockets.has(userId)) {
+        userSockets.set(userId, new Set());
+    }
+    userSockets.get(userId).add(socket.id);
     onlineUsers.add(userId);
     console.log(`🔌 Soket Bağlantısı: ${socket.user.username} (ID: ${userId}) çevrimiçi oldu.`);
 
@@ -203,12 +206,19 @@ io.on('connection', (socket) => {
 
     // Bağlantı koptuğunda (Sayfa kapatıldığında veya çıkış yapıldığında)
     socket.on('disconnect', () => {
-        userSockets.delete(userId);
-        onlineUsers.delete(userId);
-        console.log(`🔌 Soket Bağlantısı Koptu: ${socket.user.username} (ID: ${userId}) çevrimdışı oldu.`);
-
-        // Diğer tüm kullanıcılara bu kişinin çevrimdışı olduğunu duyur
-        io.emit('user_status_change', { userId: userId, isOnline: false });
+        const sockets = userSockets.get(userId);
+        if (sockets) {
+            sockets.delete(socket.id);
+            if (sockets.size === 0) {
+                userSockets.delete(userId);
+                onlineUsers.delete(userId);
+                console.log(`🔌 Soket Bağlantısı Koptu: ${socket.user.username} (ID: ${userId}) tamamen çevrimdışı oldu.`);
+                // Diğer tüm kullanıcılara bu kişinin çevrimdışı olduğunu duyur
+                io.emit('user_status_change', { userId: userId, isOnline: false });
+            } else {
+                console.log(`🔌 Soket Bağlantısı Koptu: ${socket.user.username} (ID: ${userId}) bir sekmesi kapatıldı, diğerleri hala açık.`);
+            }
+        }
     });
 });
 
@@ -419,7 +429,7 @@ app.get('/api/friends/search', authenticateToken, async (req, res) => {
 // 3.2 ARKADAŞLIK İSTEĞİ GÖNDERME
 app.post('/api/friends/request', authenticateToken, async (req, res) => {
     const currentUserId = req.user.id;
-    const { friendId } = req.body;
+    const friendId = parseInt(req.body.friendId);
 
     if (!friendId) return res.status(400).json({ message: 'Arkadaş ID zorunludur.' });
 
@@ -438,12 +448,14 @@ app.post('/api/friends/request', authenticateToken, async (req, res) => {
 
         await dbQueries.sendFriendRequest(currentUserId, friendId);
 
-        // Alıcı çevrimiçiyse anlık soket bildirimi at
-        const receiverSocketId = userSockets.get(friendId);
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit('friend_request_received', {
-                senderId: currentUserId,
-                senderUsername: req.user.username
+        // Alıcının tüm aktif sekmelerine anlık soket bildirimi at
+        const receiverSockets = userSockets.get(friendId);
+        if (receiverSockets && receiverSockets.size > 0) {
+            receiverSockets.forEach(socketId => {
+                io.to(socketId).emit('friend_request_received', {
+                    senderId: currentUserId,
+                    senderUsername: req.user.username
+                });
             });
         }
 
@@ -469,7 +481,7 @@ app.get('/api/friends/requests', authenticateToken, async (req, res) => {
 // 3.4 ARKADAŞLIK İSTEĞİNİ KABUL ETME
 app.post('/api/friends/accept', authenticateToken, async (req, res) => {
     const currentUserId = req.user.id;
-    const { friendId } = req.body;
+    const friendId = parseInt(req.body.friendId);
 
     if (!friendId) return res.status(400).json({ message: 'Arkadaş ID zorunludur.' });
 
@@ -481,12 +493,20 @@ app.post('/api/friends/accept', authenticateToken, async (req, res) => {
 
         await dbQueries.acceptFriendRequest(currentUserId, friendId);
 
-        // Her iki tarafın soketlerine anlık arkadaş olunduğuna dair haber ver (sidebar yenilensin)
-        const socketId1 = userSockets.get(currentUserId);
-        const socketId2 = userSockets.get(friendId);
+        // Her iki tarafın tüm açık sekmelerine anlık arkadaş olunduğuna dair haber ver (sidebar yenilensin)
+        const sockets1 = userSockets.get(currentUserId);
+        const sockets2 = userSockets.get(friendId);
 
-        if (socketId1) io.to(socketId1).emit('friend_request_accepted', { friendId });
-        if (socketId2) io.to(socketId2).emit('friend_request_accepted', { friendId: currentUserId });
+        if (sockets1 && sockets1.size > 0) {
+            sockets1.forEach(socketId => {
+                io.to(socketId).emit('friend_request_accepted', { friendId });
+            });
+        }
+        if (sockets2 && sockets2.size > 0) {
+            sockets2.forEach(socketId => {
+                io.to(socketId).emit('friend_request_accepted', { friendId: currentUserId });
+            });
+        }
 
         res.json({ message: 'Arkadaşlık isteği kabul edildi!' });
     } catch (error) {
