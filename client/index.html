@@ -86,12 +86,31 @@
                     </button>
                 </div>
                 
-                <!-- Kullanıcı Listesi Alanı -->
+                <!-- Arkadaş Arama/Ekleme Bölümü -->
+                <div class="friend-search-section">
+                    <form id="friend-search-form" class="friend-search-form">
+                        <input type="text" id="friend-search-input" placeholder="Kullanıcı adı ara..." required>
+                        <button type="submit" class="btn-search-icon" title="Arkadaş Ara">🔍</button>
+                    </form>
+                    <div id="search-result-box" class="search-result-box hidden">
+                        <!-- Arama sonucu dinamik olarak eklenecek -->
+                    </div>
+                </div>
+
+                <!-- Bekleyen Arkadaşlık İstekleri Bölümü -->
+                <div id="pending-requests-section" class="pending-requests-section hidden">
+                    <h4 class="section-title">Bekleyen İstekler <span id="pending-count" class="badge">0</span></h4>
+                    <ul id="pending-requests-list" class="pending-requests-list">
+                        <!-- Gelen istekler buraya listelenecek -->
+                    </ul>
+                </div>
+                
+                <!-- Kullanıcı Listesi Alanı (Sadece Arkadaşlar) -->
                 <div class="users-section">
-                    <h4>Kişiler</h4>
+                    <h4>Arkadaşlarım</h4>
                     <ul id="users-list" class="users-list">
                         <!-- Burası JavaScript ile dinamik olarak dolacak -->
-                        <li class="user-item placeholder">Yükleniyor...</li>
+                        <li class="user-item placeholder">Henüz arkadaş eklemediniz.</li>
                     </ul>
                 </div>
             </aside>

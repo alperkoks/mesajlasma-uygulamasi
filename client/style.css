@@ -550,3 +550,177 @@ body {
         display: none; /* Mobilde ilk açılışta sadece sidebar görünecek, sohbet seçince ekran değişecek. Javascript ile bunu geliştirebiliriz. */
     }
 }
+
+/* --- ARKADAŞLIK SİSTEMİ STİLLERİ --- */
+
+/* Arkadaş Arama Bölümü */
+.friend-search-section {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.friend-search-form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.friend-search-form input {
+    flex: 1;
+    padding: 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.friend-search-form input:focus {
+    border-color: var(--primary-color);
+}
+
+.btn-search-icon {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.5rem;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+}
+
+.btn-search-icon:hover {
+    background-color: #f3f4f6;
+}
+
+/* Arama Sonuç Kutusu */
+.search-result-box {
+    margin-top: 0.75rem;
+    background-color: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.search-result-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.search-result-status-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Bekleyen İstekler Bölümü */
+.pending-requests-section {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    background-color: #f9fafb;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.pending-requests-section .section-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.badge {
+    background-color: #EF4444;
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 10px;
+    font-weight: bold;
+}
+
+.pending-requests-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.pending-request-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: var(--bg-white);
+    padding: 0.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+
+.pending-request-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pending-request-actions {
+    display: flex;
+    gap: 0.25rem;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-accept {
+    background-color: #10B981;
+    color: white;
+}
+
+.btn-accept:hover {
+    background-color: #059669;
+}
+
+.btn-add-friend {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background-color: var(--primary-color);
+    color: white;
+    transition: background-color 0.2s;
+}
+
+.btn-add-friend:hover {
+    background-color: var(--primary-hover);
+}
+
+.btn-add-friend:disabled {
+    background-color: #e5e7eb;
+    color: #9ca3af;
+    cursor: not-allowed;
+}

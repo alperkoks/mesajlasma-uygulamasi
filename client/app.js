@@ -25,6 +25,14 @@ const messagesHistory = document.getElementById('messages-history');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
 
+// ARKADAŞLIK SİSTEMİ ELEMENTLERİ
+const friendSearchForm = document.getElementById('friend-search-form');
+const friendSearchInput = document.getElementById('friend-search-input');
+const searchResultBox = document.getElementById('search-result-box');
+const pendingRequestsSection = document.getElementById('pending-requests-section');
+const pendingCount = document.getElementById('pending-count');
+const pendingRequestsList = document.getElementById('pending-requests-list');
+
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
 let token = localStorage.getItem('token') || null;
@@ -191,6 +199,7 @@ async function initApp() {
 
         showScreen('chat');
         await loadUsers();
+        await loadPendingRequests();
         
         // --- SOCKET.IO BAĞLANTISINI KURMA ---
         // Sayfa her yüklendiğinde ve giriş yapıldığında soket hattını açıyoruz.
@@ -232,6 +241,22 @@ async function initApp() {
                 loadUsers();
             }
         });
+
+        // ARKADAŞLIK İSTEĞİ GELDİĞİNDE çalışan olay
+        socket.on('friend_request_received', async (data) => {
+            console.log('Yeni arkadaşlık isteği alındı:', data);
+            await loadPendingRequests();
+        });
+
+        // ARKADAŞLIK İSTEĞİ KABUL EDİLDİĞİNDE çalışan olay
+        socket.on('friend_request_accepted', async (data) => {
+            console.log('Arkadaşlık isteği kabul edildi:', data);
+            await loadUsers();
+            // Arama sonucunu da yenilemek için eğer arama kutusu açıksa
+            if (!searchResultBox.classList.contains('hidden') && friendSearchInput.value.trim() !== '') {
+                friendSearchForm.dispatchEvent(new Event('submit'));
+            }
+        });
         
     } catch (err) {
         logoutBtn.click();
@@ -250,10 +275,11 @@ async function loadUsers() {
 
 function renderUsersList() {
     usersList.innerHTML = '';
+    // Arayüzde sadece kendimiz dışındaki kişileri listeliyoruz (zaten API sadece arkadaşlarımızı dönüyor)
     const otherUsers = users.filter(user => user.username !== currentUser.username);
     
     if (otherUsers.length === 0) {
-        usersList.innerHTML = '<li class="user-item placeholder">Henüz başka kayıtlı kullanıcı yok.</li>';
+        usersList.innerHTML = '<li class="user-item placeholder">Henüz arkadaş eklemediniz. Yukarıdan aratıp ekleyebilirsiniz!</li>';
         return;
     }
 
@@ -280,6 +306,144 @@ function renderUsersList() {
         li.addEventListener('click', () => selectUserChat(user));
         usersList.appendChild(li);
     });
+}
+
+// --- ARKADAŞLIK SİSTEMİ FONKSİYONLARI ---
+
+// Bekleyen İstekleri Sunucudan Çek
+async function loadPendingRequests() {
+    try {
+        const requests = await apiCall('/friends/requests');
+        renderPendingRequests(requests);
+    } catch (err) {
+        console.error('Bekleyen istekler yüklenemedi', err);
+    }
+}
+
+// Bekleyen İstekleri Arayüze Çiz
+function renderPendingRequests(requests) {
+    if (requests.length === 0) {
+        pendingRequestsSection.classList.add('hidden');
+        return;
+    }
+
+    pendingRequestsSection.classList.remove('hidden');
+    pendingCount.textContent = requests.length;
+    pendingRequestsList.innerHTML = '';
+
+    requests.forEach(req => {
+        const li = document.createElement('li');
+        li.className = 'pending-request-item';
+        
+        const initial = req.username.substring(0, 2).toUpperCase();
+        
+        li.innerHTML = `
+            <div class="pending-request-info">
+                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.8rem; min-width: 32px;">${initial}</div>
+                <span class="username" style="font-weight: 500;">${req.username}</span>
+            </div>
+            <div class="pending-request-actions">
+                <button class="btn-small btn-accept" data-id="${req.user_id}">Kabul Et</button>
+            </div>
+        `;
+
+        li.querySelector('.btn-accept').addEventListener('click', async (e) => {
+            const friendId = parseInt(e.target.getAttribute('data-id'));
+            try {
+                const res = await apiCall('/friends/accept', 'POST', { friendId });
+                alert(res.message);
+                await loadPendingRequests();
+                await loadUsers();
+            } catch (err) {
+                console.error('İstek kabul edilemedi', err);
+            }
+        });
+
+        pendingRequestsList.appendChild(li);
+    });
+}
+
+// Arkadaş Arama Formunu Dinle
+friendSearchForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = friendSearchInput.value.trim();
+    if (!username) return;
+
+    try {
+        const result = await apiCall(`/friends/search?username=${username}`);
+        searchResultBox.classList.remove('hidden');
+        renderSearchResult(result);
+    } catch (err) {
+        searchResultBox.classList.remove('hidden');
+        searchResultBox.innerHTML = `<div style="font-size: 0.85rem; color: #EF4444; text-align: center;">Kullanıcı bulunamadı.</div>`;
+    }
+});
+
+// Arama Girişi Temizlendiğinde Sonuçları Gizle
+friendSearchInput.addEventListener('input', () => {
+    if (friendSearchInput.value.trim() === '') {
+        searchResultBox.classList.add('hidden');
+        searchResultBox.innerHTML = '';
+    }
+});
+
+// Arama Sonucunu Çiz
+function renderSearchResult(user) {
+    const initial = user.username.substring(0, 2).toUpperCase();
+    
+    let actionBtnHTML = '';
+    if (user.friendshipStatus === 'none') {
+        actionBtnHTML = `<button class="btn-add-friend" id="btn-action-add" data-id="${user.id}">Ekle</button>`;
+    } else if (user.friendshipStatus === 'pending_sent') {
+        actionBtnHTML = `<span class="search-result-status-text">İstek Gönderildi</span>`;
+    } else if (user.friendshipStatus === 'pending_received') {
+        actionBtnHTML = `<button class="btn-add-friend btn-accept" id="btn-action-accept" data-id="${user.id}">Onayla</button>`;
+    } else if (user.friendshipStatus === 'friends') {
+        actionBtnHTML = `<span class="search-result-status-text" style="color: #10B981; font-weight: bold;">Arkadaşsınız</span>`;
+    }
+
+    searchResultBox.innerHTML = `
+        <div class="search-result-item">
+            <div class="search-result-info">
+                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.8rem; min-width: 32px;">${initial}</div>
+                <span style="font-weight: 500;">${user.username}</span>
+            </div>
+            <div class="search-result-action">
+                ${actionBtnHTML}
+            </div>
+        </div>
+    `;
+
+    // Arama buton dinleyicilerini bağla
+    const addBtn = document.getElementById('btn-action-add');
+    if (addBtn) {
+        addBtn.addEventListener('click', async () => {
+            try {
+                const res = await apiCall('/friends/request', 'POST', { friendId: user.id });
+                alert(res.message);
+                user.friendshipStatus = 'pending_sent';
+                renderSearchResult(user);
+            } catch (err) {
+                console.error('İstek gönderilemedi', err);
+            }
+        });
+    }
+
+    const acceptBtn = document.getElementById('btn-action-accept');
+    if (acceptBtn) {
+        acceptBtn.addEventListener('click', async () => {
+            try {
+                const res = await apiCall('/friends/accept', 'POST', { friendId: user.id });
+                alert(res.message);
+                user.friendshipStatus = 'friends';
+                renderSearchResult(user);
+                await loadPendingRequests();
+                await loadUsers();
+            } catch (err) {
+                console.error('İstek onaylanamadı', err);
+            }
+        });
+    }
 }
 
 async function selectUserChat(user) {

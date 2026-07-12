@@ -358,18 +358,140 @@ app.post('/api/auth/login', async (req, res) => {
     }
 });
 
-// 3. TÜM KULLANICILARI LİSTELEME
+// 3. SADECE ONAYLI ARKADAŞLARI LİSTELEME
 app.get('/api/users', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
     try {
-        const users = await dbQueries.getAllUsers();
-        const usersWithStatus = users.map(user => ({
-            id: user.id,
-            username: user.username,
-            isOnline: onlineUsers.has(user.id) // Kümede bu ID varsa true döner
+        const friends = await dbQueries.getFriends(userId);
+        const friendsWithStatus = friends.map(friend => ({
+            id: friend.id,
+            username: friend.username,
+            profile_pic: friend.profile_pic,
+            isOnline: onlineUsers.has(friend.id) // Kümede bu ID varsa çevrimiçi
         }));
-        res.json(usersWithStatus);
+        res.json(friendsWithStatus);
     } catch (error) {
-        res.status(500).json({ message: 'Kullanıcılar getirilirken hata oluştu.' });
+        console.error('Arkadaş listesi getirme hatası:', error);
+        res.status(500).json({ message: 'Arkadaşlar listelenirken hata oluştu.' });
+    }
+});
+
+// 3.1 KULLANICI ARAMA VE ARKADAŞLIK DURUMUNU SORGULAMA
+app.get('/api/friends/search', authenticateToken, async (req, res) => {
+    const currentUserId = req.user.id;
+    const { username } = req.query;
+
+    if (!username) return res.status(400).json({ message: 'Kullanıcı adı girilmelidir.' });
+
+    try {
+        const targetUser = await dbQueries.findUserByUsername(username);
+        if (!targetUser) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
+        if (targetUser.id === currentUserId) return res.status(400).json({ message: 'Kendinizi arkadaş olarak ekleyemezsiniz.' });
+
+        // Arkadaşlık durumunu kontrol et
+        const friendship = await dbQueries.checkFriendshipStatus(currentUserId, targetUser.id);
+        
+        let status = 'none'; // hiçbir ilişki yok
+        if (friendship) {
+            if (friendship.status === 'accepted') {
+                status = 'friends';
+            } else if (friendship.status === 'pending') {
+                if (friendship.user_id === currentUserId) {
+                    status = 'pending_sent'; // isteği ben yolladım
+                } else {
+                    status = 'pending_received'; // isteği o yolladı, benden onay bekliyor
+                }
+            }
+        }
+
+        res.json({
+            id: targetUser.id,
+            username: targetUser.username,
+            profile_pic: targetUser.profile_pic,
+            friendshipStatus: status
+        });
+    } catch (error) {
+        console.error('Kullanıcı arama hatası:', error);
+        res.status(500).json({ message: 'Arama sırasında hata oluştu.' });
+    }
+});
+
+// 3.2 ARKADAŞLIK İSTEĞİ GÖNDERME
+app.post('/api/friends/request', authenticateToken, async (req, res) => {
+    const currentUserId = req.user.id;
+    const { friendId } = req.body;
+
+    if (!friendId) return res.status(400).json({ message: 'Arkadaş ID zorunludur.' });
+
+    try {
+        const targetUser = await dbQueries.findUserById(friendId);
+        if (!targetUser) return res.status(404).json({ message: 'Kullanıcı bulunamadı.' });
+
+        const friendship = await dbQueries.checkFriendshipStatus(currentUserId, friendId);
+        if (friendship) {
+            if (friendship.status === 'accepted') {
+                return res.status(400).json({ message: 'Zaten arkadaşsınız.' });
+            } else {
+                return res.status(400).json({ message: 'Zaten bekleyen bir arkadaşlık isteği mevcut.' });
+            }
+        }
+
+        await dbQueries.sendFriendRequest(currentUserId, friendId);
+
+        // Alıcı çevrimiçiyse anlık soket bildirimi at
+        const receiverSocketId = userSockets.get(friendId);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('friend_request_received', {
+                senderId: currentUserId,
+                senderUsername: req.user.username
+            });
+        }
+
+        res.json({ message: 'Arkadaşlık isteği başarıyla gönderildi!' });
+    } catch (error) {
+        console.error('İstek gönderme hatası:', error);
+        res.status(500).json({ message: 'Arkadaşlık isteği gönderilirken hata oluştu.' });
+    }
+});
+
+// 3.3 BEKLEYEN İSTEKLERİ LİSTELEME
+app.get('/api/friends/requests', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const requests = await dbQueries.getPendingRequests(userId);
+        res.json(requests);
+    } catch (error) {
+        console.error('İstek listesi getirme hatası:', error);
+        res.status(500).json({ message: 'Bekleyen istekler listelenirken hata oluştu.' });
+    }
+});
+
+// 3.4 ARKADAŞLIK İSTEĞİNİ KABUL ETME
+app.post('/api/friends/accept', authenticateToken, async (req, res) => {
+    const currentUserId = req.user.id;
+    const { friendId } = req.body;
+
+    if (!friendId) return res.status(400).json({ message: 'Arkadaş ID zorunludur.' });
+
+    try {
+        const friendship = await dbQueries.checkFriendshipStatus(currentUserId, friendId);
+        if (!friendship || friendship.status !== 'pending') {
+            return res.status(400).json({ message: 'Kabul edilecek bekleyen bir istek bulunamadı.' });
+        }
+
+        await dbQueries.acceptFriendRequest(currentUserId, friendId);
+
+        // Her iki tarafın soketlerine anlık arkadaş olunduğuna dair haber ver (sidebar yenilensin)
+        const socketId1 = userSockets.get(currentUserId);
+        const socketId2 = userSockets.get(friendId);
+
+        if (socketId1) io.to(socketId1).emit('friend_request_accepted', { friendId });
+        if (socketId2) io.to(socketId2).emit('friend_request_accepted', { friendId: currentUserId });
+
+        res.json({ message: 'Arkadaşlık isteği kabul edildi!' });
+    } catch (error) {
+        console.error('İstek onaylama hatası:', error);
+        res.status(500).json({ message: 'İstek onaylanırken hata oluştu.' });
     }
 });
 

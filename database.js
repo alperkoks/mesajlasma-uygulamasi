@@ -49,6 +49,18 @@ async function initDatabase() {
                     FOREIGN KEY(receiver_id) REFERENCES users(id)
                 )
             `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS friendships (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    friend_id INTEGER NOT NULL,
+                    status VARCHAR(20) DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id),
+                    FOREIGN KEY(friend_id) REFERENCES users(id),
+                    UNIQUE(user_id, friend_id)
+                )
+            `);
             
             // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(100) UNIQUE`);
@@ -121,6 +133,20 @@ async function initDatabase() {
                 FOREIGN KEY(receiver_id) REFERENCES users(id)
             )
         `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS friendships (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                friend_id INTEGER NOT NULL,
+                status TEXT DEFAULT 'pending',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                FOREIGN KEY(friend_id) REFERENCES users(id),
+                UNIQUE(user_id, friend_id)
+            )
+        `);
+
         console.log('SQLite Tabloları kontrol edildi/oluşturuldu.');
     }
 }
@@ -301,6 +327,102 @@ const dbQueries = {
                  WHERE (sender_id = ? AND receiver_id = ?) 
                     OR (sender_id = ? AND receiver_id = ?) 
                  ORDER BY created_at ASC`,
+                [user1Id, user2Id, user2Id, user1Id]
+            );
+        }
+    },
+
+    // Arkadaşlık İsteği Gönder (Çift yönlü istek kontrolü veya ekleme)
+    async sendFriendRequest(userId, friendId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'INSERT INTO friendships (user_id, friend_id, status) VALUES ($1, $2, \'pending\') ON CONFLICT DO NOTHING',
+                [userId, friendId]
+            );
+        } else {
+            await dbSqlite.run(
+                'INSERT OR IGNORE INTO friendships (user_id, friend_id, status) VALUES (?, ?, \'pending\')',
+                [userId, friendId]
+            );
+        }
+    },
+
+    // Arkadaşlık İsteğini Kabul Et
+    async acceptFriendRequest(userId, friendId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'UPDATE friendships SET status = \'accepted\' WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)',
+                [friendId, userId]
+            );
+        } else {
+            await dbSqlite.run(
+                'UPDATE friendships SET status = \'accepted\' WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)',
+                [friendId, userId, userId, friendId]
+            );
+        }
+    },
+
+    // Bekleyen Arkadaşlık İsteklerini Listele (Kullanıcıya gelen istekler)
+    async getPendingRequests(userId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                `SELECT friendships.id as friendship_id, users.id as user_id, users.username, users.profile_pic 
+                 FROM friendships 
+                 JOIN users ON users.id = friendships.user_id 
+                 WHERE friendships.friend_id = $1 AND friendships.status = 'pending'`,
+                [userId]
+            );
+            return res.rows;
+        } else {
+            return await dbSqlite.all(
+                `SELECT friendships.id as friendship_id, users.id as user_id, users.username, users.profile_pic 
+                 FROM friendships 
+                 JOIN users ON users.id = friendships.user_id 
+                 WHERE friendships.friend_id = ? AND friendships.status = 'pending'`,
+                [userId]
+            );
+        }
+    },
+
+    // Arkadaş Listesini Getir (onaylı arkadaşlıklar)
+    async getFriends(userId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                `SELECT users.id, users.username, users.profile_pic 
+                 FROM friendships 
+                 JOIN users ON (users.id = friendships.user_id AND friendships.friend_id = $1) 
+                            OR (users.id = friendships.friend_id AND friendships.user_id = $2)
+                 WHERE friendships.status = 'accepted'`,
+                [userId, userId]
+            );
+            return res.rows;
+        } else {
+            return await dbSqlite.all(
+                `SELECT users.id, users.username, users.profile_pic 
+                 FROM friendships 
+                 JOIN users ON (users.id = friendships.user_id AND friendships.friend_id = ?) 
+                            OR (users.id = friendships.friend_id AND friendships.user_id = ?)
+                 WHERE friendships.status = 'accepted'`,
+                [userId, userId]
+            );
+        }
+    },
+
+    // İki kullanıcı arasındaki arkadaşlık durumunu sorgula
+    async checkFriendshipStatus(user1Id, user2Id) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                `SELECT * FROM friendships 
+                 WHERE (user_id = $1 AND friend_id = $2) 
+                    OR (user_id = $3 AND friend_id = $4)`,
+                [user1Id, user2Id, user2Id, user1Id]
+            );
+            return res.rows[0];
+        } else {
+            return await dbSqlite.get(
+                `SELECT * FROM friendships 
+                 WHERE (user_id = ? AND friend_id = ?) 
+                    OR (user_id = ? AND friend_id = ?)`,
                 [user1Id, user2Id, user2Id, user1Id]
             );
         }
