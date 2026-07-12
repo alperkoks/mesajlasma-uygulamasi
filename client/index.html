@@ -30,6 +30,7 @@
                     <input type="password" id="login-password" required placeholder="••••••••">
                 </div>
                 <button type="submit" class="btn btn-primary">Giriş Yap</button>
+                <p class="auth-toggle" style="margin-top: 10px;"><a href="#" id="show-forgot">Şifremi Unuttum</a></p>
                 <p class="auth-toggle">Hesabınız yok mu? <a href="#" id="show-register">Kayıt Ol</a></p>
             </form>
 
@@ -41,11 +42,26 @@
                     <input type="text" id="register-username" required placeholder="Yeni kullanıcı adı">
                 </div>
                 <div class="input-group">
+                    <label for="register-email">E-posta Adresi</label>
+                    <input type="email" id="register-email" required placeholder="ornek@eposta.com">
+                </div>
+                <div class="input-group">
                     <label for="register-password">Şifre</label>
                     <input type="password" id="register-password" required placeholder="Güçlü bir şifre">
                 </div>
                 <button type="submit" class="btn btn-primary">Kayıt Ol</button>
                 <p class="auth-toggle">Zaten üye misiniz? <a href="#" id="show-login">Giriş Yap</a></p>
+            </form>
+
+            <!-- Şifre Sıfırlama Talebi Formu (Varsayılan olarak gizli) -->
+            <form id="forgot-form" class="auth-form hidden">
+                <h3>Şifre Sıfırlama</h3>
+                <div class="input-group">
+                    <label for="forgot-email">Kayıtlı E-posta Adresi</label>
+                    <input type="email" id="forgot-email" required placeholder="ornek@eposta.com">
+                </div>
+                <button type="submit" class="btn btn-primary">Sıfırlama Linki Gönder</button>
+                <p class="auth-toggle"><a href="#" id="forgot-show-login">Giriş Yap Ekranına Dön</a></p>
             </form>
         </div>
     </div>

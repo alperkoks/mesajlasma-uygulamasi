@@ -5,8 +5,11 @@ const chatScreen = document.getElementById('chat-screen');
 // FORM VE BUTON ELEMENTLERİ
 const loginForm = document.getElementById('login-form');
 const registerForm = document.getElementById('register-form');
+const forgotForm = document.getElementById('forgot-form');
 const showRegisterLink = document.getElementById('show-register');
 const showLoginLink = document.getElementById('show-login');
+const showForgotLink = document.getElementById('show-forgot');
+const forgotShowLoginLink = document.getElementById('forgot-show-login');
 const logoutBtn = document.getElementById('logout-btn');
 
 // KULLANICI PROFİLİ VE SOHBET ELEMENTLERİ
@@ -39,11 +42,27 @@ const API_URL = '/api';
 showRegisterLink.addEventListener('click', (e) => {
     e.preventDefault();
     loginForm.classList.add('hidden');
+    forgotForm.classList.add('hidden');
     registerForm.classList.remove('hidden');
 });
 
 showLoginLink.addEventListener('click', (e) => {
     e.preventDefault();
+    registerForm.classList.add('hidden');
+    forgotForm.classList.add('hidden');
+    loginForm.classList.remove('hidden');
+});
+
+showForgotLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    loginForm.classList.add('hidden');
+    registerForm.classList.add('hidden');
+    forgotForm.classList.remove('hidden');
+});
+
+forgotShowLoginLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    forgotForm.classList.add('hidden');
     registerForm.classList.add('hidden');
     loginForm.classList.remove('hidden');
 });
@@ -98,14 +117,27 @@ async function apiCall(endpoint, method = 'GET', body = null) {
 registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('register-username').value.trim();
+    const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
 
     try {
-        await apiCall('/auth/register', 'POST', { username, password });
-        alert('Kayıt başarılı! Şimdi giriş yapabilirsiniz.');
+        const data = await apiCall('/auth/register', 'POST', { username, email, password });
+        alert(data.message || 'Kayıt başarılı! Lütfen doğrulama linki için e-postanızı kontrol edin.');
         registerForm.classList.add('hidden');
         loginForm.classList.remove('hidden');
         document.getElementById('login-username').value = username;
+    } catch (err) {}
+});
+
+forgotForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgot-email').value.trim();
+
+    try {
+        const data = await apiCall('/auth/forgot-password', 'POST', { email });
+        alert(data.message || 'Şifre sıfırlama linki e-postanıza gönderildi.');
+        forgotForm.classList.add('hidden');
+        loginForm.classList.remove('hidden');
     } catch (err) {}
 });
 

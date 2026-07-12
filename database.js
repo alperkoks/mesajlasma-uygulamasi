@@ -29,6 +29,12 @@ async function initDatabase() {
                     id SERIAL PRIMARY KEY,
                     username VARCHAR(50) UNIQUE NOT NULL,
                     password TEXT NOT NULL,
+                    email VARCHAR(100) UNIQUE,
+                    is_verified INTEGER DEFAULT 0,
+                    verification_token TEXT,
+                    reset_password_token TEXT,
+                    reset_password_expires TIMESTAMP,
+                    profile_pic TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             `);
@@ -43,6 +49,15 @@ async function initDatabase() {
                     FOREIGN KEY(receiver_id) REFERENCES users(id)
                 )
             `);
+            
+            // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(100) UNIQUE`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token TEXT`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expires TIMESTAMP`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
+
             console.log('PostgreSQL Tabloları kontrol edildi/oluşturuldu.');
         } finally {
             client.release();
@@ -62,9 +77,38 @@ async function initDatabase() {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
+                email TEXT UNIQUE,
+                is_verified INTEGER DEFAULT 0,
+                verification_token TEXT,
+                reset_password_token TEXT,
+                reset_password_expires TEXT,
+                profile_pic TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // SQLite için mevcut tabloya yeni kolonları güvenli bir şekilde ekle
+        const tableInfo = await dbSqlite.all("PRAGMA table_info(users)");
+        const columns = tableInfo.map(col => col.name);
+
+        if (!columns.includes('email')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN email TEXT UNIQUE");
+        }
+        if (!columns.includes('is_verified')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0");
+        }
+        if (!columns.includes('verification_token')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN verification_token TEXT");
+        }
+        if (!columns.includes('reset_password_token')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN reset_password_token TEXT");
+        }
+        if (!columns.includes('reset_password_expires')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN reset_password_expires TEXT");
+        }
+        if (!columns.includes('profile_pic')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN profile_pic TEXT");
+        }
 
         await dbSqlite.exec(`
             CREATE TABLE IF NOT EXISTS messages (
@@ -84,19 +128,19 @@ async function initDatabase() {
 // Veritabanı işlemlerini gerçekleştiren yardımcı fonksiyonlar
 const dbQueries = {
     // Yeni kullanıcı kaydetme
-    async createUser(username, hashedPassword) {
+    async createUser(username, email, hashedPassword, verificationToken) {
         if (isPostgres) {
             const res = await dbPostgresPool.query(
-                'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username',
-                [username, hashedPassword]
+                'INSERT INTO users (username, email, password, verification_token, is_verified) VALUES ($1, $2, $3, $4, 0) RETURNING id, username, email',
+                [username, email, hashedPassword, verificationToken]
             );
             return res.rows[0];
         } else {
             const result = await dbSqlite.run(
-                'INSERT INTO users (username, password) VALUES (?, ?)',
-                [username, hashedPassword]
+                'INSERT INTO users (username, email, password, verification_token, is_verified) VALUES (?, ?, ?, ?, 0)',
+                [username, email, hashedPassword, verificationToken]
             );
-            return { id: result.lastID, username };
+            return { id: result.lastID, username, email };
         }
     },
 
@@ -110,23 +154,116 @@ const dbQueries = {
         }
     },
 
+    // E-posta adresine göre kullanıcı bulma
+    async findUserByEmail(email) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query('SELECT * FROM users WHERE email = $1', [email]);
+            return res.rows[0];
+        } else {
+            return await dbSqlite.get('SELECT * FROM users WHERE email = ?', [email]);
+        }
+    },
+
+    // Doğrulama token'ına göre kullanıcı bulma
+    async findUserByVerificationToken(token) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query('SELECT * FROM users WHERE verification_token = $1', [token]);
+            return res.rows[0];
+        } else {
+            return await dbSqlite.get('SELECT * FROM users WHERE verification_token = ?', [token]);
+        }
+    },
+
+    // Kullanıcıyı doğrulanmış olarak işaretleme
+    async verifyUser(id) {
+        if (isPostgres) {
+            await dbPostgresPool.query('UPDATE users SET is_verified = 1, verification_token = NULL WHERE id = $1', [id]);
+        } else {
+            await dbSqlite.run('UPDATE users SET is_verified = 1, verification_token = NULL WHERE id = ?', [id]);
+        }
+    },
+
+    // Şifre sıfırlama token'ı tanımlama
+    async setResetPasswordToken(email, token, expires) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'UPDATE users SET reset_password_token = $1, reset_password_expires = $2 WHERE email = $3',
+                [token, expires, email]
+            );
+        } else {
+            await dbSqlite.run(
+                'UPDATE users SET reset_password_token = ?, reset_password_expires = ? WHERE email = ?',
+                [token, expires, email]
+            );
+        }
+    },
+
+    // Şifre sıfırlama token'ına göre kullanıcı bulma
+    async findUserByResetToken(token) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                'SELECT * FROM users WHERE reset_password_token = $1',
+                [token]
+            );
+            return res.rows[0];
+        } else {
+            return await dbSqlite.get(
+                'SELECT * FROM users WHERE reset_password_token = ?',
+                [token]
+            );
+        }
+    },
+
+    // Şifre güncelleme
+    async updatePassword(id, hashedPassword) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'UPDATE users SET password = $1, reset_password_token = NULL, reset_password_expires = NULL WHERE id = $2',
+                [hashedPassword, id]
+            );
+        } else {
+            await dbSqlite.run(
+                'UPDATE users SET password = ?, reset_password_token = NULL, reset_password_expires = NULL WHERE id = ?',
+                [hashedPassword, id]
+            );
+        }
+    },
+
+    // Kullanıcı adı güncelleme
+    async updateUsername(id, newUsername) {
+        if (isPostgres) {
+            await dbPostgresPool.query('UPDATE users SET username = $1 WHERE id = $2', [newUsername, id]);
+        } else {
+            await dbSqlite.run('UPDATE users SET username = ? WHERE id = ?', [newUsername, id]);
+        }
+    },
+
+    // Profil resmi güncelleme
+    async updateProfilePic(id, imageUrl) {
+        if (isPostgres) {
+            await dbPostgresPool.query('UPDATE users SET profile_pic = $1 WHERE id = $2', [imageUrl, id]);
+        } else {
+            await dbSqlite.run('UPDATE users SET profile_pic = ? WHERE id = ?', [imageUrl, id]);
+        }
+    },
+
     // Kullanıcı ID'sine göre kullanıcı bulma
     async findUserById(id) {
         if (isPostgres) {
-            const res = await dbPostgresPool.query('SELECT id, username FROM users WHERE id = $1', [id]);
+            const res = await dbPostgresPool.query('SELECT id, username, email, profile_pic, is_verified FROM users WHERE id = $1', [id]);
             return res.rows[0];
         } else {
-            return await dbSqlite.get('SELECT id, username FROM users WHERE id = ?', [id]);
+            return await dbSqlite.get('SELECT id, username, email, profile_pic, is_verified FROM users WHERE id = ?', [id]);
         }
     },
 
     // Tüm kullanıcıları listeleme
     async getAllUsers() {
         if (isPostgres) {
-            const res = await dbPostgresPool.query('SELECT id, username FROM users ORDER BY username ASC');
+            const res = await dbPostgresPool.query('SELECT id, username, profile_pic FROM users ORDER BY username ASC');
             return res.rows;
         } else {
-            return await dbSqlite.all('SELECT id, username FROM users ORDER BY username ASC');
+            return await dbSqlite.all('SELECT id, username, profile_pic FROM users ORDER BY username ASC');
         }
     },
 
