@@ -1,3 +1,9 @@
+// GLOBAL HATA YAKALAYICI (MOBİL HATA TAKİBİ İÇİN)
+window.onerror = function(message, source, lineno, colno, error) {
+    alert("🚨 GLOBAL JS HATASI:\nMesaj: " + message + "\nSatır: " + lineno + "\nDosya: " + source);
+    return false;
+};
+
 // SERVICE WORKER KAYDI (PWA DESTEĞİ İÇİN)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -923,20 +929,22 @@ async function selectUserChat(user) {
 }
 
 // Mobilde sohbet alanından arkadaş listesine geri dönme butonu
-mobileBackBtn.addEventListener('click', () => {
-    activeChatPartner = null;
-    activeChatPartnerId = null;
-    
-    const chatContainer = document.querySelector('.chat-container');
-    if (chatContainer) {
-        chatContainer.classList.remove('mobile-chat-active');
-    }
-    
-    chatActiveScreen.classList.add('hidden');
-    noChatSelectedScreen.classList.remove('hidden');
-    
-    renderUsersList();
-});
+if (mobileBackBtn) {
+    mobileBackBtn.addEventListener('click', () => {
+        activeChatPartner = null;
+        activeChatPartnerId = null;
+        
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            chatContainer.classList.remove('mobile-chat-active');
+        }
+        
+        chatActiveScreen.classList.add('hidden');
+        noChatSelectedScreen.classList.remove('hidden');
+        
+        renderUsersList();
+    });
+}
 
 async function loadMessages() {
     try {
