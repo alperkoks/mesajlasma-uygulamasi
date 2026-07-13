@@ -76,6 +76,8 @@ const pendingRequestsList = document.getElementById('pending-requests-list');
 // GRUP SİSTEMİ ELEMENTLERİ
 const tabFriends = document.getElementById('tab-friends');
 const tabGroups = document.getElementById('tab-groups');
+const badgeFriendsDot = document.getElementById('badge-friends-dot');
+const badgeGroupsDot = document.getElementById('badge-groups-dot');
 const friendsTabContent = document.getElementById('friends-tab-content');
 const groupsTabContent = document.getElementById('groups-tab-content');
 const groupsList = document.getElementById('groups-list');
@@ -902,6 +904,7 @@ function renderUsersList() {
         li.addEventListener('click', () => selectUserChat(user));
         usersList.appendChild(li);
     });
+    updateTabBadges();
 }
 
 // --- ARKADAŞLIK SİSTEMİ FONKSİYONLARI ---
@@ -1236,8 +1239,11 @@ messageForm.addEventListener('submit', async (e) => {
             message: text
         });
 
-        messages.push(newMsg);
-        renderMessages();
+        const isAlreadyAdded = messages.some(m => m.id === newMsg.id);
+        if (!isAlreadyAdded) {
+            messages.push(newMsg);
+            renderMessages();
+        }
         messageInput.value = '';
 
         if (activeChatGroupId) {
@@ -1343,8 +1349,11 @@ if (btnAttach && fileInput) {
                 fileUrl: data.fileUrl
             });
 
-            messages.push(newMsg);
-            renderMessages();
+            const isAlreadyAdded = messages.some(m => m.id === newMsg.id);
+            if (!isAlreadyAdded) {
+                messages.push(newMsg);
+                renderMessages();
+            }
 
             // Son mesaj bilgisini listede güncelle
             if (activeChatGroupId) {
@@ -1400,6 +1409,7 @@ if (tabFriends && tabGroups) {
 
         friendsTabContent.classList.remove('hidden');
         groupsTabContent.classList.add('hidden');
+        updateTabBadges();
     });
 
     tabGroups.addEventListener('click', async () => {
@@ -1416,6 +1426,7 @@ if (tabFriends && tabGroups) {
         friendsTabContent.classList.add('hidden');
 
         await loadGroups();
+        updateTabBadges();
     });
 }
 
@@ -1520,6 +1531,10 @@ function renderGroupsList() {
             ? formatMessageTime(group.last_message_time) 
             : '';
 
+        const unreadBadge = (group.unread_count && group.unread_count > 0)
+            ? `<div class="unread-badge" style="background-color:#EF4444; color:white; font-size:0.7rem; font-weight:700; min-width:18px; height:18px; border-radius:9px; display:flex; align-items:center; justify-content:center; padding:0 4px; margin-left:auto;">${group.unread_count}</div>`
+            : '';
+
         li.innerHTML = `
             <div class="avatar" style="background-color: var(--primary-light); color: var(--primary-color); font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 50%; width: 44px; height: 44px; overflow: hidden;">${avatarHTML}</div>
             <div class="user-item-info">
@@ -1527,7 +1542,10 @@ function renderGroupsList() {
                     <span class="name">${escapeHTML(group.name)}</span>
                     <span class="last-msg-time">${lastMsgTimeText}</span>
                 </div>
-                <span class="last-msg">${lastMsgText}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="last-msg">${lastMsgText}</span>
+                    ${unreadBadge}
+                </div>
             </div>
         `;
 
@@ -1537,6 +1555,29 @@ function renderGroupsList() {
 
         groupsList.appendChild(li);
     });
+    updateTabBadges();
+}
+
+function updateTabBadges() {
+    if (badgeFriendsDot) {
+        const hasUnreadFriends = users.some(u => u.unread_count > 0);
+        const isFriendsTabActive = tabFriends && tabFriends.classList.contains('active');
+        if (hasUnreadFriends && !isFriendsTabActive) {
+            badgeFriendsDot.classList.remove('hidden');
+        } else {
+            badgeFriendsDot.classList.add('hidden');
+        }
+    }
+    
+    if (badgeGroupsDot) {
+        const hasUnreadGroups = groups.some(g => g.unread_count > 0);
+        const isGroupsTabActive = tabGroups && tabGroups.classList.contains('active');
+        if (hasUnreadGroups && !isGroupsTabActive) {
+            badgeGroupsDot.classList.remove('hidden');
+        } else {
+            badgeGroupsDot.classList.add('hidden');
+        }
+    }
 }
 
 // Grup Sohbetini Aktifleştir
@@ -1549,6 +1590,13 @@ async function selectGroupChat(group) {
         // Arama barını kapat ve sıfırla
         if (chatSearchBar) chatSearchBar.classList.add('hidden');
         if (chatSearchInput) chatSearchInput.value = '';
+
+        // Okunmamış mesaj sayısını sıfırla
+        group.unread_count = 0;
+        const localGrp = groups.find(g => g.id === group.id);
+        if (localGrp) {
+            localGrp.unread_count = 0;
+        }
 
         // Sol menüde aktif olan grubu boyamak için listeyi tekrar çiz
         renderGroupsList();
