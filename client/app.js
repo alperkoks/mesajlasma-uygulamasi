@@ -106,6 +106,9 @@ const groupSettingsNameInput = document.getElementById('group-settings-name-inpu
 const btnGroupNameUpdate = document.getElementById('btn-group-name-update');
 const groupMembersListContainer = document.getElementById('group-members-list-container');
 const btnLeaveGroup = document.getElementById('btn-leave-group');
+const groupAddMemberSection = document.getElementById('group-add-member-section');
+const groupAddMemberSelect = document.getElementById('group-add-member-select');
+const btnGroupAddMember = document.getElementById('btn-group-add-member');
 
 // PROFİL AYARLARI ELEMENTLERİ
 const settingsModal = document.getElementById('settings-modal');
@@ -1857,6 +1860,31 @@ if (btnLeaveGroup) {
     });
 }
 
+// Gruba Üye Ekleme
+if (btnGroupAddMember) {
+    btnGroupAddMember.addEventListener('click', async () => {
+        const targetUserId = groupAddMemberSelect.value;
+        if (!targetUserId || !activeChatGroupId) return;
+
+        try {
+            btnGroupAddMember.disabled = true;
+            await apiCall(`/groups/${activeChatGroupId}/add-member`, 'POST', {
+                userId: targetUserId
+            });
+            alert('Üye gruba başarıyla eklendi.');
+            
+            const group = groups.find(g => g.id === activeChatGroupId);
+            if (group) {
+                await loadGroupMembers(group);
+            }
+        } catch (err) {
+            alert('Üye eklenirken hata oluştu: ' + err.message);
+        } finally {
+            btnGroupAddMember.disabled = false;
+        }
+    });
+}
+
 async function openGroupSettings() {
     if (!activeChatGroupId) return;
 
@@ -1890,8 +1918,8 @@ async function loadGroupMembers(group) {
 
         // Giriş yapmış kullanıcının yetkilerini denetle
         const myMemberInfo = members.find(m => m.id === currentUser.id);
-        const isUserAdmin = myMemberInfo && myMemberInfo.is_admin === 1;
         const isFounder = group.created_by === currentUser.id;
+        const isUserAdmin = (myMemberInfo && myMemberInfo.is_admin === 1) || isFounder;
 
         // UI Yetkilerini Ayarla
         if (isUserAdmin) {
@@ -1899,11 +1927,24 @@ async function loadGroupMembers(group) {
             groupSettingsNameInput.removeAttribute('disabled');
             btnGroupNameUpdate.style.display = 'block';
             btnLeaveGroup.textContent = isFounder ? 'Grubu Sil / Ayrıl' : 'Gruptan Ayrıl';
+            if (groupAddMemberSection) groupAddMemberSection.style.display = 'flex';
+            if (groupAddMemberSelect) {
+                groupAddMemberSelect.innerHTML = '<option value="">Eklenecek arkadaş seçin...</option>';
+                const memberIds = members.map(m => m.id);
+                const nonMembers = users.filter(u => u.username !== currentUser.username && !memberIds.includes(u.id));
+                nonMembers.forEach(friend => {
+                    const opt = document.createElement('option');
+                    opt.value = friend.id;
+                    opt.textContent = friend.username;
+                    groupAddMemberSelect.appendChild(opt);
+                });
+            }
         } else {
             lblGroupPic.style.display = 'none';
             groupSettingsNameInput.setAttribute('disabled', 'true');
             btnGroupNameUpdate.style.display = 'none';
             btnLeaveGroup.textContent = 'Gruptan Ayrıl';
+            if (groupAddMemberSection) groupAddMemberSection.style.display = 'none';
         }
 
         members.forEach(member => {

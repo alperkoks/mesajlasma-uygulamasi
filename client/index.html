@@ -296,6 +296,17 @@
                     <button id="btn-group-name-update" class="btn btn-primary" style="display: none; width: 100%; box-sizing: border-box; padding: 0.6rem; font-size: 0.9rem; margin-top: 0.25rem;">Grup Adını Güncelle</button>
                 </div>
 
+                <!-- Gruba Üye Ekleme Bölümü (Sadece yöneticiler görebilir) -->
+                <div id="group-add-member-section" style="display: none; flex-direction: column; gap: 0.5rem; width: 100%;">
+                    <label style="font-weight: 600; font-size: 0.9rem;">Yeni Üye Ekle</label>
+                    <div style="display: flex; gap: 0.5rem; width: 100%;">
+                        <select id="group-add-member-select" style="flex: 1; padding: 0.55rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main); font-size: 0.85rem; height: 38px;">
+                            <option value="">Eklenecek arkadaş seçin...</option>
+                        </select>
+                        <button id="btn-group-add-member" class="btn btn-primary" style="padding: 0 1rem; font-size: 0.85rem; height: 38px;">Ekle</button>
+                    </div>
+                </div>
+
                 <!-- Üyeler Listesi -->
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <label style="font-weight: 600; font-size: 0.9rem;">Grup Üyeleri</label>
@@ -313,6 +324,6 @@
 
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=11"></script>
+    <script src="app.js?v=12"></script>
 </body>
 </html>

@@ -950,7 +950,7 @@ app.post('/api/groups/:groupId/update', authenticateToken, async (req, res) => {
         // Yöneticilik yetkisi kontrolü (group_members tablosundan is_admin değerine göre)
         const members = await dbQueries.getGroupMembers(groupId);
         const currentUserMember = members.find(m => m.id === currentUserId);
-        const isUserAdmin = currentUserMember && currentUserMember.is_admin === 1;
+        const isUserAdmin = (currentUserMember && currentUserMember.is_admin === 1) || group.created_by === currentUserId;
 
         if (!isUserAdmin) {
             return res.status(403).json({ message: 'Grup ayarlarını sadece yönetici güncelleyebilir.' });
@@ -996,7 +996,7 @@ app.post('/api/groups/:groupId/remove-member', authenticateToken, async (req, re
         // Yalnızca grup yöneticisi birini çıkarabilir, ancak üye kendisi gruptan ayrılabilir
         const members = await dbQueries.getGroupMembers(groupId);
         const currentUserMember = members.find(m => m.id === currentUserId);
-        const isUserAdmin = currentUserMember && currentUserMember.is_admin === 1;
+        const isUserAdmin = (currentUserMember && currentUserMember.is_admin === 1) || group.created_by === currentUserId;
 
         if (!isUserAdmin && targetUserId !== currentUserId) {
             return res.status(403).json({ message: 'Yalnızca grup yöneticisi üye çıkartabilir.' });
@@ -1037,6 +1037,56 @@ app.post('/api/groups/:groupId/remove-member', authenticateToken, async (req, re
     }
 });
 
+// 3.14.1 GRUBA YENİ ÜYE EKLE
+app.post('/api/groups/:groupId/add-member', authenticateToken, async (req, res) => {
+    const groupId = parseInt(req.params.groupId);
+    const currentUserId = req.user.id;
+    const targetUserId = parseInt(req.body.userId);
+
+    if (!targetUserId) return res.status(400).json({ message: 'Eklenecek kullanıcı ID zorunludur.' });
+
+    try {
+        const group = await dbQueries.getGroupById(groupId);
+        if (!group) return res.status(404).json({ message: 'Grup bulunamadı.' });
+
+        // Yöneticilik yetkisi kontrolü
+        const members = await dbQueries.getGroupMembers(groupId);
+        const currentUserMember = members.find(m => m.id === currentUserId);
+        const isUserAdmin = (currentUserMember && currentUserMember.is_admin === 1) || group.created_by === currentUserId;
+
+        if (!isUserAdmin) {
+            return res.status(403).json({ message: 'Gruba sadece yöneticiler üye ekleyebilir.' });
+        }
+
+        // Zaten üye mi?
+        const isAlreadyMember = members.some(m => m.id === targetUserId);
+        if (isAlreadyMember) {
+            return res.status(400).json({ message: 'Kullanıcı zaten grubun üyesi.' });
+        }
+
+        await dbQueries.addGroupMember(groupId, targetUserId, 0);
+
+        // Eklenen üyenin socket bağlantılarını bulup odaya join et
+        const targetSockets = userSockets.get(targetUserId);
+        if (targetSockets) {
+            targetSockets.forEach(sId => {
+                const socketInstance = io.sockets.sockets.get(sId);
+                if (socketInstance) {
+                    socketInstance.join(`group_${groupId}`);
+                }
+            });
+        }
+
+        // Soket üzerinden ekleme bilgisini gruba duyur
+        io.to(`group_${groupId}`).emit('member_added', { groupId, userId: targetUserId });
+
+        res.json({ message: 'Üye başarıyla gruba eklendi.' });
+    } catch (error) {
+        console.error('Üye ekleme hatası:', error);
+        res.status(500).json({ message: 'Üye gruba eklenirken hata oluştu.' });
+    }
+});
+
 // 3.15 GRUP PROFİL FOTOĞRAFI YÜKLEME
 app.post('/api/groups/:groupId/upload-pic', authenticateToken, upload.single('group_pic'), async (req, res) => {
     const groupId = parseInt(req.params.groupId);
@@ -1050,7 +1100,7 @@ app.post('/api/groups/:groupId/upload-pic', authenticateToken, upload.single('gr
         // Yöneticilik yetkisi kontrolü
         const members = await dbQueries.getGroupMembers(groupId);
         const currentUserMember = members.find(m => m.id === currentUserId);
-        const isUserAdmin = currentUserMember && currentUserMember.is_admin === 1;
+        const isUserAdmin = (currentUserMember && currentUserMember.is_admin === 1) || group.created_by === currentUserId;
 
         if (!isUserAdmin) {
             return res.status(403).json({ message: 'Grup fotoğrafını yalnızca yönetici güncelleyebilir.' });
