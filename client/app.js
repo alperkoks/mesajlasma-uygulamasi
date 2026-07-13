@@ -126,11 +126,13 @@ const lightboxModal = document.getElementById('lightbox-modal');
 const lightboxImg = document.getElementById('lightbox-img');
 const closeLightbox = document.getElementById('close-lightbox');
 const btnRequestNotifications = document.getElementById('btn-request-notifications');
+const btnInstallApp = document.getElementById('btn-install-app');
 const btnChatOptions = document.getElementById('btn-chat-options');
 const chatOptionsDropdown = document.getElementById('chat-options-dropdown');
 
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
+let deferredPrompt = null;
 let token = localStorage.getItem('token') || null;
 let activeChatPartner = null;
 let activeChatPartnerId = null;
@@ -301,6 +303,33 @@ if (btnRequestNotifications) {
         }
     });
 }
+
+// PWA (Uygulama) Kurulum İşlemleri
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (btnInstallApp) {
+        btnInstallApp.classList.remove('hidden');
+    }
+});
+
+if (btnInstallApp) {
+    btnInstallApp.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`PWA Kurulum Seçimi: ${outcome}`);
+        deferredPrompt = null;
+        btnInstallApp.classList.add('hidden');
+    });
+}
+
+window.addEventListener('appinstalled', () => {
+    console.log('PWA Uygulaması kuruldu.');
+    if (btnInstallApp) {
+        btnInstallApp.classList.add('hidden');
+    }
+});
 
 // Arkadaşlıktan Çıkarma Butonunu Dinle
 btnUnfriend.addEventListener('click', async () => {
@@ -599,8 +628,11 @@ async function initPushNotifications() {
             });
         }
 
+        // Aboneliği JSON formatına çevirip kaydet (bazı tarayıcılarda doğrudan stringify boş nesne döner)
+        const subscriptionJSON = subscription.toJSON();
+
         // Aboneliği sunucuya kaydet
-        await apiCall('/push/subscribe', 'POST', { subscription });
+        await apiCall('/push/subscribe', 'POST', { subscription: subscriptionJSON });
         console.log('Web Push aboneliği başarıyla sunucuya kaydedildi.');
     } catch (err) {
         console.error('Web Push bildirim kaydı hatası:', err);
