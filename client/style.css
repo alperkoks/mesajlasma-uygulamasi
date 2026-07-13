@@ -889,45 +889,38 @@ body {
 
     /* 2. SOHBET EKRANI MOBİL DÜZENLEMELERİ */
     .chat-container {
-        position: relative;
+        display: flex;
         width: 100vw;
         height: 100vh;
         overflow: hidden;
     }
 
-    /* Sol Panel (Sidebar) - Mobilde tam ekran */
+    /* Varsayılan durumda (sohbet seçilmediğinde):
+       Sidebar tam genişlik kaplar, Sohbet alanı tamamen gizlenir */
     .sidebar {
         width: 100% !important;
+        flex: 1 !important;
+        display: flex !important;
         height: 100% !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 10;
-        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         border-right: none;
     }
 
-    /* Sağ Panel (Sohbet Alanı) - Mobilde tam ekran */
     .chat-area {
-        width: 100% !important;
-        height: 100% !important;
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 5;
-        transform: translateX(100%);
-        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        background-color: var(--bg-white);
+        display: none !important;
     }
 
-    /* Aktif sohbet açıldığında kayma animasyonları */
+    /* Sohbet seçildiğinde:
+       Sidebar gizlenir, Sohbet alanı tam genişlik kaplar */
     .chat-container.mobile-chat-active .sidebar {
-        transform: translateX(-100%);
+        display: none !important;
     }
 
     .chat-container.mobile-chat-active .chat-area {
-        transform: translateX(0);
-        z-index: 12;
+        display: flex !important;
+        width: 100% !important;
+        flex: 1 !important;
+        height: 100% !important;
+        background-color: var(--bg-white);
     }
 
     /* Geri Butonu görünürlüğü */
@@ -935,7 +928,7 @@ body {
         display: block !important;
     }
 
-    /* Boş ekranı mobilde gizleyelim, doğrudan sidebar görünecek */
+    /* Boş ekranı mobilde gizleyelim */
     #no-chat-selected {
         display: none !important;
     }
