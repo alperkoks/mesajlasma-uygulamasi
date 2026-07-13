@@ -58,6 +58,14 @@ body.dark-theme .sidebar-header {
 body.dark-theme .friend-search-section {
     background-color: #131c2e;
 }
+body.dark-theme .message-row.received .message-bubble {
+    background-color: #1e293b;
+    color: #ffffff;
+    border-color: #334155;
+}
+body.dark-theme .mobile-back-btn {
+    color: var(--text-main) !important;
+}
 
 * {
     margin: 0;
@@ -976,6 +984,9 @@ body {
     /* Geri Butonu görünürlüğü */
     .mobile-back-btn {
         display: block !important;
+        color: var(--text-main);
+        font-weight: 600;
+        font-size: 1.45rem !important;
     }
 
     /* Boş ekranı mobilde gizleyelim */
