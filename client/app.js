@@ -622,8 +622,11 @@ async function initApp() {
             if (msg.group_id) {
                 const isCurrentGroup = (activeChatGroupId === msg.group_id);
                 if (isCurrentGroup) {
-                    messages.push(msg);
-                    renderMessages();
+                    const isAlreadyAdded = messages.some(m => m.id === msg.id);
+                    if (!isAlreadyAdded) {
+                        messages.push(msg);
+                        renderMessages();
+                    }
                 }
                 
                 // Grubun son mesajını güncelle
@@ -646,8 +649,11 @@ async function initApp() {
             const isCurrentChat = (activeChatPartnerId === msg.sender_id);
             
             if (isCurrentChat) {
-                messages.push(msg);
-                renderMessages();
+                const isAlreadyAdded = messages.some(m => m.id === msg.id);
+                if (!isAlreadyAdded) {
+                    messages.push(msg);
+                    renderMessages();
+                }
                 
                 apiCall(`/messages/${msg.sender_id}`).catch(() => {});
             }
