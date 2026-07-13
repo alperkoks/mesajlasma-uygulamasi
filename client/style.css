@@ -867,3 +867,85 @@ body {
         opacity: 1;
     }
 }
+
+/* MOBİL/RESPONSIVE TASARIM KURALLARI */
+@media (max-width: 767px) {
+    /* 1. GİRİŞ VE KAYIT EKRANI MOBİL DÜZENLEMELERİ */
+    #auth-screen {
+        padding: 0;
+        background-color: var(--bg-main);
+    }
+    
+    .auth-card {
+        width: 100%;
+        height: 100vh;
+        border-radius: 0;
+        box-shadow: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 2rem 1.5rem;
+    }
+
+    /* 2. SOHBET EKRANI MOBİL DÜZENLEMELERİ */
+    .chat-container {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    /* Sol Panel (Sidebar) - Mobilde tam ekran */
+    .sidebar {
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 10;
+        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        border-right: none;
+    }
+
+    /* Sağ Panel (Sohbet Alanı) - Mobilde tam ekran */
+    .chat-area {
+        width: 100% !important;
+        height: 100% !important;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 5;
+        transform: translateX(100%);
+        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        background-color: var(--bg-main);
+    }
+
+    /* Aktif sohbet açıldığında kayma animasyonları */
+    .chat-container.mobile-chat-active .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .chat-container.mobile-chat-active .chat-area {
+        transform: translateX(0);
+        z-index: 12;
+    }
+
+    /* Geri Butonu görünürlüğü */
+    .mobile-back-btn {
+        display: block !important;
+    }
+
+    /* Boş ekranı mobilde gizleyelim, doğrudan sidebar görünecek */
+    #no-chat-selected {
+        display: none !important;
+    }
+
+    /* Mesajlaşma alanı ve inputlar */
+    .chat-footer {
+        padding: 0.75rem;
+    }
+
+    .message-bubble {
+        max-width: 85%;
+    }
+}

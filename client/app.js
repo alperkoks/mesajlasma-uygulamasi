@@ -35,6 +35,7 @@ const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
 const btnUnfriend = document.getElementById('btn-unfriend');
 const btnBlock = document.getElementById('btn-block');
+const mobileBackBtn = document.getElementById('mobile-back-btn');
 
 // ARKADAŞLIK SİSTEMİ ELEMENTLERİ
 const friendSearchForm = document.getElementById('friend-search-form');
@@ -897,6 +898,12 @@ async function selectUserChat(user) {
 
     renderUsersList();
 
+    // Mobilde sohbet alanını öne getirmek için container'a sınıf ekle
+    const chatContainer = document.querySelector('.chat-container');
+    if (chatContainer) {
+        chatContainer.classList.add('mobile-chat-active');
+    }
+
     activeChatName.textContent = user.username;
     if (user.profile_pic) {
         activeChatAvatar.innerHTML = `<img src="${user.profile_pic}" alt="${user.username}" class="avatar-img">`;
@@ -910,6 +917,22 @@ async function selectUserChat(user) {
 
     await loadMessages();
 }
+
+// Mobilde sohbet alanından arkadaş listesine geri dönme butonu
+mobileBackBtn.addEventListener('click', () => {
+    activeChatPartner = null;
+    activeChatPartnerId = null;
+    
+    const chatContainer = document.querySelector('.chat-container');
+    if (chatContainer) {
+        chatContainer.classList.remove('mobile-chat-active');
+    }
+    
+    chatActiveScreen.classList.add('hidden');
+    noChatSelectedScreen.classList.remove('hidden');
+    
+    renderUsersList();
+});
 
 async function loadMessages() {
     try {
