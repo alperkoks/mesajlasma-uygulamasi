@@ -19,8 +19,33 @@ self.addEventListener('push', (event) => {
         data: data.data || {}
     };
 
+    const payloadData = data.data || {};
+    const senderId = payloadData.senderId;
+    const groupId = payloadData.groupId;
+
     event.waitUntil(
-        self.registration.showNotification(title, options)
+        caches.open('app-settings').then((cache) => {
+            return cache.match('/muted-chats');
+        }).then((response) => {
+            if (response) {
+                return response.json().catch(() => []);
+            }
+            return [];
+        }).then((mutedChats) => {
+            const isGroupMuted = groupId && mutedChats.includes(`group_${groupId}`);
+            const isUserMuted = senderId && mutedChats.includes(`user_${senderId}`);
+
+            if (isGroupMuted || isUserMuted) {
+                console.log('Bu sohbet sessize alınmış, bildirim sessiz gösterilecek.');
+                options.silent = true;
+                options.vibrate = [];
+            }
+            
+            return self.registration.showNotification(title, options);
+        }).catch((err) => {
+            console.error('Push bildirim hatası:', err);
+            return self.registration.showNotification(title, options);
+        })
     );
 });
 

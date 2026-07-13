@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=15">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -181,6 +181,7 @@
                             <!-- Açılır Menü (Dropdown) -->
                             <div id="chat-options-dropdown" class="hidden" style="position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; min-width: 180px; z-index: 100; overflow: hidden; padding: 0.25rem 0;">
                                 <button id="btn-group-settings" class="dropdown-item hidden" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">⚙️ <span>Grup Ayarları</span></button>
+                                <button id="btn-mute-chat" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🔕 <span>Sessize Al</span></button>
                                 <button id="btn-toggle-search" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🔍 <span>Mesajlarda Ara</span></button>
                                 <button id="btn-clear-chat" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🗑️ <span>Sohbeti Temizle</span></button>
                                 <button id="btn-unfriend" class="dropdown-item dropdown-item-danger" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--danger-color); cursor: pointer; transition: background-color 0.2s;">❌ <span>Arkadaştan Çıkar</span></button>
@@ -237,6 +238,15 @@
                     <div class="input-group">
                         <label for="settings-username">Kullanıcı Adı</label>
                         <input type="text" id="settings-username" required autocomplete="off" placeholder="Yeni kullanıcı adı">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="settings-volume">Uygulama İçi Ses Seviyesi (<span id="settings-volume-value">100%</span>)</label>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span>🔈</span>
+                            <input type="range" id="settings-volume" min="0" max="1" step="0.05" value="1" style="flex: 1; accent-color: var(--primary-color); height: 8px;">
+                            <span>🔊</span>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Değişiklikleri Kaydet</button>
                 </form>
@@ -332,6 +342,6 @@
 
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=22"></script>
+    <script src="app.js?v=23"></script>
 </body>
 </html>

@@ -129,6 +129,9 @@ const btnRequestNotifications = document.getElementById('btn-request-notificatio
 const btnInstallApp = document.getElementById('btn-install-app');
 const btnChatOptions = document.getElementById('btn-chat-options');
 const chatOptionsDropdown = document.getElementById('chat-options-dropdown');
+const btnMuteChat = document.getElementById('btn-mute-chat');
+const settingsVolume = document.getElementById('settings-volume');
+const settingsVolumeValue = document.getElementById('settings-volume-value');
 
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
@@ -143,6 +146,8 @@ let messages = [];
 let socket = null; // Soket bağlantı nesnemiz
 let titleAlertInterval = null;
 const originalTitle = document.title;
+let appVolume = parseFloat(localStorage.getItem('appVolume') || '1.0');
+let mutedChats = JSON.parse(localStorage.getItem('mutedChats') || '[]');
 
 // API Sunucu Adresi (Hem lokalde hem bulutta otomatik çalışması için bağıl yol yapıyoruz)
 const API_URL = '/api';
@@ -331,6 +336,62 @@ window.addEventListener('appinstalled', () => {
     }
 });
 
+// Ses Seviyesi Kaydırıcı Anlık Değişim Dinleyicisi
+if (settingsVolume && settingsVolumeValue) {
+    settingsVolume.addEventListener('input', () => {
+        settingsVolumeValue.textContent = Math.round(settingsVolume.value * 100) + '%';
+    });
+}
+
+// Sohbet Sessize Alma İşlemleri
+if (btnMuteChat) {
+    btnMuteChat.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const targetId = activeChatPartnerId ? `user_${activeChatPartnerId}` : `group_${activeChatGroupId}`;
+        if (!targetId) return;
+
+        if (mutedChats.includes(targetId)) {
+            mutedChats = mutedChats.filter(id => id !== targetId);
+            alert('Sohbet sesi açıldı.');
+        } else {
+            mutedChats.push(targetId);
+            alert('Sohbet sessize alındı. Bu sohbetten gelen bildirimler telefonunuzu titretmeyecek ve ses çıkarmayacaktır.');
+        }
+
+        // Değişiklikleri kaydet
+        localStorage.setItem('mutedChats', JSON.stringify(mutedChats));
+        await saveMutedChatsToCache(mutedChats);
+        updateMuteButtonUI();
+    });
+}
+
+function updateMuteButtonUI() {
+    if (!btnMuteChat) return;
+    const targetId = activeChatPartnerId ? `user_${activeChatPartnerId}` : `group_${activeChatGroupId}`;
+    if (!targetId) {
+        btnMuteChat.classList.add('hidden');
+        return;
+    }
+    btnMuteChat.classList.remove('hidden');
+
+    if (mutedChats.includes(targetId)) {
+        btnMuteChat.innerHTML = '🔔 <span>Sesi Aç</span>';
+    } else {
+        btnMuteChat.innerHTML = '🔕 <span>Sessize Al</span>';
+    }
+}
+
+async function saveMutedChatsToCache(mutedList) {
+    try {
+        if ('caches' in window) {
+            const cache = await caches.open('app-settings');
+            await cache.put('/muted-chats', new Response(JSON.stringify(mutedList)));
+        }
+    } catch (e) {
+        console.warn('Mute listesi Cache API\'ye kaydedilemedi:', e);
+    }
+}
+
 // Arkadaşlıktan Çıkarma Butonunu Dinle
 btnUnfriend.addEventListener('click', async () => {
     if (!activeChatPartnerId) return;
@@ -380,6 +441,11 @@ openSettingsBtn.addEventListener('click', () => {
         settingsAvatarPreview.textContent = currentUser.username.substring(0, 2).toUpperCase();
     }
     btnUploadPhoto.classList.add('hidden'); // Yükle butonu gizli başlasın
+    
+    if (settingsVolume && settingsVolumeValue) {
+        settingsVolume.value = appVolume;
+        settingsVolumeValue.textContent = Math.round(appVolume * 100) + '%';
+    }
     
     settingsModal.classList.remove('hidden');
 });
@@ -468,6 +534,12 @@ btnUploadPhoto.addEventListener('click', async () => {
 settingsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const newUsername = settingsUsername.value.trim();
+    // Ses Seviyesini Kaydet
+    if (settingsVolume) {
+        appVolume = parseFloat(settingsVolume.value);
+        localStorage.setItem('appVolume', appVolume);
+    }
+
     if (!newUsername || newUsername === currentUser.username) {
         settingsModal.classList.add('hidden');
         return;
@@ -546,19 +618,28 @@ function initAudioContext() {
 document.addEventListener('click', initAudioContext);
 document.addEventListener('touchstart', initAudioContext);
 
-function playNotificationSound() {
+function playNotificationSound(chatId = null) {
+    // Sohbet sessize alınmışsa ses çalma
+    if (chatId && mutedChats.includes(chatId)) {
+        return;
+    }
+
     try {
         initAudioContext();
         if (!globalAudioContext) return;
         
         const audioCtx = globalAudioContext;
         
+        // Kullanıcının belirlediği ses seviyesi (maksimum 0.8)
+        const vol = appVolume * 0.8;
+        if (vol <= 0) return; // Ses sıfırsa çalma
+        
         // 1. Nota (C5 - Do)
         const osc1 = audioCtx.createOscillator();
         const gain1 = audioCtx.createGain();
         osc1.type = 'sine';
         osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime);
-        gain1.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain1.gain.setValueAtTime(vol, audioCtx.currentTime);
         gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
         osc1.connect(gain1);
         gain1.connect(audioCtx.destination);
@@ -573,7 +654,7 @@ function playNotificationSound() {
                 const gain2 = audioCtx.createGain();
                 osc2.type = 'sine';
                 osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime);
-                gain2.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain2.gain.setValueAtTime(vol, audioCtx.currentTime);
                 gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.20);
                 osc2.connect(gain2);
                 gain2.connect(audioCtx.destination);
@@ -787,7 +868,7 @@ async function initApp() {
                 
                 // Sadece başkası gönderdiyse ses çal
                 if (msg.sender_id !== currentUser.id) {
-                    playNotificationSound();
+                    playNotificationSound(`group_${msg.group_id}`);
                 }
 
                 if (document.hidden || !isCurrentGroup) {
@@ -834,7 +915,7 @@ async function initApp() {
             // --- BİLDİRİM VE SES TETİKLEMELERİ ---
             // Sadece başkası gönderdiyse ses çal
             if (msg.sender_id !== currentUser.id) {
-                playNotificationSound();
+                playNotificationSound(`user_${msg.sender_id}`);
             }
 
             // Eğer sekme arka plandaysa (kullanıcı başka sekmedeyse) veya sohbet o kişiyle açık değilse uyar
@@ -1242,6 +1323,7 @@ async function selectUserChat(user) {
         activeChatPartner = user.username;
         activeChatPartnerId = user.id;
         activeChatGroupId = null;
+        updateMuteButtonUI();
 
         // Arama barını kapat ve sıfırla
         if (chatSearchBar) chatSearchBar.classList.add('hidden');
@@ -1766,6 +1848,7 @@ async function selectGroupChat(group) {
         activeChatPartner = null;
         activeChatPartnerId = null;
         activeChatGroupId = group.id;
+        updateMuteButtonUI();
 
         // Arama barını kapat ve sıfırla
         if (chatSearchBar) chatSearchBar.classList.add('hidden');
