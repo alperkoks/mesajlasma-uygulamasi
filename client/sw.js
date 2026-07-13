@@ -1,58 +1,26 @@
-const CACHE_NAME = 'agchat-cache-v5';
-const ASSETS_TO_CACHE = [
-    '/',
-    '/index.html',
-    '/style.css?v=5',
-    '/app.js?v=5',
-    '/manifest.json',
-    '/icon-192.png',
-    '/icon-512.png'
-];
+// GELİŞTİRME SÜRECİNDE ÖNBELLEK BYPASS EDİCİ SERVICE WORKER
+const CACHE_NAME = 'agchat-bypass-v5';
 
-// Service Worker Kurulumu (Install) ve Dosyaları Önbelleğe Alma
 self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            console.log('📦 PWA Önbellekleme Yapılıyor...');
-            return cache.addAll(ASSETS_TO_CACHE);
-        }).then(() => self.skipWaiting())
-    );
+    // Kurulum anında beklemeden hemen aktif olmasını sağla
+    self.skipWaiting();
 });
 
-// Eski Önbellekleri Temizleme (Activate)
 self.addEventListener('activate', (event) => {
+    // Eski tüm önbellekleri tamamen sil ve temizle
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cache) => {
-                    if (cache !== CACHE_NAME) {
-                        console.log('🧹 Eski PWA Önbelleği Siliniyor:', cache);
-                        return caches.delete(cache);
-                    }
+                    console.log('🧹 Geliştirme Temizliği - Önbellek Siliniyor:', cache);
+                    return caches.delete(cache);
                 })
             );
         }).then(() => self.clients.claim())
     );
 });
 
-// İstekleri Yakalama (Fetch) ve Ağ Hatası Durumunda Önbelleği Kullanma
+// Tüm istekleri önbelleğe almadan doğrudan ağdan çek (Network-Only)
 self.addEventListener('fetch', (event) => {
-    // Socket.io and API requests are not cached
-    if (event.request.url.includes('/api/') || event.request.url.includes('/socket.io/')) {
-        return;
-    }
-
-    event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
-            if (cachedResponse) {
-                return cachedResponse;
-            }
-            return fetch(event.request).catch(() => {
-                // If offline and page navigation, return index.html
-                if (event.request.mode === 'navigate') {
-                    return caches.match('/index.html');
-                }
-            });
-        })
-    );
+    event.respondWith(fetch(event.request));
 });
