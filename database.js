@@ -115,7 +115,7 @@ async function initDatabase() {
         const columns = tableInfo.map(col => col.name);
 
         if (!columns.includes('email')) {
-            await dbSqlite.exec("ALTER TABLE users ADD COLUMN email TEXT UNIQUE");
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN email TEXT");
         }
         if (!columns.includes('is_verified')) {
             await dbSqlite.exec("ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0");

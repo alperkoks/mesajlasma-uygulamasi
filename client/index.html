@@ -169,12 +169,22 @@
                 <span id="close-settings" class="close-btn" title="Kapat">&times;</span>
             </div>
             <div class="modal-body">
+                <!-- Profil Resmi Yükleme Bölümü -->
+                <div class="profile-pic-settings">
+                    <div class="avatar" id="settings-avatar-preview" style="width: 80px; height: 80px; font-size: 2rem; margin: 0 auto 1rem;">U</div>
+                    <div style="text-align: center; margin-bottom: 1.5rem;">
+                        <input type="file" id="settings-file-input" accept="image/*" class="hidden">
+                        <button type="button" id="btn-select-photo" class="btn btn-small" style="background-color: var(--primary-color); color: white;">Görsel Seç</button>
+                        <button type="button" id="btn-upload-photo" class="btn btn-small btn-accept hidden">Fotoğrafı Yükle</button>
+                    </div>
+                </div>
+
                 <form id="settings-form">
                     <div class="input-group">
                         <label for="settings-username">Kullanıcı Adı</label>
                         <input type="text" id="settings-username" required autocomplete="off" placeholder="Yeni kullanıcı adı">
                     </div>
-                    <button type="submit" class="btn btn-primary">Değişiklikleri Kaydet</button>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Değişiklikleri Kaydet</button>
                 </form>
             </div>
         </div>

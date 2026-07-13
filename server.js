@@ -15,6 +15,40 @@ const PORT = process.env.PORT || 3000; // Buluttaki dinamik portu veya lokalde 3
 const JWT_SECRET = 'mesajlasma-gizli-anahtar-12345';
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const cloudinary = require('cloudinary').v2;
+const multer = require('multer');
+
+// Cloudinary Yapılandırması (Görsel yüklemeleri için)
+if (process.env.CLOUDINARY_CLOUD_NAME) {
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+    console.log('✅ Cloudinary profil fotoğrafı yükleme altyapısı hazır.');
+} else {
+    console.log('⚠️ Cloudinary çevre değişkenleri eksik. Profil fotoğrafı yükleme simülasyon modunda çalışacak.');
+}
+
+// Disk yazma izinleriyle uğraşmamak için bellek (MemoryStorage) depolamalı Multer kurulumu
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Cloudinary'e hafızadaki (buffer) dosyayı yükleme akışı (stream) yardımcı fonksiyonu
+const uploadStream = (buffer) => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { folder: 'profile_pics' },
+            (error, result) => {
+                if (result) {
+                    resolve(result);
+                } else {
+                    reject(error);
+                }
+            }
+        );
+        stream.end(buffer);
+    });
+};
 
 // E-posta Gönderme Sistemi Kurulumu (Brevo API v3)
 // Render.com gibi bulut sunucuları SMTP portlarını (587/465) engellediği için e-postaları doğrudan HTTPS (REST API) üzerinden gönderiyoruz.
@@ -412,6 +446,54 @@ app.post('/api/profile/update-username', authenticateToken, async (req, res) => 
     } catch (error) {
         console.error('Kullanıcı adı güncelleme hatası:', error);
         res.status(500).json({ message: 'Kullanıcı adı güncellenirken sunucu hatası oluştu.' });
+    }
+});
+
+// 2.2 PROFİL FOTOĞRAFI YÜKLEME
+app.post('/api/profile/upload-pic', authenticateToken, upload.single('profile_pic'), async (req, res) => {
+    const userId = req.user.id;
+
+    if (!req.file) {
+        return res.status(400).json({ message: 'Lütfen geçerli bir görsel dosyası seçin.' });
+    }
+
+    try {
+        let imageUrl = '';
+
+        // Eğer Cloudinary ayarları girilmişse resmi yükle
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+            const uploadResult = await uploadStream(req.file.buffer);
+            imageUrl = uploadResult.secure_url;
+        } else {
+            // Eğer Cloudinary kurulu değilse simüle et
+            console.log('📷 [FOTOĞRAF SİMÜLASYONU] Cloudinary ayarları eksik, yerel test resmi kullanılıyor.');
+            imageUrl = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150';
+        }
+
+        // Veritabanını güncelle
+        await dbQueries.updateProfilePic(userId, imageUrl);
+
+        // Yeni bilgileri içeren taze bir JWT token üret (Token içindeki profile_pic güncellensin)
+        const token = jwt.sign(
+            { id: userId, username: req.user.username, profile_pic: imageUrl }, 
+            JWT_SECRET, 
+            { expiresIn: '7d' }
+        );
+
+        // Tüm aktif kullanıcılara profil resminin değiştiğini duyur (soket ile anlık güncellensin)
+        io.emit('profile_pic_changed', {
+            userId: userId,
+            profilePic: imageUrl
+        });
+
+        res.json({
+            message: 'Profil fotoğrafınız başarıyla güncellendi!',
+            token: token,
+            profile_pic: imageUrl
+        });
+    } catch (error) {
+        console.error('Profil resmi yükleme hatası:', error);
+        res.status(500).json({ message: 'Profil resmi yüklenirken hata oluştu.' });
     }
 });
 

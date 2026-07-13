@@ -41,6 +41,10 @@ const openSettingsBtn = document.getElementById('open-settings-btn');
 const closeSettings = document.getElementById('close-settings');
 const settingsForm = document.getElementById('settings-form');
 const settingsUsername = document.getElementById('settings-username');
+const settingsAvatarPreview = document.getElementById('settings-avatar-preview');
+const settingsFileInput = document.getElementById('settings-file-input');
+const btnSelectPhoto = document.getElementById('btn-select-photo');
+const btnUploadPhoto = document.getElementById('btn-upload-photo');
 
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
@@ -234,6 +238,15 @@ btnBlock.addEventListener('click', async () => {
 // Ayarlar Modalini Aç
 openSettingsBtn.addEventListener('click', () => {
     settingsUsername.value = currentUser.username;
+    
+    // Profil resmi önizlemesini yükle
+    if (currentUser.profile_pic) {
+        settingsAvatarPreview.innerHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
+    } else {
+        settingsAvatarPreview.textContent = currentUser.username.substring(0, 2).toUpperCase();
+    }
+    btnUploadPhoto.classList.add('hidden'); // Yükle butonu gizli başlasın
+    
     settingsModal.classList.remove('hidden');
 });
 
@@ -246,6 +259,74 @@ closeSettings.addEventListener('click', () => {
 window.addEventListener('click', (e) => {
     if (e.target === settingsModal) {
         settingsModal.classList.add('hidden');
+    }
+});
+
+// "Görsel Seç" butonuna basıldığında dosya seçiciyi tetikle
+btnSelectPhoto.addEventListener('click', () => {
+    settingsFileInput.click();
+});
+
+// Dosya seçildiğinde önizleme yap
+settingsFileInput.addEventListener('change', () => {
+    const file = settingsFileInput.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            settingsAvatarPreview.innerHTML = `<img src="${e.target.result}" class="avatar-img">`;
+            btnUploadPhoto.classList.remove('hidden'); // Fotoğrafı Yükle butonunu göster
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// "Fotoğrafı Yükle" butonuna basıldığında görseli sunucuya yükle (Cloudinary)
+btnUploadPhoto.addEventListener('click', async () => {
+    const file = settingsFileInput.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('profile_pic', file);
+
+    try {
+        const response = await fetch('/api/profile/upload-pic', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || 'Yükleme başarısız oldu.');
+        }
+
+        alert(data.message);
+
+        // Token ve Kullanıcı bilgisini güncelle
+        token = data.token;
+        currentUser.profile_pic = data.profile_pic;
+        localStorage.setItem('token', token);
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+        // Kendi avatarlarımızı anlık güncelle
+        if (currentUser.profile_pic) {
+            const imgHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
+            myAvatar.innerHTML = imgHTML;
+            settingsAvatarPreview.innerHTML = imgHTML;
+        }
+
+        btnUploadPhoto.classList.add('hidden');
+
+        if (socket) {
+            socket.auth.token = token;
+        }
+
+        await loadUsers();
+    } catch (err) {
+        console.error('Profil resmi yükleme hatası:', err);
+        alert(err.message || 'Profil resmi yüklenirken bir hata oluştu.');
     }
 });
 
@@ -270,11 +351,14 @@ settingsForm.addEventListener('submit', async (e) => {
 
         // Kendi arayüzümüzü güncelle
         myUsernameEl.textContent = currentUser.username;
-        myAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+        if (currentUser.profile_pic) {
+            myAvatar.innerHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
+        } else {
+            myAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+        }
 
         settingsModal.classList.add('hidden');
         
-        // Soket bağlantısını yeni token ile tazelemek için (isteğe bağlı)
         if (socket) {
             socket.auth.token = token;
         }
@@ -294,7 +378,11 @@ async function initApp() {
     try {
         currentUser = JSON.parse(localStorage.getItem('currentUser'));
         myUsernameEl.textContent = currentUser.username;
-        myAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+        if (currentUser.profile_pic) {
+            myAvatar.innerHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
+        } else {
+            myAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+        }
 
         showScreen('chat');
         await loadUsers();
@@ -388,6 +476,23 @@ async function initApp() {
                 activeChatAvatar.textContent = data.newUsername.substring(0, 2).toUpperCase();
             }
         });
+
+        // KULLANICI PROFİL FOTOĞRAFINI DEĞİŞTİRDİĞİNDE çalışan olay
+        socket.on('profile_pic_changed', (data) => {
+            console.log('Profil fotoğrafı değişti:', data);
+            
+            // 1. Arkadaşlarımız arasındaysa profil resmini güncelle
+            const friend = users.find(u => u.id === data.userId);
+            if (friend) {
+                friend.profile_pic = data.profilePic;
+                renderUsersList();
+            }
+
+            // 2. Eğer şu an sohbet ettiğimiz partner ise başlık bilgisini güncelle
+            if (activeChatPartnerId === data.userId) {
+                activeChatAvatar.innerHTML = `<img src="${data.profilePic}" alt="${activeChatPartner}" class="avatar-img">`;
+            }
+        });
         
     } catch (err) {
         logoutBtn.click();
@@ -422,8 +527,12 @@ function renderUsersList() {
         const statusClass = user.isOnline ? 'online' : 'offline';
         const statusText = user.isOnline ? 'çevrimiçi' : 'çevrimdışı';
 
+        const avatarHTML = user.profile_pic 
+            ? `<img src="${user.profile_pic}" alt="${user.username}" class="avatar-img">`
+            : initial;
+
         li.innerHTML = `
-            <div class="avatar">${initial}</div>
+            <div class="avatar">${avatarHTML}</div>
             <div class="user-item-info">
                 <div class="user-item-header">
                     <span class="name">${user.username}</span>
@@ -467,10 +576,13 @@ function renderPendingRequests(requests) {
         li.className = 'pending-request-item';
         
         const initial = req.username.substring(0, 2).toUpperCase();
+        const avatarHTML = req.profile_pic 
+            ? `<img src="${req.profile_pic}" alt="${req.username}" class="avatar-img">`
+            : initial;
         
         li.innerHTML = `
             <div class="pending-request-info">
-                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.8rem; min-width: 32px;">${initial}</div>
+                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.8rem; min-width: 32px;">${avatarHTML}</div>
                 <span class="username" style="font-weight: 500;">${req.username}</span>
             </div>
             <div class="pending-request-actions">
@@ -535,10 +647,14 @@ function renderSearchResult(user) {
         actionBtnHTML = `<button class="btn-add-friend" style="background-color: #EF4444;" id="btn-action-unblock" data-id="${user.id}">Engeli Kaldır</button>`;
     }
 
+    const avatarHTML = user.profile_pic 
+        ? `<img src="${user.profile_pic}" alt="${user.username}" class="avatar-img">`
+        : initial;
+
     searchResultBox.innerHTML = `
         <div class="search-result-item">
             <div class="search-result-info">
-                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.8rem; min-width: 32px;">${initial}</div>
+                <div class="avatar" style="width: 32px; height: 32px; font-size: 0.8rem; min-width: 32px;">${avatarHTML}</div>
                 <span style="font-weight: 500;">${user.username}</span>
             </div>
             <div class="search-result-action">
@@ -600,7 +716,11 @@ async function selectUserChat(user) {
     renderUsersList();
 
     activeChatName.textContent = user.username;
-    activeChatAvatar.textContent = user.username.substring(0, 2).toUpperCase();
+    if (user.profile_pic) {
+        activeChatAvatar.innerHTML = `<img src="${user.profile_pic}" alt="${user.username}" class="avatar-img">`;
+    } else {
+        activeChatAvatar.textContent = user.username.substring(0, 2).toUpperCase();
+    }
     activeChatStatus.textContent = user.isOnline ? 'çevrimiçi' : 'çevrimdışı';
 
     noChatSelectedScreen.classList.add('hidden');
