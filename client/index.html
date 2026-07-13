@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -116,7 +116,7 @@
                 <!-- Sekme Seçenekleri -->
                 <div class="sidebar-tabs" style="display: flex; gap: 0.25rem; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color);">
                     <button id="tab-friends" class="btn active" style="flex: 1; padding: 0.4rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background-color: var(--primary-color); color: white;">Arkadaşlar</button>
-                    <button id="tab-groups" class="btn" style="flex: 1; padding: 0.4rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background-color: transparent; border: 1px solid var(--border-color);">Gruplar</button>
+                    <button id="tab-groups" class="btn" style="flex: 1; padding: 0.4rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main);">Gruplar</button>
                 </div>
 
                 <!-- Arkadaşlar Sekmesi İçeriği -->
@@ -167,6 +167,7 @@
                             </div>
                         </div>
                         <div class="chat-header-actions" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button id="btn-group-settings" class="btn-icon hidden" title="Grup Bilgileri & Ayarları" style="font-size: 1.25rem; padding: 0.3rem;">⚙️</button>
                             <button id="btn-toggle-search" class="btn-icon" title="Mesajlarda Ara" style="font-size: 1.2rem; padding: 0.3rem;">🔍</button>
                             <button id="btn-clear-chat" class="btn-icon" title="Sohbeti Temizle" style="font-size: 1.2rem; padding: 0.3rem;">🗑️</button>
                             <button id="btn-unfriend" class="btn-action-danger" title="Arkadaşlıktan Çıkar">❌ <span>Çıkar</span></button>
@@ -264,8 +265,50 @@
         </div>
     </div>
 
+    <!-- 6. EKRAN: GRUP AYARLARI/BİLGİLERİ MODALI (Varsayılan olarak gizli) -->
+    <div id="group-settings-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3>Grup Bilgileri & Ayarları</h3>
+                <span id="close-group-settings-modal" class="close-btn" title="Kapat">&times;</span>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                
+                <!-- Grup Profil Fotoğrafı Bölümü -->
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                    <div id="group-settings-avatar-preview" style="width: 80px; height: 80px; border-radius: 50%; background-color: var(--primary-light); color: var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold; overflow: hidden;">
+                        G
+                    </div>
+                    <label id="lbl-group-pic" for="group-pic-input" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem; cursor: pointer; display: none;">Grup Fotoğrafı Yükle</label>
+                    <input type="file" id="group-pic-input" accept="image/*" style="display: none;">
+                </div>
+
+                <!-- Grup Adı Düzenleme -->
+                <div class="input-group">
+                    <label for="group-settings-name-input">Grup Adı</label>
+                    <div style="display: flex; gap: 0.5rem; width: 100%;">
+                        <input type="text" id="group-settings-name-input" placeholder="Grup adını girin..." style="flex: 1;" autocomplete="off">
+                        <button id="btn-group-name-update" class="btn btn-primary" style="display: none; padding: 0 1rem; font-size: 0.85rem;">Güncelle</button>
+                    </div>
+                </div>
+
+                <!-- Üyeler Listesi -->
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <label style="font-weight: 600; font-size: 0.9rem;">Grup Üyeleri</label>
+                    <div id="group-members-list-container" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Üyeler buraya JS ile dinamik çizilecek -->
+                    </div>
+                </div>
+
+                <!-- Gruptan Ayrıl / Sil Butonu -->
+                <button id="btn-leave-group" class="btn btn-action-danger" style="width: 100%; margin-top: 0.5rem;">Gruptan Ayrıl</button>
+                
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>

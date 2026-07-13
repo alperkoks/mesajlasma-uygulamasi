@@ -925,6 +925,143 @@ app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => 
     }
 });
 
+// 3.12 GRUP ÜYELERİNİ GETİR
+app.get('/api/groups/:groupId/members', authenticateToken, async (req, res) => {
+    const groupId = parseInt(req.params.groupId);
+    try {
+        const members = await dbQueries.getGroupMembers(groupId);
+        res.json(members);
+    } catch (error) {
+        console.error('Grup üyeleri getirme hatası:', error);
+        res.status(500).json({ message: 'Grup üyeleri listelenirken hata oluştu.' });
+    }
+});
+
+// 3.13 GRUP AYARLARINI GÜNCELLE (AD DEĞİŞTİRME & YÖNETİCİLİK DEVRETME)
+app.post('/api/groups/:groupId/update', authenticateToken, async (req, res) => {
+    const groupId = parseInt(req.params.groupId);
+    const currentUserId = req.user.id;
+    const { name, profilePic, createdBy } = req.body;
+
+    try {
+        const group = await dbQueries.getGroupById(groupId);
+        if (!group) return res.status(404).json({ message: 'Grup bulunamadı.' });
+
+        // Sadece grup yöneticisi güncelleyebilir
+        if (group.created_by !== currentUserId) {
+            return res.status(403).json({ message: 'Grup ayarlarını sadece yönetici güncelleyebilir.' });
+        }
+
+        const finalName = name ? name.trim() : group.name;
+        const finalProfilePic = profilePic !== undefined ? profilePic : group.profile_pic;
+        const finalCreatedBy = createdBy ? parseInt(createdBy) : group.created_by;
+
+        await dbQueries.updateGroup(groupId, finalName, finalProfilePic, finalCreatedBy);
+
+        const updatedGroup = {
+            id: groupId,
+            name: finalName,
+            profile_pic: finalProfilePic,
+            created_by: finalCreatedBy
+        };
+
+        // Soketle tüm gruba duyur
+        io.to(`group_${groupId}`).emit('group_updated', updatedGroup);
+
+        res.json({ message: 'Grup başarıyla güncellendi.', group: updatedGroup });
+    } catch (error) {
+        console.error('Grup güncelleme hatası:', error);
+        res.status(500).json({ message: 'Grup güncellenirken hata oluştu.' });
+    }
+});
+
+// 3.14 GRUPTAN ÜYE ÇIKAR VEYA AYRIL
+app.post('/api/groups/:groupId/remove-member', authenticateToken, async (req, res) => {
+    const groupId = parseInt(req.params.groupId);
+    const currentUserId = req.user.id;
+    const targetUserId = parseInt(req.body.userId);
+
+    try {
+        const group = await dbQueries.getGroupById(groupId);
+        if (!group) return res.status(404).json({ message: 'Grup bulunamadı.' });
+
+        // Yalnızca grup yöneticisi birini çıkarabilir, ancak üye kendisi gruptan ayrılabilir
+        if (group.created_by !== currentUserId && targetUserId !== currentUserId) {
+            return res.status(403).json({ message: 'Yalnızca grup yöneticisi üye çıkartabilir.' });
+        }
+
+        // Eğer yönetici kendisi ayrılmaya çalışıyorsa ve grupta başkaları varsa, önce yöneticiliği devretmeli!
+        if (targetUserId === currentUserId && group.created_by === currentUserId) {
+            const members = await dbQueries.getGroupMembers(groupId);
+            if (members.length > 1) {
+                return res.status(400).json({ message: 'Gruptan ayrılmadan önce yöneticiliği başka bir üyeye devretmelisiniz.' });
+            }
+        }
+
+        await dbQueries.removeGroupMember(groupId, targetUserId);
+
+        // Soket üzerinden üye çıkışını duyur
+        io.to(`group_${groupId}`).emit('member_removed', { groupId, userId: targetUserId });
+
+        // Çıkarılan üyenin soketlerini odadan çıkar ve uyar
+        const targetSockets = userSockets.get(targetUserId);
+        if (targetSockets) {
+            targetSockets.forEach(sId => {
+                const s = io.sockets.sockets.get(sId);
+                if (s) {
+                    s.leave(`group_${groupId}`);
+                    s.emit('left_group', { groupId });
+                }
+            });
+        }
+
+        res.json({ message: targetUserId === currentUserId ? 'Gruptan başarıyla ayrıldınız.' : 'Üye gruptan çıkartıldı.' });
+    } catch (error) {
+        console.error('Üye çıkarma hatası:', error);
+        res.status(500).json({ message: 'Üye gruptan çıkarılırken hata oluştu.' });
+    }
+});
+
+// 3.15 GRUP PROFİL FOTOĞRAFI YÜKLEME
+app.post('/api/groups/:groupId/upload-pic', authenticateToken, upload.single('group_pic'), async (req, res) => {
+    const groupId = parseInt(req.params.groupId);
+    const currentUserId = req.user.id;
+
+    if (!req.file) return res.status(400).json({ message: 'Lütfen geçerli bir görsel seçin.' });
+
+    try {
+        const group = await dbQueries.getGroupById(groupId);
+        if (!group) return res.status(404).json({ message: 'Grup bulunamadı.' });
+        if (group.created_by !== currentUserId) {
+            return res.status(403).json({ message: 'Grup fotoğrafını yalnızca yönetici güncelleyebilir.' });
+        }
+
+        let imageUrl = '';
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+            const uploadResult = await uploadStream(req.file.buffer);
+            imageUrl = uploadResult.secure_url;
+        } else {
+            console.log('📷 [GRUP FOTOĞRAF SİMÜLASYONU] Cloudinary ayarları eksik.');
+            imageUrl = 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=150&h=150';
+        }
+
+        await dbQueries.updateGroup(groupId, group.name, imageUrl, group.created_by);
+
+        // Soketle tüm gruba duyur
+        io.to(`group_${groupId}`).emit('group_updated', {
+            id: groupId,
+            name: group.name,
+            profile_pic: imageUrl,
+            created_by: group.created_by
+        });
+
+        res.json({ message: 'Grup fotoğrafı başarıyla güncellendi.', profile_pic: imageUrl });
+    } catch (error) {
+        console.error('Grup fotoğrafı yükleme hatası:', error);
+        res.status(500).json({ message: 'Grup fotoğrafı güncellenirken hata oluştu.' });
+    }
+});
+
 // 4. İKİ KULLANICI ARASINDAKİ MESAJ GEÇMİŞİ
 app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
     const senderId = req.user.id;

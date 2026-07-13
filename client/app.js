@@ -93,6 +93,18 @@ const chatSearchBar = document.getElementById('chat-search-bar');
 const chatSearchInput = document.getElementById('chat-search-input');
 const btnChatSearchClose = document.getElementById('btn-chat-search-close');
 
+// GRUP AYARLARI MODAL ELEMENTLERİ
+const btnGroupSettings = document.getElementById('btn-group-settings');
+const groupSettingsModal = document.getElementById('group-settings-modal');
+const closeGroupSettingsModal = document.getElementById('close-group-settings-modal');
+const groupSettingsAvatarPreview = document.getElementById('group-settings-avatar-preview');
+const lblGroupPic = document.getElementById('lbl-group-pic');
+const groupPicInput = document.getElementById('group-pic-input');
+const groupSettingsNameInput = document.getElementById('group-settings-name-input');
+const btnGroupNameUpdate = document.getElementById('btn-group-name-update');
+const groupMembersListContainer = document.getElementById('group-members-list-container');
+const btnLeaveGroup = document.getElementById('btn-leave-group');
+
 // PROFİL AYARLARI ELEMENTLERİ
 const settingsModal = document.getElementById('settings-modal');
 const openSettingsBtn = document.getElementById('open-settings-btn');
@@ -687,6 +699,37 @@ async function initApp() {
             loadGroups();
         });
 
+        // GRUP GÜNCELLEMELERİ VE MODERASYON SOKET OLAYLARI
+        socket.on('group_updated', (updatedGroup) => {
+            if (activeChatGroupId === updatedGroup.id) {
+                activeChatName.textContent = updatedGroup.name;
+                if (updatedGroup.profile_pic) {
+                    activeChatAvatar.style.backgroundColor = 'transparent';
+                    activeChatAvatar.innerHTML = `<img src="${updatedGroup.profile_pic}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+                }
+            }
+            loadGroups();
+        });
+
+        socket.on('member_removed', (data) => {
+            if (activeChatGroupId === data.groupId) {
+                if (groupSettingsModal && !groupSettingsModal.classList.contains('hidden')) {
+                    const group = groups.find(g => g.id === data.groupId);
+                    if (group) loadGroupMembers(group);
+                }
+            }
+        });
+
+        socket.on('left_group', (data) => {
+            if (activeChatGroupId === data.groupId) {
+                alert('Bu gruptan çıkarıldınız moruk!');
+                activeChatGroupId = null;
+                chatActiveScreen.classList.add('hidden');
+                noChatSelectedScreen.classList.remove('hidden');
+            }
+            loadGroups();
+        });
+
         // SOHBET TEMİZLENDİĞİNDE çalışan olay
         socket.on('chat_cleared', (data) => {
             if (data.groupId && activeChatGroupId === data.groupId) {
@@ -1029,6 +1072,7 @@ async function selectUserChat(user) {
         // Butonları görünür kıl
         btnUnfriend.classList.remove('hidden');
         btnBlock.classList.remove('hidden');
+        if (btnGroupSettings) btnGroupSettings.classList.add('hidden');
 
         // Okunmamış mesaj sayısını sıfırla
         user.unread_count = 0;
@@ -1345,7 +1389,7 @@ if (tabFriends && tabGroups) {
 
         tabGroups.classList.remove('active');
         tabGroups.style.backgroundColor = 'transparent';
-        tabGroups.style.color = 'inherit';
+        tabGroups.style.color = 'var(--text-main)';
         tabGroups.style.border = '1px solid var(--border-color)';
 
         friendsTabContent.classList.remove('hidden');
@@ -1359,7 +1403,7 @@ if (tabFriends && tabGroups) {
 
         tabFriends.classList.remove('active');
         tabFriends.style.backgroundColor = 'transparent';
-        tabFriends.style.color = 'inherit';
+        tabFriends.style.color = 'var(--text-main)';
         tabFriends.style.border = '1px solid var(--border-color)';
 
         groupsTabContent.classList.remove('hidden');
@@ -1458,6 +1502,9 @@ function renderGroupsList() {
         li.className = `user-item ${activeChatGroupId === group.id ? 'active' : ''}`;
         
         const initial = group.name.substring(0, 2).toUpperCase();
+        const avatarHTML = group.profile_pic 
+            ? `<img src="${group.profile_pic}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">` 
+            : initial;
 
         const lastMsgText = group.last_message 
             ? escapeHTML(group.last_message) 
@@ -1468,7 +1515,7 @@ function renderGroupsList() {
             : '';
 
         li.innerHTML = `
-            <div class="avatar" style="background-color: var(--primary-light); color: var(--primary-color); font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 50%; width: 44px; height: 44px;">${initial}</div>
+            <div class="avatar" style="background-color: var(--primary-light); color: var(--primary-color); font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 50%; width: 44px; height: 44px; overflow: hidden;">${avatarHTML}</div>
             <div class="user-item-info">
                 <div class="user-item-header">
                     <span class="name">${escapeHTML(group.name)}</span>
@@ -1507,10 +1554,15 @@ async function selectGroupChat(group) {
         }
 
         // Başlık güncellemeleri
-        activeChatAvatar.style.backgroundColor = 'var(--primary-light)';
-        activeChatAvatar.style.color = 'var(--primary-color)';
-        activeChatAvatar.style.fontWeight = 'bold';
-        activeChatAvatar.innerHTML = group.name.substring(0, 2).toUpperCase();
+        if (group.profile_pic) {
+            activeChatAvatar.style.backgroundColor = 'transparent';
+            activeChatAvatar.innerHTML = `<img src="${group.profile_pic}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        } else {
+            activeChatAvatar.style.backgroundColor = 'var(--primary-light)';
+            activeChatAvatar.style.color = 'var(--primary-color)';
+            activeChatAvatar.style.fontWeight = 'bold';
+            activeChatAvatar.innerHTML = group.name.substring(0, 2).toUpperCase();
+        }
 
         activeChatName.textContent = group.name;
         activeChatStatus.textContent = 'Grup Sohbeti';
@@ -1518,6 +1570,7 @@ async function selectGroupChat(group) {
         // Arkadaşlık butonlarını gizle
         btnUnfriend.classList.add('hidden');
         btnBlock.classList.add('hidden');
+        if (btnGroupSettings) btnGroupSettings.classList.remove('hidden');
 
         noChatSelectedScreen.classList.add('hidden');
         chatActiveScreen.classList.remove('hidden');
@@ -1611,6 +1664,233 @@ if (btnClearChat) {
             alert('Sohbet temizlenirken hata oluştu: ' + err.message);
         }
     });
+}
+
+// --- GRUP AYARLARI VE MODERASYON UI İŞLEMLERİ ---
+
+if (btnGroupSettings) {
+    btnGroupSettings.addEventListener('click', openGroupSettings);
+}
+
+if (closeGroupSettingsModal) {
+    closeGroupSettingsModal.addEventListener('click', () => {
+        groupSettingsModal.classList.add('hidden');
+    });
+}
+
+// Grup Adı Güncelleme
+if (btnGroupNameUpdate) {
+    btnGroupNameUpdate.addEventListener('click', async () => {
+        const newName = groupSettingsNameInput.value.trim();
+        if (!newName) return;
+        try {
+            await apiCall(`/groups/${activeChatGroupId}/update`, 'POST', { name: newName });
+            alert('Grup adı başarıyla güncellendi.');
+            await loadGroups();
+            const grp = groups.find(g => g.id === activeChatGroupId);
+            if (grp) {
+                activeChatName.textContent = grp.name;
+            }
+        } catch (err) {
+            alert('Grup adı güncellenemedi: ' + err.message);
+        }
+    });
+}
+
+// Grup Profil Fotoğrafı Seçme & Yükleme
+if (groupPicInput) {
+    groupPicInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('group_pic', file);
+
+        const originalText = lblGroupPic.textContent;
+        lblGroupPic.textContent = 'Yükleniyor...';
+        lblGroupPic.style.opacity = '0.7';
+
+        try {
+            const res = await fetch(`/api/groups/${activeChatGroupId}/upload-pic`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Fotoğraf yüklenemedi.');
+
+            alert(data.message);
+            groupSettingsAvatarPreview.innerHTML = `<img src="${data.profile_pic}" style="width:100%; height:100%; object-fit:cover;">`;
+            await loadGroups();
+            
+            if (activeChatAvatar) {
+                activeChatAvatar.style.backgroundColor = 'transparent';
+                activeChatAvatar.innerHTML = `<img src="${data.profile_pic}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`;
+            }
+        } catch (err) {
+            alert('Hata: ' + err.message);
+        } finally {
+            lblGroupPic.textContent = originalText;
+            lblGroupPic.style.opacity = '1';
+            groupPicInput.value = '';
+        }
+    });
+}
+
+// Gruptan Ayrıl / Sil
+if (btnLeaveGroup) {
+    btnLeaveGroup.addEventListener('click', async () => {
+        const group = groups.find(g => g.id === activeChatGroupId);
+        if (!group) return;
+
+        const isAdmin = group.created_by === currentUser.id;
+        const confirmMsg = isAdmin
+            ? 'Bu grubu tamamen kapatmak/ayrılmak istediğinize emin misiniz?'
+            : 'Gruptan ayrılmak istediğinize emin misiniz?';
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            await apiCall(`/groups/${activeChatGroupId}/remove-member`, 'POST', {
+                userId: currentUser.id
+            });
+
+            groupSettingsModal.classList.add('hidden');
+            activeChatGroupId = null;
+            chatActiveScreen.classList.add('hidden');
+            noChatSelectedScreen.classList.remove('hidden');
+
+            await loadGroups();
+        } catch (err) {
+            alert('Gruptan ayrılırken hata oluştu: ' + err.message);
+        }
+    });
+}
+
+async function openGroupSettings() {
+    if (!activeChatGroupId) return;
+
+    try {
+        const group = groups.find(g => g.id === activeChatGroupId);
+        if (!group) return;
+
+        groupSettingsNameInput.value = group.name;
+
+        if (group.profile_pic) {
+            groupSettingsAvatarPreview.style.backgroundColor = 'transparent';
+            groupSettingsAvatarPreview.innerHTML = `<img src="${group.profile_pic}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        } else {
+            groupSettingsAvatarPreview.style.backgroundColor = 'var(--primary-light)';
+            groupSettingsAvatarPreview.innerHTML = group.name.substring(0, 2).toUpperCase();
+        }
+
+        const isAdmin = group.created_by === currentUser.id;
+
+        if (isAdmin) {
+            lblGroupPic.style.display = 'inline-block';
+            groupSettingsNameInput.removeAttribute('disabled');
+            btnGroupNameUpdate.style.display = 'inline-block';
+            btnLeaveGroup.textContent = 'Grubu Sil / Ayrıl';
+        } else {
+            lblGroupPic.style.display = 'none';
+            groupSettingsNameInput.setAttribute('disabled', 'true');
+            btnGroupNameUpdate.style.display = 'none';
+            btnLeaveGroup.textContent = 'Gruptan Ayrıl';
+        }
+
+        await loadGroupMembers(group);
+
+        groupSettingsModal.classList.remove('hidden');
+    } catch (err) {
+        alert('Grup ayarları yüklenemedi: ' + err.message);
+    }
+}
+
+async function loadGroupMembers(group) {
+    try {
+        const members = await apiCall(`/groups/${group.id}/members`);
+        groupMembersListContainer.innerHTML = '';
+
+        const isAdmin = group.created_by === currentUser.id;
+
+        members.forEach(member => {
+            const div = document.createElement('div');
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.justifyContent = 'space-between';
+            div.style.padding = '0.5rem 0';
+            div.style.borderBottom = '1px solid var(--border-color)';
+
+            const isMemberAdmin = group.created_by === member.id;
+
+            let actionHTML = '';
+            if (isMemberAdmin) {
+                actionHTML = '<span style="font-size: 0.75rem; background-color: var(--primary-light); color: var(--primary-color); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold;">Yönetici</span>';
+            } else if (isAdmin) {
+                actionHTML = `
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button class="btn btn-make-admin" data-uid="${member.id}" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; background-color: var(--primary-light); color: var(--primary-color); border: none; border-radius: 4px; cursor: pointer;">Yönetici Yap</button>
+                        <button class="btn btn-kick-member" data-uid="${member.id}" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; background-color: var(--danger-light); color: var(--danger-color); border: none; border-radius: 4px; cursor: pointer;">Çıkar</button>
+                    </div>
+                `;
+            }
+
+            const initial = member.username.substring(0, 2).toUpperCase();
+
+            div.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <div style="width: 32px; height: 32px; border-radius: 50%; background-color: var(--border-color); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold; overflow: hidden;">
+                        ${member.profile_pic ? `<img src="${member.profile_pic}" style="width: 100%; height: 100%; object-fit: cover;">` : initial}
+                    </div>
+                    <span style="font-size: 0.9rem; color: var(--text-main); font-weight: 500;">${escapeHTML(member.username)}</span>
+                </div>
+                <div>${actionHTML}</div>
+            `;
+
+            groupMembersListContainer.appendChild(div);
+        });
+
+        // Yönetici Yap Olayları
+        groupMembersListContainer.querySelectorAll('.btn-make-admin').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const targetUserId = e.target.getAttribute('data-uid');
+                if (!confirm('Yöneticilik yetkisini bu üyeye devretmek istediğinize emin misiniz?')) return;
+
+                try {
+                    await apiCall(`/groups/${group.id}/update`, 'POST', {
+                        createdBy: targetUserId
+                    });
+                    await loadGroups();
+                    await openGroupSettings();
+                } catch (err) {
+                    alert('Yöneticilik devredilemedi: ' + err.message);
+                }
+            });
+        });
+
+        // Çıkar Olayları
+        groupMembersListContainer.querySelectorAll('.btn-kick-member').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const targetUserId = e.target.getAttribute('data-uid');
+                if (!confirm('Bu üyeyi gruptan çıkartmak istediğinize emin misiniz?')) return;
+
+                try {
+                    await apiCall(`/groups/${group.id}/remove-member`, 'POST', {
+                        userId: targetUserId
+                    });
+                    await loadGroupMembers(group);
+                } catch (err) {
+                    alert('Üye çıkartılamadı: ' + err.message);
+                }
+            });
+        });
+
+    } catch (err) {
+        console.error('Grup üyeleri yüklenemedi', err);
+    }
 }
 
 initApp();

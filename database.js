@@ -93,6 +93,7 @@ async function initDatabase() {
                 )
             `);
             // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
+            await client.query(`ALTER TABLE messages ALTER COLUMN receiver_id DROP NOT NULL`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS group_id INTEGER`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) DEFAULT 'text'`);
@@ -103,6 +104,7 @@ async function initDatabase() {
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token TEXT`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expires TIMESTAMP`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
+            await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
 
             console.log('PostgreSQL Tabloları kontrol edildi/oluşturuldu.');
         } finally {
@@ -230,6 +232,12 @@ async function initDatabase() {
                 UNIQUE(group_id, user_id)
             )
         `);
+
+        const tableInfoGroups = await dbSqlite.all("PRAGMA table_info(groups)");
+        const columnsGroups = tableInfoGroups.map(col => col.name);
+        if (!columnsGroups.includes('profile_pic')) {
+            await dbSqlite.exec("ALTER TABLE groups ADD COLUMN profile_pic TEXT");
+        }
 
         console.log('SQLite Tabloları kontrol edildi/oluşturuldu.');
     }
@@ -379,14 +387,15 @@ const dbQueries = {
 
     // Yeni mesaj kaydetme (Grup ve dosya tipleri desteğiyle)
     async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null) {
-        const finalReceiverId = groupId ? 0 : receiverId;
         if (isPostgres) {
+            const finalReceiverId = groupId ? null : receiverId;
             const res = await dbPostgresPool.query(
                 'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
                 [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl]
             );
             return res.rows[0];
         } else {
+            const finalReceiverId = groupId ? 0 : receiverId;
             const result = await dbSqlite.run(
                 'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
                 [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl]
@@ -688,6 +697,8 @@ const dbQueries = {
             SELECT 
                 groups.id,
                 groups.name,
+                groups.profile_pic,
+                groups.created_by,
                 (
                     SELECT message FROM messages 
                     WHERE messages.group_id = groups.id 
@@ -768,6 +779,46 @@ const dbQueries = {
                     [userId, receiverId, receiverId, userId]
                 );
             }
+        }
+    },
+
+    // Grup ID'sine göre grup bul
+    async getGroupById(groupId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query('SELECT * FROM groups WHERE id = $1', [groupId]);
+            return res.rows[0];
+        } else {
+            return await dbSqlite.get('SELECT * FROM groups WHERE id = ?', [groupId]);
+        }
+    },
+
+    // Grup ayarlarını güncelle
+    async updateGroup(groupId, name, profilePic, createdBy) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'UPDATE groups SET name = $1, profile_pic = $2, created_by = $3 WHERE id = $4',
+                [name, profilePic, createdBy, groupId]
+            );
+        } else {
+            await dbSqlite.run(
+                'UPDATE groups SET name = ?, profile_pic = ?, created_by = ? WHERE id = ?',
+                [name, profilePic, createdBy, groupId]
+            );
+        }
+    },
+
+    // Gruptan üye çıkar / ayrıl
+    async removeGroupMember(groupId, userId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'DELETE FROM group_members WHERE group_id = $1 AND user_id = $2',
+                [groupId, userId]
+            );
+        } else {
+            await dbSqlite.run(
+                'DELETE FROM group_members WHERE group_id = ? AND user_id = ?',
+                [groupId, userId]
+            );
         }
     }
 };
