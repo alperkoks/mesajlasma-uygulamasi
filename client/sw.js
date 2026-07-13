@@ -1,9 +1,9 @@
-const CACHE_NAME = 'agchat-cache-v4';
+const CACHE_NAME = 'agchat-cache-v5';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
-    '/style.css?v=4',
-    '/app.js?v=4',
+    '/style.css?v=5',
+    '/app.js?v=5',
     '/manifest.json',
     '/icon-192.png',
     '/icon-512.png'
@@ -37,7 +37,7 @@ self.addEventListener('activate', (event) => {
 
 // İstekleri Yakalama (Fetch) ve Ağ Hatası Durumunda Önbelleği Kullanma
 self.addEventListener('fetch', (event) => {
-    // Socket.io ve API isteklerini önbelleğe alma (sadece statik dosyalar)
+    // Socket.io and API requests are not cached
     if (event.request.url.includes('/api/') || event.request.url.includes('/socket.io/')) {
         return;
     }
@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
                 return cachedResponse;
             }
             return fetch(event.request).catch(() => {
-                // Eğer sayfa/dosya ağ hatası yüzünden yüklenemiyorsa çevrimdışı yedek döndür
+                // If offline and page navigation, return index.html
                 if (event.request.mode === 'navigate') {
                     return caches.match('/index.html');
                 }
