@@ -137,6 +137,7 @@ body {
     align-items: center;
     justify-content: center;
     transition: background-color 0.2s;
+    color: var(--text-main);
 }
 
 .btn-icon:hover {
