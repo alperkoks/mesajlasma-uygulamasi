@@ -6,6 +6,7 @@ const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io'); // Socket.IO kütüphanesini dahil ettik
 const { initDatabase, dbQueries } = require('./database');
+const webpush = require('web-push');
 
 const app = express();
 const server = http.createServer(app);
@@ -1203,6 +1204,47 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
             }
         }
 
+        // --- ÇEVRİMDIŞI KULLANICILAR İÇİN WEB PUSH BİLDİRİMLERİ ---
+        // Mesaj göndereni bul
+        const senderUser = await dbQueries.findUserById(senderId);
+        const senderName = senderUser ? senderUser.username : 'Birisi';
+
+        const pushPayload = {
+            title: senderName,
+            body: savedMessage.message_type === 'text' ? savedMessage.message : '📁 Bir dosya gönderdi.',
+            icon: '/favicon.ico',
+            data: {
+                groupId: groupId || null,
+                senderId: senderId
+            }
+        };
+
+        if (groupId) {
+            const members = await dbQueries.getGroupMembers(groupId);
+            const groupInfo = await dbQueries.getGroupById(groupId);
+            const groupName = groupInfo ? groupInfo.name : 'Grup';
+            
+            for (const member of members) {
+                // Kendimiz hariç ve o anda aktif soket bağlantısı olmayan (offline) üyelere push gönder
+                if (member.id !== senderId && !userSockets.has(member.id)) {
+                    sendPushNotification(member.id, {
+                        title: groupName,
+                        body: `${senderName}: ${pushPayload.body}`,
+                        icon: '/favicon.ico',
+                        data: {
+                            groupId: groupId,
+                            senderId: senderId
+                        }
+                    });
+                }
+            }
+        } else if (receiverId) {
+            // Alıcı o anda online değilse push yolla
+            if (!userSockets.has(receiverId)) {
+                sendPushNotification(receiverId, pushPayload);
+            }
+        }
+
         res.status(201).json(savedMessage);
     } catch (error) {
         console.error('Mesaj gönderme hatası:', error);
@@ -1238,10 +1280,106 @@ app.delete('/api/messages/clear', authenticateToken, async (req, res) => {
     }
 });
 
+// 6. WEB PUSH BİLDİRİM ROTASI - PUBLIC KEY AL
+app.get('/api/push/public-key', authenticateToken, async (req, res) => {
+    try {
+        const vapidPublicKey = await dbQueries.getSetting('vapid_public_key');
+        if (!vapidPublicKey) {
+            return res.status(404).json({ message: 'VAPID anahtarı henüz oluşturulmadı.' });
+        }
+        res.json({ publicKey: vapidPublicKey });
+    } catch (error) {
+        console.error('VAPID public key çekme hatası:', error);
+        res.status(500).json({ message: 'Anahtar çekilirken hata oluştu.' });
+    }
+});
+
+// 6.1 WEB PUSH BİLDİRİM ROTASI - ABONE OL
+app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { subscription } = req.body;
+
+    if (!subscription) return res.status(400).json({ message: 'Abonelik bilgisi zorunludur.' });
+
+    try {
+        const subStr = JSON.stringify(subscription);
+        await dbQueries.addPushSubscription(userId, subStr);
+        res.json({ message: 'Başarıyla anlık bildirimlere abone olundu.' });
+    } catch (error) {
+        console.error('Abone olma hatası:', error);
+        res.status(500).json({ message: 'Abone olunurken hata oluştu.' });
+    }
+});
+
+// 6.2 WEB PUSH BİLDİRİM ROTASI - ABONELİKTEN ÇIK
+app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { subscription } = req.body;
+
+    if (!subscription) return res.status(400).json({ message: 'Abonelik bilgisi zorunludur.' });
+
+    try {
+        const subStr = JSON.stringify(subscription);
+        await dbQueries.removePushSubscription(userId, subStr);
+        res.json({ message: 'Bildirim aboneliği iptal edildi.' });
+    } catch (error) {
+        console.error('Abonelik iptal hatası:', error);
+        res.status(500).json({ message: 'Abonelik iptal edilirken hata oluştu.' });
+    }
+});
+
+// Web Push Bildirim Gönderme Yardımcısı
+async function sendPushNotification(recipientId, payload) {
+    try {
+        const subscriptions = await dbQueries.getPushSubscriptions(recipientId);
+        if (!subscriptions || subscriptions.length === 0) return;
+
+        console.log(`Sending push notification to user ${recipientId} (${subscriptions.length} subscription(s))...`);
+        const payloadStr = JSON.stringify(payload);
+
+        for (const sub of subscriptions) {
+            try {
+                await webpush.sendNotification(sub, payloadStr);
+            } catch (err) {
+                // Eğer abonelik artık geçersizse (kullanıcı tarayıcısından izni kaldırmışsa vb.) veritabanından temizle
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    console.log(`Removing expired subscription for user ${recipientId}...`);
+                    await dbQueries.removePushSubscription(recipientId, JSON.stringify(sub));
+                } else {
+                    console.error('Failed to send push notification:', err);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Push notification helper error:', error);
+    }
+}
+
 // Sunucuyu başlat
 async function startServer() {
     try {
         await initDatabase();
+
+        // Web Push VAPID Anahtarlarını Yapılandır/Yükle
+        let vapidPublicKey = await dbQueries.getSetting('vapid_public_key');
+        let vapidPrivateKey = await dbQueries.getSetting('vapid_private_key');
+
+        if (!vapidPublicKey || !vapidPrivateKey) {
+            console.log('🗝️ VAPID anahtarları bulunamadı. Yeni anahtar seti üretiliyor...');
+            const keys = webpush.generateVAPIDKeys();
+            vapidPublicKey = keys.publicKey;
+            vapidPrivateKey = keys.privateKey;
+            await dbQueries.setSetting('vapid_public_key', vapidPublicKey);
+            await dbQueries.setSetting('vapid_private_key', vapidPrivateKey);
+        }
+
+        webpush.setVapidDetails(
+            'mailto:admin@mesajlasma-uygulamasi.com',
+            vapidPublicKey,
+            vapidPrivateKey
+        );
+        console.log('✅ Web Push VAPID anahtarları başarıyla yapılandırıldı.');
+
         server.listen(PORT, () => {
             console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor!`);
         });

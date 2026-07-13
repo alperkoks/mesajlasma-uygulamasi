@@ -103,6 +103,22 @@ async function initDatabase() {
                     UNIQUE(message_id, user_id)
                 )
             `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS system_settings (
+                    key VARCHAR(100) PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS push_subscriptions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL,
+                    subscription TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    UNIQUE(user_id, subscription)
+                )
+            `);
             // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
             await client.query(`ALTER TABLE messages ALTER COLUMN receiver_id DROP NOT NULL`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read INTEGER DEFAULT 0`);
@@ -254,6 +270,24 @@ async function initDatabase() {
                 FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE,
                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
                 UNIQUE(message_id, user_id)
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                subscription TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, subscription)
             )
         `);
 
@@ -827,6 +861,67 @@ const dbQueries = {
                     ON CONFLICT(message_id, user_id) DO NOTHING
                 `, [userId, userId, receiverId, receiverId, userId]);
             }
+        }
+    },
+
+    // Sistem ayarlarını getir
+    async getSetting(key) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query('SELECT value FROM system_settings WHERE key = $1', [key]);
+            return res.rows[0] ? res.rows[0].value : null;
+        } else {
+            const res = await dbSqlite.get('SELECT value FROM system_settings WHERE key = ?', [key]);
+            return res ? res.value : null;
+        }
+    },
+
+    // Sistem ayarı kaydet/güncelle
+    async setSetting(key, value) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'INSERT INTO system_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+                [key, value]
+            );
+        } else {
+            await dbSqlite.run(
+                'INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)',
+                [key, value]
+            );
+        }
+    },
+
+    // Bildirim aboneliği ekle
+    async addPushSubscription(userId, subscription) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'INSERT INTO push_subscriptions (user_id, subscription) VALUES ($1, $2) ON CONFLICT (user_id, subscription) DO NOTHING',
+                [userId, subscription]
+            );
+        } else {
+            await dbSqlite.run(
+                'INSERT OR IGNORE INTO push_subscriptions (user_id, subscription) VALUES (?, ?)',
+                [userId, subscription]
+            );
+        }
+    },
+
+    // Kullanıcının bildirim aboneliklerini getir
+    async getPushSubscriptions(userId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query('SELECT subscription FROM push_subscriptions WHERE user_id = $1', [userId]);
+            return res.rows.map(r => JSON.parse(r.subscription));
+        } else {
+            const res = await dbSqlite.all('SELECT subscription FROM push_subscriptions WHERE user_id = ?', [userId]);
+            return res.map(r => JSON.parse(r.subscription));
+        }
+    },
+
+    // Bildirim aboneliğini sil
+    async removePushSubscription(userId, subscription) {
+        if (isPostgres) {
+            await dbPostgresPool.query('DELETE FROM push_subscriptions WHERE user_id = $1 AND subscription = $2', [userId, subscription]);
+        } else {
+            await dbSqlite.run('DELETE FROM push_subscriptions WHERE user_id = ? AND subscription = ?', [userId, subscription]);
         }
     },
 
