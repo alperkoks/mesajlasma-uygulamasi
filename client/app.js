@@ -717,6 +717,11 @@ async function initPushNotifications() {
     try {
         // Service worker dosyasını kaydet
         const registration = await navigator.serviceWorker.register('/service-worker.js');
+        try {
+            await registration.update();
+        } catch (e) {
+            console.warn('Servis işçisi güncelleme denetimi yapılamadı:', e);
+        }
         
         // Sunucudan VAPID Public Key al
         const keyData = await apiCall('/push/public-key');
