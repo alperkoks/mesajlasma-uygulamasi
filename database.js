@@ -105,6 +105,7 @@ async function initDatabase() {
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expires TIMESTAMP`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
             await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
+            await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0`);
 
             console.log('PostgreSQL Tabloları kontrol edildi/oluşturuldu.');
         } finally {
@@ -237,6 +238,12 @@ async function initDatabase() {
         const columnsGroups = tableInfoGroups.map(col => col.name);
         if (!columnsGroups.includes('profile_pic')) {
             await dbSqlite.exec("ALTER TABLE groups ADD COLUMN profile_pic TEXT");
+        }
+
+        const tableInfoMembers = await dbSqlite.all("PRAGMA table_info(group_members)");
+        const columnsMembers = tableInfoMembers.map(col => col.name);
+        if (!columnsMembers.includes('is_admin')) {
+            await dbSqlite.exec("ALTER TABLE group_members ADD COLUMN is_admin INTEGER DEFAULT 0");
         }
 
         console.log('SQLite Tabloları kontrol edildi/oluşturuldu.');
@@ -677,16 +684,16 @@ const dbQueries = {
     },
 
     // Gruba üye ekle
-    async addGroupMember(groupId, userId) {
+    async addGroupMember(groupId, userId, isAdmin = 0) {
         if (isPostgres) {
             await dbPostgresPool.query(
-                'INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-                [groupId, userId]
+                'INSERT INTO group_members (group_id, user_id, is_admin) VALUES ($1, $2, $3) ON CONFLICT (group_id, user_id) DO UPDATE SET is_admin = EXCLUDED.is_admin',
+                [groupId, userId, isAdmin]
             );
         } else {
             await dbSqlite.run(
-                'INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)',
-                [groupId, userId]
+                'INSERT INTO group_members (group_id, user_id, is_admin) VALUES (?, ?, ?) ON CONFLICT(group_id, user_id) DO UPDATE SET is_admin = excluded.is_admin',
+                [groupId, userId, isAdmin]
             );
         }
     },
@@ -729,13 +736,13 @@ const dbQueries = {
     async getGroupMembers(groupId) {
         if (isPostgres) {
             const res = await dbPostgresPool.query(
-                'SELECT users.id, users.username, users.profile_pic FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = $1',
+                'SELECT users.id, users.username, users.profile_pic, group_members.is_admin FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = $1',
                 [groupId]
             );
             return res.rows;
         } else {
             return await dbSqlite.all(
-                'SELECT users.id, users.username, users.profile_pic FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = ?',
+                'SELECT users.id, users.username, users.profile_pic, group_members.is_admin FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = ?',
                 [groupId]
             );
         }

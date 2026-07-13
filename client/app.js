@@ -631,19 +631,31 @@ async function initApp() {
                     }
                 }
                 
-                // Grubun son mesajını güncelle
+                // Grubun son mesajını güncelle ve okunmamış bildirim sayısını artır
                 const grp = groups.find(g => g.id === msg.group_id);
                 if (grp) {
                     grp.last_message = msg.message;
                     grp.last_message_time = msg.created_at;
+                    if (!isCurrentGroup) {
+                        grp.unread_count = (grp.unread_count || 0) + 1;
+                    }
                     renderGroupsList();
                 } else {
                     loadGroups();
                 }
                 
                 if (document.hidden || !isCurrentGroup) {
-                    playMessageNotificationSound();
-                    showDesktopNotification("Yeni Grup Mesajı", msg.message);
+                    playNotificationSound();
+                    const senderName = msg.sender_name || 'Grup Üyesi';
+                    startTitleAlert(senderName);
+
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification(grp ? grp.name : "Yeni Grup Mesajı", {
+                            body: `${senderName}: ${msg.message}`,
+                            tag: `group-${msg.group_id}`,
+                            renotify: true
+                        });
+                    }
                 }
                 return;
             }
@@ -1841,20 +1853,7 @@ async function openGroupSettings() {
             groupSettingsAvatarPreview.innerHTML = group.name.substring(0, 2).toUpperCase();
         }
 
-        const isAdmin = group.created_by === currentUser.id;
-
-        if (isAdmin) {
-            lblGroupPic.style.display = 'inline-block';
-            groupSettingsNameInput.removeAttribute('disabled');
-            btnGroupNameUpdate.style.display = 'inline-block';
-            btnLeaveGroup.textContent = 'Grubu Sil / Ayrıl';
-        } else {
-            lblGroupPic.style.display = 'none';
-            groupSettingsNameInput.setAttribute('disabled', 'true');
-            btnGroupNameUpdate.style.display = 'none';
-            btnLeaveGroup.textContent = 'Gruptan Ayrıl';
-        }
-
+        // Üyeleri ve yetkileri yükle
         await loadGroupMembers(group);
 
         groupSettingsModal.classList.remove('hidden');
@@ -1868,7 +1867,23 @@ async function loadGroupMembers(group) {
         const members = await apiCall(`/groups/${group.id}/members`);
         groupMembersListContainer.innerHTML = '';
 
-        const isAdmin = group.created_by === currentUser.id;
+        // Giriş yapmış kullanıcının yetkilerini denetle
+        const myMemberInfo = members.find(m => m.id === currentUser.id);
+        const isUserAdmin = myMemberInfo && myMemberInfo.is_admin === 1;
+        const isFounder = group.created_by === currentUser.id;
+
+        // UI Yetkilerini Ayarla
+        if (isUserAdmin) {
+            lblGroupPic.style.display = 'inline-block';
+            groupSettingsNameInput.removeAttribute('disabled');
+            btnGroupNameUpdate.style.display = 'inline-block';
+            btnLeaveGroup.textContent = isFounder ? 'Grubu Sil / Ayrıl' : 'Gruptan Ayrıl';
+        } else {
+            lblGroupPic.style.display = 'none';
+            groupSettingsNameInput.setAttribute('disabled', 'true');
+            btnGroupNameUpdate.style.display = 'none';
+            btnLeaveGroup.textContent = 'Gruptan Ayrıl';
+        }
 
         members.forEach(member => {
             const div = document.createElement('div');
@@ -1878,12 +1893,15 @@ async function loadGroupMembers(group) {
             div.style.padding = '0.5rem 0';
             div.style.borderBottom = '1px solid var(--border-color)';
 
-            const isMemberAdmin = group.created_by === member.id;
+            const isMemberAdmin = member.is_admin === 1;
+            const isMemberFounder = group.created_by === member.id;
 
             let actionHTML = '';
-            if (isMemberAdmin) {
+            if (isMemberFounder) {
+                actionHTML = '<span style="font-size: 0.75rem; background-color: var(--primary-light); color: var(--primary-color); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold;">Grup Kurucusu</span>';
+            } else if (isMemberAdmin) {
                 actionHTML = '<span style="font-size: 0.75rem; background-color: var(--primary-light); color: var(--primary-color); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold;">Yönetici</span>';
-            } else if (isAdmin) {
+            } else if (isUserAdmin) {
                 actionHTML = `
                     <div style="display: flex; gap: 0.25rem;">
                         <button class="btn btn-make-admin" data-uid="${member.id}" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; background-color: var(--primary-light); color: var(--primary-color); border: none; border-radius: 4px; cursor: pointer;">Yönetici Yap</button>
@@ -1911,7 +1929,7 @@ async function loadGroupMembers(group) {
         groupMembersListContainer.querySelectorAll('.btn-make-admin').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const targetUserId = e.target.getAttribute('data-uid');
-                if (!confirm('Yöneticilik yetkisini bu üyeye devretmek istediğinize emin misiniz?')) return;
+                if (!confirm('Bu üyeye yöneticilik yetkisi vermek istediğinize emin misiniz? Kendiniz de yönetici kalacaksınız.')) return;
 
                 try {
                     await apiCall(`/groups/${group.id}/update`, 'POST', {
@@ -1920,7 +1938,7 @@ async function loadGroupMembers(group) {
                     await loadGroups();
                     await openGroupSettings();
                 } catch (err) {
-                    alert('Yöneticilik devredilemedi: ' + err.message);
+                    alert('Yöneticilik verilemedi: ' + err.message);
                 }
             });
         });

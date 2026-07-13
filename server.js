@@ -863,13 +863,13 @@ app.post('/api/groups/create', authenticateToken, async (req, res) => {
         const group = await dbQueries.createGroup(name.trim(), creatorId);
         const groupId = group.id;
 
-        // Oluşturucuyu otomatik üye olarak ekle
-        await dbQueries.addGroupMember(groupId, creatorId);
+        // Oluşturucuyu otomatik üye olarak ekle (is_admin = 1)
+        await dbQueries.addGroupMember(groupId, creatorId, 1);
 
-        // Seçilen diğer arkadaşları gruba üye olarak ekle
+        // Seçilen diğer arkadaşları gruba üye olarak ekle (is_admin = 0)
         if (memberIds && Array.isArray(memberIds)) {
             for (const memberId of memberIds) {
-                await dbQueries.addGroupMember(groupId, parseInt(memberId));
+                await dbQueries.addGroupMember(groupId, parseInt(memberId), 0);
             }
         }
 
@@ -937,7 +937,7 @@ app.get('/api/groups/:groupId/members', authenticateToken, async (req, res) => {
     }
 });
 
-// 3.13 GRUP AYARLARINI GÜNCELLE (AD DEĞİŞTİRME & YÖNETİCİLİK DEVRETME)
+// 3.13 GRUP AYARLARINI GÜNCELLE (AD DEĞİŞTİRME & YÖNETİCİLİK EKLEME)
 app.post('/api/groups/:groupId/update', authenticateToken, async (req, res) => {
     const groupId = parseInt(req.params.groupId);
     const currentUserId = req.user.id;
@@ -947,22 +947,30 @@ app.post('/api/groups/:groupId/update', authenticateToken, async (req, res) => {
         const group = await dbQueries.getGroupById(groupId);
         if (!group) return res.status(404).json({ message: 'Grup bulunamadı.' });
 
-        // Sadece grup yöneticisi güncelleyebilir
-        if (group.created_by !== currentUserId) {
+        // Yöneticilik yetkisi kontrolü (group_members tablosundan is_admin değerine göre)
+        const members = await dbQueries.getGroupMembers(groupId);
+        const currentUserMember = members.find(m => m.id === currentUserId);
+        const isUserAdmin = currentUserMember && currentUserMember.is_admin === 1;
+
+        if (!isUserAdmin) {
             return res.status(403).json({ message: 'Grup ayarlarını sadece yönetici güncelleyebilir.' });
+        }
+
+        // Eğer yeni bir yönetici atanmak isteniyorsa
+        if (createdBy) {
+            await dbQueries.addGroupMember(groupId, parseInt(createdBy), 1);
         }
 
         const finalName = name ? name.trim() : group.name;
         const finalProfilePic = profilePic !== undefined ? profilePic : group.profile_pic;
-        const finalCreatedBy = createdBy ? parseInt(createdBy) : group.created_by;
 
-        await dbQueries.updateGroup(groupId, finalName, finalProfilePic, finalCreatedBy);
+        await dbQueries.updateGroup(groupId, finalName, finalProfilePic, group.created_by);
 
         const updatedGroup = {
             id: groupId,
             name: finalName,
             profile_pic: finalProfilePic,
-            created_by: finalCreatedBy
+            created_by: group.created_by
         };
 
         // Soketle tüm gruba duyur
@@ -986,15 +994,22 @@ app.post('/api/groups/:groupId/remove-member', authenticateToken, async (req, re
         if (!group) return res.status(404).json({ message: 'Grup bulunamadı.' });
 
         // Yalnızca grup yöneticisi birini çıkarabilir, ancak üye kendisi gruptan ayrılabilir
-        if (group.created_by !== currentUserId && targetUserId !== currentUserId) {
+        const members = await dbQueries.getGroupMembers(groupId);
+        const currentUserMember = members.find(m => m.id === currentUserId);
+        const isUserAdmin = currentUserMember && currentUserMember.is_admin === 1;
+
+        if (!isUserAdmin && targetUserId !== currentUserId) {
             return res.status(403).json({ message: 'Yalnızca grup yöneticisi üye çıkartabilir.' });
         }
 
-        // Eğer yönetici kendisi ayrılmaya çalışıyorsa ve grupta başkaları varsa, önce yöneticiliği devretmeli!
+        // Eğer kurucu yönetici (group.created_by) kendisi ayrılmaya çalışıyorsa ve grupta başkaları varsa, önce kurucu devretmeli veya gruptan çıkmamalı (eğer başka yönetici yoksa devretmeli)
         if (targetUserId === currentUserId && group.created_by === currentUserId) {
-            const members = await dbQueries.getGroupMembers(groupId);
             if (members.length > 1) {
-                return res.status(400).json({ message: 'Gruptan ayrılmadan önce yöneticiliği başka bir üyeye devretmelisiniz.' });
+                // Başka bir yönetici olup olmadığını kontrol et
+                const otherAdmins = members.filter(m => m.id !== currentUserId && m.is_admin === 1);
+                if (otherAdmins.length === 0) {
+                    return res.status(400).json({ message: 'Gruptan ayrılmadan önce en az bir üyeyi yönetici yapmalısınız.' });
+                }
             }
         }
 
@@ -1032,7 +1047,12 @@ app.post('/api/groups/:groupId/upload-pic', authenticateToken, upload.single('gr
     try {
         const group = await dbQueries.getGroupById(groupId);
         if (!group) return res.status(404).json({ message: 'Grup bulunamadı.' });
-        if (group.created_by !== currentUserId) {
+        // Yöneticilik yetkisi kontrolü
+        const members = await dbQueries.getGroupMembers(groupId);
+        const currentUserMember = members.find(m => m.id === currentUserId);
+        const isUserAdmin = currentUserMember && currentUserMember.is_admin === 1;
+
+        if (!isUserAdmin) {
             return res.status(403).json({ message: 'Grup fotoğrafını yalnızca yönetici güncelleyebilir.' });
         }
 
