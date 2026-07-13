@@ -1,9 +1,9 @@
-const CACHE_NAME = 'agchat-cache-v1';
+const CACHE_NAME = 'agchat-cache-v3';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
-    '/style.css',
-    '/app.js',
+    '/style.css?v=3',
+    '/app.js?v=3',
     '/manifest.json',
     '/icon-192.png',
     '/icon-512.png'
