@@ -1,4 +1,3 @@
-// Service Worker for Antigravity Chat Push Notifications
 self.addEventListener('push', (event) => {
     let data = { title: 'Yeni Mesaj', body: 'Harika bir haberiniz var!' };
 
@@ -16,12 +15,19 @@ self.addEventListener('push', (event) => {
         body: data.body,
         icon: data.icon || '/favicon.ico',
         badge: '/favicon.ico',
-        vibrate: [100, 50, 100],
+        vibrate: [150, 80, 150], // Daha belirgin bir titreşim deseni
         data: data.data || {}
     };
 
     event.waitUntil(
-        self.registration.showNotification(title, options)
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            const isAppFocused = clientList.some(c => c.focused);
+            if (isAppFocused) {
+                console.log('Uygulama aktif olarak açık, arka plan bildirimi pas geçildi.');
+                return;
+            }
+            return self.registration.showNotification(title, options);
+        })
     );
 });
 

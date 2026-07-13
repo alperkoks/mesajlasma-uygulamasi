@@ -1273,7 +1273,7 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
             
             for (const member of members) {
                 // Kendimiz hariç ve o anda aktif soket bağlantısı olmayan (offline) üyelere push gönder
-                if (member.id !== senderId && !userSockets.has(member.id)) {
+                if (member.id !== senderId) {
                     sendPushNotification(member.id, {
                         title: groupName,
                         body: `${senderName}: ${pushPayload.body}`,
@@ -1286,10 +1286,7 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
                 }
             }
         } else if (receiverId) {
-            // Alıcı o anda online değilse push yolla
-            if (!userSockets.has(receiverId)) {
-                sendPushNotification(receiverId, pushPayload);
-            }
+            sendPushNotification(receiverId, pushPayload);
         }
 
         res.status(201).json(savedMessage);
