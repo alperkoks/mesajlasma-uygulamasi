@@ -190,6 +190,14 @@
         </div>
     </div>
 
+    <!-- 4. EKRAN: BÜYÜK FOTOĞRAF ÖNİZLEME MODALI (LIGHTBOX) -->
+    <div id="lightbox-modal" class="modal hidden" style="background-color: rgba(0,0,0,0.85);">
+        <div class="lightbox-content" style="position: relative; text-align: center;">
+            <span id="close-lightbox" class="close-btn" style="position: absolute; top: -45px; right: 10px; color: white; font-size: 3rem;">&times;</span>
+            <img id="lightbox-img" src="" alt="Büyük profil fotoğrafı" style="max-width: 90vw; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); object-fit: contain;">
+        </div>
+    </div>
+
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js"></script>

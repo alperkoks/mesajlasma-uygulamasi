@@ -46,6 +46,11 @@ const settingsFileInput = document.getElementById('settings-file-input');
 const btnSelectPhoto = document.getElementById('btn-select-photo');
 const btnUploadPhoto = document.getElementById('btn-upload-photo');
 
+// LIGHTBOX (BÜYÜK RESİM ÖNİZLEME) ELEMENTLERİ
+const lightboxModal = document.getElementById('lightbox-modal');
+const lightboxImg = document.getElementById('lightbox-img');
+const closeLightbox = document.getElementById('close-lightbox');
+
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
 let token = localStorage.getItem('token') || null;
@@ -364,6 +369,29 @@ settingsForm.addEventListener('submit', async (e) => {
         }
     } catch (err) {
         // Hata zaten apiCall içinde alert ediliyor
+    }
+});
+
+// Profil resmine tıklanınca resmi büyük aç (Lightbox)
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('avatar-img')) {
+        const imgSrc = e.target.src;
+        if (imgSrc) {
+            lightboxImg.src = imgSrc;
+            lightboxModal.classList.remove('hidden');
+        }
+    }
+});
+
+// Lightbox modalını kapat
+closeLightbox.addEventListener('click', () => {
+    lightboxModal.classList.add('hidden');
+});
+
+// Modal dışına tıklandığında da kapat
+lightboxModal.addEventListener('click', (e) => {
+    if (e.target === lightboxModal) {
+        lightboxModal.classList.add('hidden');
     }
 });
 
