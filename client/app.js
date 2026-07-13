@@ -62,6 +62,8 @@ const btnUnfriend = document.getElementById('btn-unfriend');
 const btnBlock = document.getElementById('btn-block');
 const mobileBackBtn = document.getElementById('mobile-back-btn');
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const fileInput = document.getElementById('file-input');
+const btnAttach = document.getElementById('btn-attach');
 
 // ARKADAŞLIK SİSTEMİ ELEMENTLERİ
 const friendSearchForm = document.getElementById('friend-search-form');
@@ -70,6 +72,26 @@ const searchResultBox = document.getElementById('search-result-box');
 const pendingRequestsSection = document.getElementById('pending-requests-section');
 const pendingCount = document.getElementById('pending-count');
 const pendingRequestsList = document.getElementById('pending-requests-list');
+
+// GRUP SİSTEMİ ELEMENTLERİ
+const tabFriends = document.getElementById('tab-friends');
+const tabGroups = document.getElementById('tab-groups');
+const friendsTabContent = document.getElementById('friends-tab-content');
+const groupsTabContent = document.getElementById('groups-tab-content');
+const groupsList = document.getElementById('groups-list');
+const btnCreateGroupOpen = document.getElementById('btn-create-group-open');
+const groupCreateModal = document.getElementById('group-create-modal');
+const closeGroupModal = document.getElementById('close-group-modal');
+const groupCreateForm = document.getElementById('group-create-form');
+const groupNameInput = document.getElementById('group-name-input');
+const groupFriendsCheckboxes = document.getElementById('group-friends-checkboxes');
+
+// ARAMA VE SOHBET TEMİZLEME ELEMENTLERİ
+const btnToggleSearch = document.getElementById('btn-toggle-search');
+const btnClearChat = document.getElementById('btn-clear-chat');
+const chatSearchBar = document.getElementById('chat-search-bar');
+const chatSearchInput = document.getElementById('chat-search-input');
+const btnChatSearchClose = document.getElementById('btn-chat-search-close');
 
 // PROFİL AYARLARI ELEMENTLERİ
 const settingsModal = document.getElementById('settings-modal');
@@ -92,6 +114,8 @@ let currentUser = null;
 let token = localStorage.getItem('token') || null;
 let activeChatPartner = null;
 let activeChatPartnerId = null;
+let groups = [];
+let activeChatGroupId = null;
 let users = [];
 let messages = [];
 let socket = null; // Soket bağlantı nesnemiz
@@ -524,6 +548,7 @@ async function initApp() {
         showScreen('chat');
         await loadUsers();
         await loadPendingRequests();
+        await loadGroups();
         
         // --- SOCKET.IO BAĞLANTISINI KURMA ---
         // Sayfa her yüklendiğinde ve giriş yapıldığında soket hattını açıyoruz.
@@ -554,16 +579,64 @@ async function initApp() {
             }
         });
 
+        // Başka bir kullanıcının yazma durumu değiştiğinde çalışan olay
+        socket.on('typing_status', (data) => {
+            const user = users.find(u => u.id === data.senderId);
+            if (user) {
+                user.isTyping = data.isTyping;
+                renderUsersList();
+                
+                // Eğer yazan kişi şu an aktif sohbet ortağımızsa başlığı da güncelle
+                if (activeChatPartnerId === data.senderId) {
+                    activeChatStatus.textContent = data.isTyping ? 'yazıyor...' : (user.isOnline ? 'çevrimiçi' : 'çevrimdışı');
+                }
+            }
+        });
+
+        // Başka bir kullanıcı gönderdiğimiz mesajları okuduğunda çalışan olay
+        socket.on('messages_read', (data) => {
+            if (activeChatPartnerId === data.readerId) {
+                messages.forEach(msg => {
+                    if (msg.sender_id === currentUser.id) {
+                        msg.is_read = 1;
+                    }
+                });
+                renderMessages();
+            }
+        });
+
         // SUNUCUDAN ANLIK MESAJ GELDİĞİNDE çalışan olay
         socket.on('receive_message', (msg) => {
-            // Gelen mesaj şu an sohbet penceresi açık olan kişiden mi geldi?
+            if (msg.group_id) {
+                const isCurrentGroup = (activeChatGroupId === msg.group_id);
+                if (isCurrentGroup) {
+                    messages.push(msg);
+                    renderMessages();
+                }
+                
+                // Grubun son mesajını güncelle
+                const grp = groups.find(g => g.id === msg.group_id);
+                if (grp) {
+                    grp.last_message = msg.message;
+                    grp.last_message_time = msg.created_at;
+                    renderGroupsList();
+                } else {
+                    loadGroups();
+                }
+                
+                if (document.hidden || !isCurrentGroup) {
+                    playMessageNotificationSound();
+                    showDesktopNotification("Yeni Grup Mesajı", msg.message);
+                }
+                return;
+            }
+
             const isCurrentChat = (activeChatPartnerId === msg.sender_id);
             
             if (isCurrentChat) {
                 messages.push(msg);
-                renderMessages(); // Mesajı ekrana anında çiz ve kaydır
+                renderMessages();
                 
-                // Mesajı okuduğumuzu sunucuya bildir (arka planda)
                 apiCall(`/messages/${msg.sender_id}`).catch(() => {});
             }
             
@@ -605,6 +678,34 @@ async function initApp() {
                         window.focus();
                         if (sender) selectUserChat(sender);
                     };
+                }
+            }
+        });
+
+        // YENİ GRUP OLUŞTURULDUĞUNDA çalışan olay
+        socket.on('group_created', (group) => {
+            loadGroups();
+        });
+
+        // SOHBET TEMİZLENDİĞİNDE çalışan olay
+        socket.on('chat_cleared', (data) => {
+            if (data.groupId && activeChatGroupId === data.groupId) {
+                messages = [];
+                renderMessages();
+                const grp = groups.find(g => g.id === data.groupId);
+                if (grp) {
+                    grp.last_message = 'Sohbet temizlendi';
+                    grp.last_message_time = null;
+                    renderGroupsList();
+                }
+            } else if (data.senderId && activeChatPartnerId === data.senderId) {
+                messages = [];
+                renderMessages();
+                const partner = users.find(u => u.id === data.senderId);
+                if (partner) {
+                    partner.last_message = 'Sohbet temizlendi';
+                    partner.last_message_time = null;
+                    renderUsersList();
                 }
             }
         });
@@ -719,10 +820,14 @@ function renderUsersList() {
             ? `<div class="unread-badge">${user.unread_count}</div>` 
             : '';
 
-        // Son mesaj içeriği veya çevrimiçi durumu
-        const lastMsgText = user.last_message 
-            ? user.last_message 
+        // Son mesaj içeriği veya çevrimiçi durumu (Yazıyor kontrolü ile)
+        let lastMsgText = user.last_message 
+            ? escapeHTML(user.last_message) 
             : (user.isOnline ? 'çevrimiçi' : 'çevrimdışı');
+
+        if (user.isTyping) {
+            lastMsgText = '<span style="color:var(--primary-color); font-weight:500; font-style:italic;">yazıyor...</span>';
+        }
 
         const lastMsgTimeText = user.last_message_time 
             ? formatMessageTime(user.last_message_time) 
@@ -915,6 +1020,15 @@ async function selectUserChat(user) {
     try {
         activeChatPartner = user.username;
         activeChatPartnerId = user.id;
+        activeChatGroupId = null;
+
+        // Arama barını kapat ve sıfırla
+        if (chatSearchBar) chatSearchBar.classList.add('hidden');
+        if (chatSearchInput) chatSearchInput.value = '';
+
+        // Butonları görünür kıl
+        btnUnfriend.classList.remove('hidden');
+        btnBlock.classList.remove('hidden');
 
         // Okunmamış mesaj sayısını sıfırla
         user.unread_count = 0;
@@ -942,6 +1056,16 @@ async function selectUserChat(user) {
         noChatSelectedScreen.classList.add('hidden');
         chatActiveScreen.classList.remove('hidden');
 
+        // Yükleniyor durumunu göstermek için skeleton loader ekle
+        messagesHistory.innerHTML = `
+            <div class="skeleton-loader">
+                <div class="skeleton-item received"><div class="skeleton-bubble"></div></div>
+                <div class="skeleton-item sent"><div class="skeleton-bubble"></div></div>
+                <div class="skeleton-item received"><div class="skeleton-bubble"></div></div>
+                <div class="skeleton-item sent"><div class="skeleton-bubble"></div></div>
+            </div>
+        `;
+
         await loadMessages();
     } catch (err) {
         alert("Hata (selectUserChat): " + err.message + "\nStack: " + err.stack);
@@ -968,7 +1092,12 @@ if (mobileBackBtn) {
 
 async function loadMessages() {
     try {
-        const history = await apiCall(`/messages/${activeChatPartnerId}`);
+        let history;
+        if (activeChatGroupId) {
+            history = await apiCall(`/groups/${activeChatGroupId}/messages`);
+        } else {
+            history = await apiCall(`/messages/${activeChatPartnerId}`);
+        }
         messages = history;
         renderMessages();
     } catch (err) {
@@ -979,22 +1108,64 @@ async function loadMessages() {
 function renderMessages() {
     messagesHistory.innerHTML = '';
     
-    if (messages.length === 0) {
-        messagesHistory.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:2rem;">Sohbetin başlangıcı. İlk mesajı siz yazın!</div>';
+    const searchQuery = chatSearchInput ? chatSearchInput.value.toLowerCase().trim() : '';
+    const filteredMessages = messages.filter(msg => {
+        if (!searchQuery) return true;
+        return msg.message && msg.message.toLowerCase().includes(searchQuery);
+    });
+
+    if (filteredMessages.length === 0) {
+        if (searchQuery) {
+            messagesHistory.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:2rem;">Arama kriterine uygun mesaj bulunamadı.</div>';
+        } else {
+            messagesHistory.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:2rem;">Sohbetin başlangıcı. İlk mesajı siz yazın!</div>';
+        }
         return;
     }
 
-    messages.forEach(msg => {
+    filteredMessages.forEach(msg => {
         const row = document.createElement('div');
         const isSentByMe = msg.sender_id === currentUser.id;
         row.className = `message-row ${isSentByMe ? 'sent' : 'received'}`;
 
         const msgTime = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+        let ticksHTML = '';
+        if (isSentByMe) {
+            if (msg.is_read === 1) {
+                ticksHTML = '<span class="msg-tick read" style="color:#60a5fa; margin-left:4px; font-weight:bold;">✓✓</span>';
+            } else {
+                const partner = users.find(u => u.id === msg.receiver_id);
+                if (partner && partner.isOnline) {
+                    ticksHTML = '<span class="msg-tick delivered" style="color:var(--text-muted); margin-left:4px;">✓✓</span>';
+                } else {
+                    ticksHTML = '<span class="msg-tick sent" style="color:var(--text-muted); margin-left:4px;">✓</span>';
+                }
+            }
+        }
+
+        let msgContentHTML = '';
+        if (msg.message_type === 'image') {
+            msgContentHTML = `<img src="${msg.file_url}" alt="görsel" style="max-width:100%; max-height:240px; border-radius:8px; display:block; cursor:pointer; margin-bottom: 2px;" onclick="window.open('${msg.file_url}', '_blank')">`;
+        } else if (msg.message_type === 'file') {
+            msgContentHTML = `<a href="${msg.file_url}" target="_blank" style="color:inherit; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; word-break:break-all;">📁 ${escapeHTML(msg.message)}</a>`;
+        } else {
+            msgContentHTML = escapeHTML(msg.message);
+        }
+
+        let senderNameHTML = '';
+        if (activeChatGroupId && !isSentByMe) {
+            senderNameHTML = `<div style="font-size:0.75rem; font-weight:600; color:var(--primary-color); margin-bottom: 2.5px;">${escapeHTML(msg.sender_name || 'Grup Üyesi')}</div>`;
+        }
+
         row.innerHTML = `
             <div class="message-bubble">
-                <div class="message-text">${escapeHTML(msg.message)}</div>
-                <span class="message-time">${msgTime}</span>
+                ${senderNameHTML}
+                <div class="message-text">${msgContentHTML}</div>
+                <span class="message-time" style="display:inline-flex; align-items:center; gap: 2px;">
+                    ${msgTime}
+                    ${ticksHTML}
+                </span>
             </div>
         `;
         messagesHistory.appendChild(row);
@@ -1006,11 +1177,12 @@ function renderMessages() {
 messageForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
-    if (!text || !activeChatPartnerId) return;
+    if (!text || (!activeChatPartnerId && !activeChatGroupId)) return;
 
     try {
         const newMsg = await apiCall('/messages', 'POST', {
             receiverId: activeChatPartnerId,
+            groupId: activeChatGroupId,
             message: text
         });
 
@@ -1018,17 +1190,137 @@ messageForm.addEventListener('submit', async (e) => {
         renderMessages();
         messageInput.value = '';
 
-        // Gönderdiğimiz mesajı listedeki son mesaj olarak güncelle
-        const partner = users.find(u => u.id === activeChatPartnerId);
-        if (partner) {
-            partner.last_message = newMsg.message;
-            partner.last_message_time = newMsg.created_at;
-            renderUsersList();
+        if (activeChatGroupId) {
+            // Grubun son mesaj bilgisini güncelle
+            const grp = groups.find(g => g.id === activeChatGroupId);
+            if (grp) {
+                grp.last_message = newMsg.message;
+                grp.last_message_time = newMsg.created_at;
+                renderGroupsList();
+            }
+        } else {
+            // Gönderdiğimiz mesajı listedeki son mesaj olarak güncelle
+            const partner = users.find(u => u.id === activeChatPartnerId);
+            if (partner) {
+                partner.last_message = newMsg.message;
+                partner.last_message_time = newMsg.created_at;
+                renderUsersList();
+            }
+            if (isCurrentlyTyping) {
+                isCurrentlyTyping = false;
+                socket.emit('stop_typing', { receiverId: activeChatPartnerId });
+            }
         }
     } catch (err) {
         console.error('Mesaj gönderilemedi', err);
     }
 });
+
+// --- YAZIYOR... ALGILAMA VE TETİKLEME ---
+let typingTimeout;
+let isCurrentlyTyping = false;
+
+if (messageInput) {
+    messageInput.addEventListener('input', () => {
+        if (!isCurrentlyTyping && activeChatPartnerId) {
+            isCurrentlyTyping = true;
+            socket.emit('typing', { receiverId: activeChatPartnerId });
+        }
+
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            if (isCurrentlyTyping && activeChatPartnerId) {
+                isCurrentlyTyping = false;
+                socket.emit('stop_typing', { receiverId: activeChatPartnerId });
+            }
+        }, 1500);
+    });
+
+    messageInput.addEventListener('blur', () => {
+        if (isCurrentlyTyping && activeChatPartnerId) {
+            isCurrentlyTyping = false;
+            socket.emit('stop_typing', { receiverId: activeChatPartnerId });
+        }
+    });
+}
+
+// --- SOHBET İÇİ DOSYA VE RESİM GÖNDERİMİ ---
+if (btnAttach && fileInput) {
+    btnAttach.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file || (!activeChatPartnerId && !activeChatGroupId)) return;
+
+        // Dosya boyutu limiti (10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            alert('Dosya boyutu 10MB\'tan büyük olamaz moruk.');
+            fileInput.value = '';
+            return;
+        }
+
+        // Arayüz yükleme görsel geri bildirimi
+        btnAttach.disabled = true;
+        const originalText = btnAttach.textContent;
+        btnAttach.textContent = '⏳';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            // Sunucuya yükle
+            const uploadRes = await fetch('/api/messages/upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!uploadRes.ok) {
+                const errData = await uploadRes.json();
+                throw new Error(errData.message || 'Yükleme başarısız.');
+            }
+
+            const data = await uploadRes.json();
+
+            // Mesajı veritabanına gönder
+            const newMsg = await apiCall('/messages', 'POST', {
+                receiverId: activeChatPartnerId,
+                groupId: activeChatGroupId,
+                message: data.fileName,
+                messageType: data.messageType,
+                fileUrl: data.fileUrl
+            });
+
+            messages.push(newMsg);
+            renderMessages();
+
+            // Son mesaj bilgisini listede güncelle
+            if (activeChatGroupId) {
+                const grp = groups.find(g => g.id === activeChatGroupId);
+                if (grp) {
+                    grp.last_message = newMsg.message;
+                    grp.last_message_time = newMsg.created_at;
+                    renderGroupsList();
+                }
+            } else {
+                const partner = users.find(u => u.id === activeChatPartnerId);
+                if (partner) {
+                    partner.last_message = newMsg.message;
+                    partner.last_message_time = newMsg.created_at;
+                    renderUsersList();
+                }
+            }
+        } catch (err) {
+            alert('Dosya gönderilemedi moruk: ' + err.message);
+        } finally {
+            btnAttach.disabled = false;
+            btnAttach.textContent = originalText;
+            fileInput.value = '';
+        }
+    });
+}
 
 function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, 
@@ -1040,6 +1332,285 @@ function escapeHTML(str) {
             '"': '&quot;'
         }[tag] || tag)
     );
+}
+
+// --- GRUP SOHBETLERİ UI VE İŞLEVSELLİK MANTIĞI ---
+
+// Sekme Geçişleri (Arkadaşlar / Gruplar)
+if (tabFriends && tabGroups) {
+    tabFriends.addEventListener('click', () => {
+        tabFriends.classList.add('active');
+        tabFriends.style.backgroundColor = 'var(--primary-color)';
+        tabFriends.style.color = 'white';
+
+        tabGroups.classList.remove('active');
+        tabGroups.style.backgroundColor = 'transparent';
+        tabGroups.style.color = 'inherit';
+        tabGroups.style.border = '1px solid var(--border-color)';
+
+        friendsTabContent.classList.remove('hidden');
+        groupsTabContent.classList.add('hidden');
+    });
+
+    tabGroups.addEventListener('click', async () => {
+        tabGroups.classList.add('active');
+        tabGroups.style.backgroundColor = 'var(--primary-color)';
+        tabGroups.style.color = 'white';
+
+        tabFriends.classList.remove('active');
+        tabFriends.style.backgroundColor = 'transparent';
+        tabFriends.style.color = 'inherit';
+        tabFriends.style.border = '1px solid var(--border-color)';
+
+        groupsTabContent.classList.remove('hidden');
+        friendsTabContent.classList.add('hidden');
+
+        await loadGroups();
+    });
+}
+
+// Grup Oluşturma Modalı Aç/Kapat
+if (btnCreateGroupOpen) {
+    btnCreateGroupOpen.addEventListener('click', () => {
+        groupFriendsCheckboxes.innerHTML = '';
+        if (users.length === 0) {
+            groupFriendsCheckboxes.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding-top:1rem;">Gruba eklenecek arkadaşınız bulunmuyor.</div>';
+        } else {
+            users.forEach(user => {
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.alignItems = 'center';
+                div.style.gap = '0.5rem';
+                div.style.padding = '0.25rem 0';
+                div.innerHTML = `
+                    <input type="checkbox" id="chk-group-friend-${user.id}" value="${user.id}" class="group-friend-checkbox" style="width:18px; height:18px; cursor:pointer;">
+                    <label for="chk-group-friend-${user.id}" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; font-size:0.9rem; user-select:none;">
+                        <div style="width:26px; height:26px; border-radius:50%; background-color:var(--border-color); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold; overflow:hidden;">
+                            ${user.profile_pic ? `<img src="${user.profile_pic}" style="width:100%; height:100%; object-fit:cover;">` : user.username.substring(0,2).toUpperCase()}
+                        </div>
+                        <span>${escapeHTML(user.username)}</span>
+                    </label>
+                `;
+                groupFriendsCheckboxes.appendChild(div);
+            });
+        }
+        groupCreateModal.classList.remove('hidden');
+    });
+}
+
+if (closeGroupModal) {
+    closeGroupModal.addEventListener('click', () => {
+        groupCreateModal.classList.add('hidden');
+        groupNameInput.value = '';
+        groupFriendsCheckboxes.innerHTML = '';
+    });
+}
+
+// Grup Oluşturma Formu Submit
+if (groupCreateForm) {
+    groupCreateForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const groupName = groupNameInput.value.trim();
+        if (!groupName) return;
+
+        const checkedBoxes = document.querySelectorAll('.group-friend-checkbox:checked');
+        const memberIds = Array.from(checkedBoxes).map(cb => cb.value);
+
+        try {
+            const newGroup = await apiCall('/groups/create', 'POST', {
+                name: groupName,
+                memberIds: memberIds
+            });
+
+            groupCreateModal.classList.add('hidden');
+            groupNameInput.value = '';
+            groupFriendsCheckboxes.innerHTML = '';
+
+            await loadGroups();
+            selectGroupChat(newGroup);
+        } catch (err) {
+            alert('Grup oluşturulamadı: ' + err.message);
+        }
+    });
+}
+
+// Grupları Veritabanından Yükle
+async function loadGroups() {
+    try {
+        const res = await apiCall('/groups');
+        groups = res;
+        renderGroupsList();
+    } catch (err) {
+        console.error('Gruplar yüklenemedi', err);
+    }
+}
+
+// Grup Listesini Ekrana Çiz
+function renderGroupsList() {
+    groupsList.innerHTML = '';
+    if (groups.length === 0) {
+        groupsList.innerHTML = '<li class="user-item placeholder">Henüz bir gruba dahil değilsiniz.</li>';
+        return;
+    }
+
+    groups.forEach(group => {
+        const li = document.createElement('li');
+        li.className = `user-item ${activeChatGroupId === group.id ? 'active' : ''}`;
+        
+        const initial = group.name.substring(0, 2).toUpperCase();
+
+        const lastMsgText = group.last_message 
+            ? escapeHTML(group.last_message) 
+            : 'Grup kuruldu';
+
+        const lastMsgTimeText = group.last_message_time 
+            ? formatMessageTime(group.last_message_time) 
+            : '';
+
+        li.innerHTML = `
+            <div class="avatar" style="background-color: var(--primary-light); color: var(--primary-color); font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 50%; width: 44px; height: 44px;">${initial}</div>
+            <div class="user-item-info">
+                <div class="user-item-header">
+                    <span class="name">${escapeHTML(group.name)}</span>
+                    <span class="last-msg-time">${lastMsgTimeText}</span>
+                </div>
+                <span class="last-msg">${lastMsgText}</span>
+            </div>
+        `;
+
+        li.addEventListener('click', () => {
+            selectGroupChat(group);
+        });
+
+        groupsList.appendChild(li);
+    });
+}
+
+// Grup Sohbetini Aktifleştir
+async function selectGroupChat(group) {
+    try {
+        activeChatPartner = null;
+        activeChatPartnerId = null;
+        activeChatGroupId = group.id;
+
+        // Arama barını kapat ve sıfırla
+        if (chatSearchBar) chatSearchBar.classList.add('hidden');
+        if (chatSearchInput) chatSearchInput.value = '';
+
+        // Sol menüde aktif olan grubu boyamak için listeyi tekrar çiz
+        renderGroupsList();
+
+        // Mobilde sohbet penceresini aktif yap
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            chatContainer.classList.add('mobile-chat-active');
+        }
+
+        // Başlık güncellemeleri
+        activeChatAvatar.style.backgroundColor = 'var(--primary-light)';
+        activeChatAvatar.style.color = 'var(--primary-color)';
+        activeChatAvatar.style.fontWeight = 'bold';
+        activeChatAvatar.innerHTML = group.name.substring(0, 2).toUpperCase();
+
+        activeChatName.textContent = group.name;
+        activeChatStatus.textContent = 'Grup Sohbeti';
+
+        // Arkadaşlık butonlarını gizle
+        btnUnfriend.classList.add('hidden');
+        btnBlock.classList.add('hidden');
+
+        noChatSelectedScreen.classList.add('hidden');
+        chatActiveScreen.classList.remove('hidden');
+
+        // Yükleniyor skeleton loader'ı bas
+        messagesHistory.innerHTML = `
+            <div class="skeleton-loader">
+                <div class="skeleton-item received"><div class="skeleton-bubble"></div></div>
+                <div class="skeleton-item sent"><div class="skeleton-bubble"></div></div>
+                <div class="skeleton-item received"><div class="skeleton-bubble"></div></div>
+                <div class="skeleton-item sent"><div class="skeleton-bubble"></div></div>
+            </div>
+        `;
+
+        await loadMessages();
+    } catch (err) {
+        alert("Hata (selectGroupChat): " + err.message);
+    }
+}
+
+// --- ARAMA VE SOHBET TEMİZLEME UI İŞLEMLERİ ---
+
+// Arama Çubuğu Aç/Kapat
+if (btnToggleSearch && chatSearchBar && chatSearchInput) {
+    btnToggleSearch.addEventListener('click', () => {
+        chatSearchBar.classList.toggle('hidden');
+        if (!chatSearchBar.classList.contains('hidden')) {
+            chatSearchInput.focus();
+        } else {
+            chatSearchInput.value = '';
+            renderMessages();
+        }
+    });
+}
+
+// Arama Çubuğu Kapatma Butonu
+if (btnChatSearchClose && chatSearchBar && chatSearchInput) {
+    btnChatSearchClose.addEventListener('click', () => {
+        chatSearchBar.classList.add('hidden');
+        chatSearchInput.value = '';
+        renderMessages();
+    });
+}
+
+// Arama Girdisi Yazıldığında Anlık Filtreleme
+if (chatSearchInput) {
+    chatSearchInput.addEventListener('input', () => {
+        renderMessages();
+    });
+}
+
+// Sohbet Temizleme (Silme) Olayı
+if (btnClearChat) {
+    btnClearChat.addEventListener('click', async () => {
+        if (!activeChatPartnerId && !activeChatGroupId) return;
+
+        const isGroup = !!activeChatGroupId;
+        const confirmMsg = isGroup 
+            ? 'Bu grubun tüm mesaj geçmişini temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz!'
+            : 'Bu arkadaşınızla olan tüm sohbet geçmişini temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz!';
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const res = await apiCall('/messages/clear', 'DELETE', {
+                receiverId: activeChatPartnerId,
+                groupId: activeChatGroupId
+            });
+
+            alert(res.message);
+            messages = [];
+            renderMessages();
+
+            // Sol listelerdeki son mesaj bilgisini de güncelle
+            if (isGroup) {
+                const grp = groups.find(g => g.id === activeChatGroupId);
+                if (grp) {
+                    grp.last_message = 'Sohbet temizlendi';
+                    grp.last_message_time = null;
+                    renderGroupsList();
+                }
+            } else {
+                const partner = users.find(u => u.id === activeChatPartnerId);
+                if (partner) {
+                    partner.last_message = 'Sohbet temizlendi';
+                    partner.last_message_time = null;
+                    renderUsersList();
+                }
+            }
+        } catch (err) {
+            alert('Sohbet temizlenirken hata oluştu: ' + err.message);
+        }
+    });
 }
 
 initApp();

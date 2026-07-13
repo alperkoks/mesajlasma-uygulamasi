@@ -72,8 +72,31 @@ async function initDatabase() {
                     UNIQUE(user_id, blocked_id)
                 )
             `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS groups (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    created_by INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(created_by) REFERENCES users(id)
+                )
+            `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS group_members (
+                    id SERIAL PRIMARY KEY,
+                    group_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    UNIQUE(group_id, user_id)
+                )
+            `);
             // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS group_id INTEGER`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) DEFAULT 'text'`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(100) UNIQUE`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT`);
@@ -145,11 +168,20 @@ async function initDatabase() {
             )
         `);
 
-        // SQLite için messages tablosuna is_read kolonu ekle
+        // SQLite için messages tablosuna is_read ve grup/dosya kolonları ekle
         const tableInfoMsg = await dbSqlite.all("PRAGMA table_info(messages)");
         const columnsMsg = tableInfoMsg.map(col => col.name);
         if (!columnsMsg.includes('is_read')) {
             await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_read INTEGER DEFAULT 0");
+        }
+        if (!columnsMsg.includes('group_id')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN group_id INTEGER");
+        }
+        if (!columnsMsg.includes('message_type')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN message_type TEXT DEFAULT 'text'");
+        }
+        if (!columnsMsg.includes('file_url')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN file_url TEXT");
         }
 
         await dbSqlite.exec(`
@@ -174,6 +206,28 @@ async function initDatabase() {
                 FOREIGN KEY(user_id) REFERENCES users(id),
                 FOREIGN KEY(blocked_id) REFERENCES users(id),
                 UNIQUE(user_id, blocked_id)
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                created_by INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(created_by) REFERENCES users(id)
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS group_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(group_id, user_id)
             )
         `);
 
@@ -323,18 +377,19 @@ const dbQueries = {
         }
     },
 
-    // Yeni mesaj kaydetme
-    async saveMessage(senderId, receiverId, messageText) {
+    // Yeni mesaj kaydetme (Grup ve dosya tipleri desteğiyle)
+    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null) {
+        const finalReceiverId = groupId ? 0 : receiverId;
         if (isPostgres) {
             const res = await dbPostgresPool.query(
-                'INSERT INTO messages (sender_id, receiver_id, message) VALUES ($1, $2, $3) RETURNING *',
-                [senderId, receiverId, messageText]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl]
             );
             return res.rows[0];
         } else {
             const result = await dbSqlite.run(
-                'INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)',
-                [senderId, receiverId, messageText]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl]
             );
             return await dbSqlite.get('SELECT * FROM messages WHERE id = ?', [result.lastID]);
         }
@@ -592,6 +647,127 @@ const dbQueries = {
                  WHERE blocks.user_id = ?`,
                 [userId]
             );
+        }
+    },
+
+    // Yeni grup oluştur
+    async createGroup(name, createdBy) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                'INSERT INTO groups (name, created_by) VALUES ($1, $2) RETURNING *',
+                [name, createdBy]
+            );
+            return res.rows[0];
+        } else {
+            const result = await dbSqlite.run(
+                'INSERT INTO groups (name, created_by) VALUES (?, ?)',
+                [name, createdBy]
+            );
+            return await dbSqlite.get('SELECT * FROM groups WHERE id = ?', [result.lastID]);
+        }
+    },
+
+    // Gruba üye ekle
+    async addGroupMember(groupId, userId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'INSERT INTO group_members (group_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                [groupId, userId]
+            );
+        } else {
+            await dbSqlite.run(
+                'INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)',
+                [groupId, userId]
+            );
+        }
+    },
+
+    // Kullanıcının dahil olduğu grupları listele
+    async getUserGroups(userId) {
+        const queryStr = `
+            SELECT 
+                groups.id,
+                groups.name,
+                (
+                    SELECT message FROM messages 
+                    WHERE messages.group_id = groups.id 
+                    ORDER BY messages.created_at DESC 
+                    LIMIT 1
+                ) AS last_message,
+                (
+                    SELECT created_at FROM messages 
+                    WHERE messages.group_id = groups.id 
+                    ORDER BY messages.created_at DESC 
+                    LIMIT 1
+                ) AS last_message_time
+            FROM groups
+            JOIN group_members ON group_members.group_id = groups.id
+            WHERE group_members.user_id = $1
+            ORDER BY last_message_time DESC NULLS LAST, groups.name ASC
+        `;
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(queryStr, [userId]);
+            return res.rows;
+        } else {
+            const queryStrSqlite = queryStr.replace(/\$1/g, '?').replace('DESC NULLS LAST', 'DESC');
+            return await dbSqlite.all(queryStrSqlite, [userId]);
+        }
+    },
+
+    // Grubun üyelerini listele
+    async getGroupMembers(groupId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                'SELECT users.id, users.username, users.profile_pic FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = $1',
+                [groupId]
+            );
+            return res.rows;
+        } else {
+            return await dbSqlite.all(
+                'SELECT users.id, users.username, users.profile_pic FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = ?',
+                [groupId]
+            );
+        }
+    },
+
+    // Grubun mesaj geçmişini getir
+    async getGroupMessageHistory(groupId) {
+        const queryStr = `
+            SELECT messages.*, users.username AS sender_name 
+            FROM messages 
+            JOIN users ON users.id = messages.sender_id 
+            WHERE messages.group_id = $1 
+            ORDER BY messages.created_at ASC
+        `;
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(queryStr, [groupId]);
+            return res.rows;
+        } else {
+            const queryStrSqlite = queryStr.replace(/\$1/g, '?');
+            return await dbSqlite.all(queryStrSqlite, [groupId]);
+        }
+    },
+
+    // Sohbet geçmişini tamamen temizle (sil)
+    async clearChatHistory(userId, receiverId = null, groupId = null) {
+        if (groupId) {
+            if (isPostgres) {
+                await dbPostgresPool.query('DELETE FROM messages WHERE group_id = $1', [groupId]);
+            } else {
+                await dbSqlite.run('DELETE FROM messages WHERE group_id = ?', [groupId]);
+            }
+        } else if (receiverId) {
+            if (isPostgres) {
+                await dbPostgresPool.query(
+                    'DELETE FROM messages WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)) AND group_id IS NULL',
+                    [userId, receiverId]
+                );
+            } else {
+                await dbSqlite.run(
+                    'DELETE FROM messages WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) AND group_id IS NULL',
+                    [userId, receiverId, receiverId, userId]
+                );
+            }
         }
     }
 };

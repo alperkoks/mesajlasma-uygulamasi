@@ -343,12 +343,13 @@ body {
     gap: 0.75rem;
     padding: 0.75rem 1.25rem;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, transform 0.2s ease, border-left-color 0.2s;
     border-left: 3px solid transparent;
 }
 
 .user-item:hover {
     background-color: var(--bg-light);
+    transform: translateX(4px);
 }
 
 .user-item.active {
@@ -539,9 +540,21 @@ body {
     gap: 1rem;
 }
 
+@keyframes messageFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .message-row {
     display: flex;
     width: 100%;
+    animation: messageFadeIn 0.22s ease-out forwards;
 }
 
 .message-row.sent {
@@ -1018,4 +1031,61 @@ body {
     .chat-header-actions .btn-action-danger span {
         display: none;
     }
+}
+
+/* SKELETON LOADER TASARIMLARI (PREMIUM HİS) */
+.skeleton-loader {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.5rem;
+    width: 100%;
+    height: 100%;
+}
+
+.skeleton-item {
+    display: flex;
+    width: 100%;
+}
+
+.skeleton-item.sent {
+    justify-content: flex-end;
+}
+
+.skeleton-item.received {
+    justify-content: flex-start;
+}
+
+.skeleton-bubble {
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, var(--border-color) 25%, var(--bg-white) 50%, var(--border-color) 75%);
+    background-size: 200% 100%;
+    animation: skeletonShimmer 1.5s infinite linear;
+    opacity: 0.6;
+}
+
+.skeleton-item.sent .skeleton-bubble {
+    width: 35%;
+    border-bottom-right-radius: 2px;
+}
+
+.skeleton-item.received .skeleton-bubble {
+    width: 45%;
+    border-bottom-left-radius: 2px;
+}
+
+@keyframes skeletonShimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* MİKRO-ETKİLEŞİM GERİ BİLDİRİMLERİ */
+.btn:active, .btn-icon:active, .btn-action-danger:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
 }

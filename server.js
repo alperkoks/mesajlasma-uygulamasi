@@ -238,6 +238,34 @@ io.on('connection', (socket) => {
     // Diğer tüm çevrimiçi kullanıcılara bu kişinin çevrimiçi olduğunu duyur
     io.emit('user_status_change', { userId: userId, isOnline: true });
 
+    // Kullanıcının dahil olduğu gruplara soket oda kaydı yap
+    dbQueries.getUserGroups(userId).then(groups => {
+        groups.forEach(group => {
+            socket.join(`group_${group.id}`);
+        });
+    }).catch(err => {
+        console.error('Soket grup odalarına eklenirken hata oluştu:', err);
+    });
+
+    // Yazıyor... durumunu ilet
+    socket.on('typing', ({ receiverId }) => {
+        const receiverSockets = userSockets.get(Number(receiverId));
+        if (receiverSockets && receiverSockets.size > 0) {
+            receiverSockets.forEach(socketId => {
+                io.to(socketId).emit('typing_status', { senderId: userId, isTyping: true });
+            });
+        }
+    });
+
+    socket.on('stop_typing', ({ receiverId }) => {
+        const receiverSockets = userSockets.get(Number(receiverId));
+        if (receiverSockets && receiverSockets.size > 0) {
+            receiverSockets.forEach(socketId => {
+                io.to(socketId).emit('typing_status', { senderId: userId, isTyping: false });
+            });
+        }
+    });
+
     // Bağlantı koptuğunda (Sayfa kapatıldığında veya çıkış yapıldığında)
     socket.on('disconnect', () => {
         const sockets = userSockets.get(userId);
@@ -494,6 +522,53 @@ app.post('/api/profile/upload-pic', authenticateToken, upload.single('profile_pi
     } catch (error) {
         console.error('Profil resmi yükleme hatası:', error);
         res.status(500).json({ message: 'Profil resmi yüklenirken hata oluştu.' });
+    }
+});
+
+// 2.3 SOHBET İÇİ DOSYA/RESİM YÜKLEME
+app.post('/api/messages/upload', authenticateToken, upload.single('file'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ message: 'Lütfen yüklenecek bir dosya seçin.' });
+    }
+
+    try {
+        let fileUrl = '';
+        const isImage = req.file.mimetype.startsWith('image/');
+
+        // Eğer Cloudinary ayarları girilmişse resmi veya dosyayı yükle
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+            const uploadResult = await new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    { folder: 'chat_files', resource_type: 'auto' },
+                    (error, result) => {
+                        if (result) {
+                            resolve(result);
+                        } else {
+                            reject(error);
+                        }
+                    }
+                );
+                stream.end(req.file.buffer);
+            });
+            fileUrl = uploadResult.secure_url;
+        } else {
+            // Eğer Cloudinary kurulu değilse simüle et
+            console.log('📷 [SOHBET DOSYA SİMÜLASYONU] Cloudinary ayarları eksik, test linki üretiliyor.');
+            if (isImage) {
+                fileUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
+            } else {
+                fileUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
+            }
+        }
+
+        res.json({
+            fileUrl: fileUrl,
+            messageType: isImage ? 'image' : 'file',
+            fileName: req.file.originalname
+        });
+    } catch (error) {
+        console.error('Dosya yükleme hatası:', error);
+        res.status(500).json({ message: 'Dosya yüklenirken hata oluştu.' });
     }
 });
 
@@ -762,6 +837,94 @@ app.get('/api/friends/blocked', authenticateToken, async (req, res) => {
     }
 });
 
+// 3.9 KULLANICININ GRUPLARINI LİSTELE
+app.get('/api/groups', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const groups = await dbQueries.getUserGroups(userId);
+        res.json(groups);
+    } catch (error) {
+        console.error('Grupları çekme hatası:', error);
+        res.status(500).json({ message: 'Gruplar listelenirken hata oluştu.' });
+    }
+});
+
+// 3.10 YENİ GRUP OLUŞTUR
+app.post('/api/groups/create', authenticateToken, async (req, res) => {
+    const creatorId = req.user.id;
+    const { name, memberIds } = req.body;
+
+    if (!name || name.trim() === '') {
+        return res.status(400).json({ message: 'Grup ismi zorunludur.' });
+    }
+
+    try {
+        // Grubu veritabanında oluştur
+        const group = await dbQueries.createGroup(name.trim(), creatorId);
+        const groupId = group.id;
+
+        // Oluşturucuyu otomatik üye olarak ekle
+        await dbQueries.addGroupMember(groupId, creatorId);
+
+        // Seçilen diğer arkadaşları gruba üye olarak ekle
+        if (memberIds && Array.isArray(memberIds)) {
+            for (const memberId of memberIds) {
+                await dbQueries.addGroupMember(groupId, parseInt(memberId));
+            }
+        }
+
+        // Tüm grup üyelerinin aktif soket bağlantılarını bul ve gruba oda kanalı (room) aç
+        const allMembers = [creatorId, ...(memberIds || []).map(Number)];
+        allMembers.forEach(mId => {
+            const sockets = userSockets.get(mId);
+            if (sockets) {
+                sockets.forEach(sId => {
+                    const socketInstance = io.sockets.sockets.get(sId);
+                    if (socketInstance) {
+                        socketInstance.join(`group_${groupId}`);
+                    }
+                });
+            }
+        });
+
+        // Gruba katılan üyelere anlık soket bildirimiyle grubun kurulduğunu haber ver
+        allMembers.forEach(mId => {
+            const sockets = userSockets.get(mId);
+            if (sockets) {
+                sockets.forEach(sId => {
+                    io.to(sId).emit('group_created', group);
+                });
+            }
+        });
+
+        res.status(201).json(group);
+    } catch (error) {
+        console.error('Grup oluşturma hatası:', error);
+        res.status(500).json({ message: 'Grup oluşturulurken hata oluştu.' });
+    }
+});
+
+// 3.11 GRUBUN MESAJ GEÇMİŞİNİ GETİR
+app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => {
+    const groupId = parseInt(req.params.groupId);
+    const userId = req.user.id;
+
+    try {
+        // Güvenlik kontrolü: Kullanıcı grubun üyesi mi?
+        const members = await dbQueries.getGroupMembers(groupId);
+        const isMember = members.some(m => m.id === userId);
+        if (!isMember) {
+            return res.status(403).json({ message: 'Bu grubun üyesi değilsiniz.' });
+        }
+
+        const messages = await dbQueries.getGroupMessageHistory(groupId);
+        res.json(messages);
+    } catch (error) {
+        console.error('Grup mesaj geçmişi çekme hatası:', error);
+        res.status(500).json({ message: 'Grup mesajları listelenirken hata oluştu.' });
+    }
+});
+
 // 4. İKİ KULLANICI ARASINDAKİ MESAJ GEÇMİŞİ
 app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
     const senderId = req.user.id;
@@ -770,6 +933,14 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
     try {
         // Mesaj geçmişini getirmeden önce karşı taraftan gelen okunmamış mesajları okundu olarak işaretle
         await dbQueries.markMessagesAsRead(receiverId, senderId);
+        
+        // Göndericiye mesajlarının okunduğunu soketle bildir
+        const senderSockets = userSockets.get(receiverId);
+        if (senderSockets && senderSockets.size > 0) {
+            senderSockets.forEach(socketId => {
+                io.to(socketId).emit('messages_read', { readerId: senderId });
+            });
+        }
         
         const messages = await dbQueries.getMessageHistory(senderId, receiverId);
         res.json(messages);
@@ -782,34 +953,85 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
 // 5. YENİ MESAJ GÖNDERME VE ANLIK İLETME
 app.post('/api/messages', authenticateToken, async (req, res) => {
     const senderId = req.user.id;
-    const receiverId = parseInt(req.body.receiverId);
-    const { message } = req.body;
+    const receiverId = req.body.receiverId ? parseInt(req.body.receiverId) : null;
+    const { message, groupId, messageType, fileUrl } = req.body;
 
-    if (!receiverId || !message) return res.status(400).json({ message: 'Alıcı ve mesaj içeriği zorunludur.' });
+    if (!groupId && !receiverId) {
+        return res.status(400).json({ message: 'Alıcı ID veya Grup ID zorunludur.' });
+    }
+    if (!message && !fileUrl) {
+        return res.status(400).json({ message: 'Mesaj içeriği veya dosya zorunludur.' });
+    }
 
     try {
-        // Engelleme durumunu kontrol et
-        const isBlocked = await dbQueries.isBlocked(senderId, receiverId);
-        if (isBlocked) {
-            return res.status(403).json({ message: 'Bu kullanıcıyla aranızda engelleme bulunduğu için mesaj gönderilemez.' });
+        // Özel mesaj ise engelleme kontrolü yap
+        if (!groupId && receiverId) {
+            const isBlocked = await dbQueries.isBlocked(senderId, receiverId);
+            if (isBlocked) {
+                return res.status(403).json({ message: 'Bu kullanıcıyla aranızda engelleme bulunduğu için mesaj gönderilemez.' });
+            }
         }
 
         // Mesajı veritabanına kaydet
-        const savedMessage = await dbQueries.saveMessage(senderId, receiverId, message);
+        const savedMessage = await dbQueries.saveMessage(
+            senderId, 
+            receiverId, 
+            message || '', 
+            groupId || null, 
+            messageType || 'text', 
+            fileUrl || null
+        );
         
         // --- GERÇEK ZAMANLI SOKET İLETİMİ ---
-        // Alıcı çevrimiçi ise onun tüm aktif sekmelerine mesajı anında fırlat
-        const receiverSockets = userSockets.get(receiverId);
-        if (receiverSockets && receiverSockets.size > 0) {
-            receiverSockets.forEach(socketId => {
-                io.to(socketId).emit('receive_message', savedMessage);
-            });
+        if (groupId) {
+            // Grup mesajı iletimi (Grup odasına üye olanlara fırlat)
+            io.to(`group_${groupId}`).emit('receive_message', savedMessage);
+        } else if (receiverId) {
+            // Özel mesaj iletimi
+            const receiverSockets = userSockets.get(receiverId);
+            if (receiverSockets && receiverSockets.size > 0) {
+                receiverSockets.forEach(socketId => {
+                    io.to(socketId).emit('receive_message', savedMessage);
+                });
+            }
         }
 
         res.status(201).json(savedMessage);
     } catch (error) {
         console.error('Mesaj gönderme hatası:', error);
         res.status(500).json({ message: 'Mesaj kaydedilirken hata oluştu.' });
+    }
+});
+
+// 5.1 SOHBET GEÇMİŞİNİ TEMİZLE (SİL)
+app.delete('/api/messages/clear', authenticateToken, async (req, res) => {
+    const currentUserId = req.user.id;
+    const receiverId = req.body.receiverId ? parseInt(req.body.receiverId) : null;
+    const groupId = req.body.groupId ? parseInt(req.body.groupId) : null;
+
+    if (!groupId && !receiverId) {
+        return res.status(400).json({ message: 'Alıcı ID veya Grup ID zorunludur.' });
+    }
+
+    try {
+        await dbQueries.clearChatHistory(currentUserId, receiverId, groupId);
+
+        // --- SOKET ÜZERİNDEN DİĞER KULLANICILARA DUYUR ---
+        if (groupId) {
+            io.to(`group_${groupId}`).emit('chat_cleared', { groupId });
+        } else if (receiverId) {
+            const receiverSockets = userSockets.get(receiverId);
+            if (receiverSockets && receiverSockets.size > 0) {
+                receiverSockets.forEach(socketId => {
+                    io.to(socketId).emit('chat_cleared', { senderId: currentUserId });
+                });
+            }
+        }
+
+        res.json({ message: 'Sohbet geçmişi başarıyla temizlendi.' });
+    } catch (error) {
+        console.error('Sohbet temizleme hatası:', error);
+        res.status(500).json({ message: 'Sohbet temizlenirken hata oluştu.' });
     }
 });
 

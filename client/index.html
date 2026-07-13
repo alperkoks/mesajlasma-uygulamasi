@@ -113,13 +113,33 @@
                     </ul>
                 </div>
                 
-                <!-- Kullanıcı Listesi Alanı (Sadece Arkadaşlar) -->
-                <div class="users-section">
-                    <h4>Arkadaşlarım</h4>
-                    <ul id="users-list" class="users-list">
-                        <!-- Burası JavaScript ile dinamik olarak dolacak -->
-                        <li class="user-item placeholder">Henüz arkadaş eklemediniz.</li>
-                    </ul>
+                <!-- Sekme Seçenekleri -->
+                <div class="sidebar-tabs" style="display: flex; gap: 0.25rem; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color);">
+                    <button id="tab-friends" class="btn active" style="flex: 1; padding: 0.4rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background-color: var(--primary-color); color: white;">Arkadaşlar</button>
+                    <button id="tab-groups" class="btn" style="flex: 1; padding: 0.4rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background-color: transparent; border: 1px solid var(--border-color);">Gruplar</button>
+                </div>
+
+                <!-- Arkadaşlar Sekmesi İçeriği -->
+                <div id="friends-tab-content" class="tab-content" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+                    <div class="users-section">
+                        <ul id="users-list" class="users-list">
+                            <!-- Burası JavaScript ile dinamik olarak dolacak -->
+                            <li class="user-item placeholder">Henüz arkadaş eklemediniz.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Gruplar Sekmesi İçeriği -->
+                <div id="groups-tab-content" class="tab-content hidden" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+                    <div class="users-section" style="flex: 1; display: flex; flex-direction: column;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem 0.25rem 1rem;">
+                            <h4 style="margin: 0;">Gruplarım</h4>
+                            <button id="btn-create-group-open" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; background-color: var(--primary-color); color: white;">+ Yeni Grup</button>
+                        </div>
+                        <ul id="groups-list" class="users-list" style="flex: 1; overflow-y: auto;">
+                            <li class="user-item placeholder">Henüz bir gruba dahil değilsiniz.</li>
+                        </ul>
+                    </div>
                 </div>
             </aside>
 
@@ -146,11 +166,19 @@
                                 <span class="active-chat-status" id="active-chat-status">çevrimiçi</span>
                             </div>
                         </div>
-                        <div class="chat-header-actions">
+                        <div class="chat-header-actions" style="display: flex; gap: 0.5rem; align-items: center;">
+                            <button id="btn-toggle-search" class="btn-icon" title="Mesajlarda Ara" style="font-size: 1.2rem; padding: 0.3rem;">🔍</button>
+                            <button id="btn-clear-chat" class="btn-icon" title="Sohbeti Temizle" style="font-size: 1.2rem; padding: 0.3rem;">🗑️</button>
                             <button id="btn-unfriend" class="btn-action-danger" title="Arkadaşlıktan Çıkar">❌ <span>Çıkar</span></button>
                             <button id="btn-block" class="btn-action-danger" title="Engelle">🚫 <span>Engelle</span></button>
                         </div>
                     </header>
+
+                    <!-- Arama Barı (Başlık Altı, Varsayılan olarak gizli) -->
+                    <div id="chat-search-bar" class="hidden" style="display: flex; gap: 0.5rem; align-items: center; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color); background-color: var(--bg-white);">
+                        <input type="text" id="chat-search-input" placeholder="Mesajlarda ara..." style="flex: 1; padding: 0.4rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; outline: none; background-color: var(--bg-white); color: var(--text-main);" autocomplete="off">
+                        <button id="btn-chat-search-close" class="btn-icon" style="font-size: 1.25rem; font-weight: bold; cursor: pointer; border: none; background: transparent; color: var(--text-muted); padding: 0 0.5rem;">×</button>
+                    </div>
 
                     <!-- Mesaj Geçmişi -->
                     <div class="messages-history" id="messages-history">
@@ -160,7 +188,9 @@
                     <!-- Mesaj Gönderme Kutusu -->
                     <footer class="chat-footer">
                         <form id="message-form">
-                            <input type="text" id="message-input" autocomplete="off" placeholder="Mesajınızı yazın..." required>
+                            <input type="file" id="file-input" style="display:none;" accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                            <button type="button" id="btn-attach" class="btn-icon" title="Resim/Dosya Gönder" style="width: auto; min-width: 44px; margin-right: 0.25rem; font-size: 1.35rem; padding: 0.25rem;">📎</button>
+                            <input type="text" id="message-input" autocomplete="off" placeholder="Mesajınızı yazın...">
                             <button type="submit" class="btn btn-send">Gönder</button>
                         </form>
                     </footer>
@@ -204,6 +234,33 @@
         <div class="lightbox-content" style="position: relative; text-align: center;">
             <span id="close-lightbox" class="close-btn" style="position: absolute; top: -45px; right: 10px; color: white; font-size: 3rem;">&times;</span>
             <img id="lightbox-img" src="" alt="Büyük profil fotoğrafı" style="max-width: 90vw; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); object-fit: contain;">
+        </div>
+    </div>
+
+    <!-- 5. EKRAN: GRUP OLUŞTURMA MODALI (Varsayılan olarak gizli) -->
+    <div id="group-create-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3>Yeni Grup Oluştur</h3>
+                <span id="close-group-modal" class="close-btn" title="Kapat">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="group-create-form" style="display: flex; flex-direction: column; gap: 1.25rem;">
+                    <div class="input-group">
+                        <label for="group-name-input">Grup Adı</label>
+                        <input type="text" id="group-name-input" required placeholder="Grup adını yazın..." autocomplete="off">
+                    </div>
+                    
+                    <div class="input-group" style="display: flex; flex-direction: column; height: 200px;">
+                        <label style="margin-bottom: 0.5rem;">Gruba Eklenecek Arkadaşlar</label>
+                        <div id="group-friends-checkboxes" style="flex: 1; border: 1px solid var(--border-color); border-radius: 8px; padding: 0.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;">
+                            <!-- Arkadaş listesi checkbox olarak dinamik eklenecek -->
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Grubu Oluştur</button>
+                </form>
+            </div>
         </div>
     </div>
 
