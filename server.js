@@ -173,6 +173,13 @@ async function sendResetPasswordEmail(email, username, token) {
 // Ara Katmanlar
 app.use(cors());
 app.use(express.json());
+// Servis işçisi dosyası için özel önbellek önleme (no-cache) rotası
+app.get('/service-worker.js', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.setHeader('Content-Type', 'application/javascript');
+    res.sendFile(path.join(__dirname, 'client', 'service-worker.js'));
+});
+
 app.use(express.static(path.join(__dirname, 'client')));
 
 // Test rotası (Sunucuya ulaşıp ulaşamadığımızı anlamak için)
