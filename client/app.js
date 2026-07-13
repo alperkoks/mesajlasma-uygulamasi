@@ -59,6 +59,8 @@ let activeChatPartnerId = null;
 let users = [];
 let messages = [];
 let socket = null; // Soket bağlantı nesnemiz
+let titleAlertInterval = null;
+const originalTitle = document.title;
 
 // API Sunucu Adresi (Hem lokalde hem bulutta otomatik çalışması için bağıl yol yapıyoruz)
 const API_URL = '/api';
@@ -395,6 +397,72 @@ lightboxModal.addEventListener('click', (e) => {
     }
 });
 
+// --- BİLDİRİM VE SES YARDIMCI FONKSİYONLARI ---
+
+// Web Audio API ile programatik, tatlı bir bildirim melodisi sentezle
+function playNotificationSound() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // 1. Nota (C5 - Do)
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+        gain1.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+        osc1.connect(gain1);
+        gain1.connect(audioCtx.destination);
+        osc1.start();
+        osc1.stop(audioCtx.currentTime + 0.15);
+
+        // 2. Nota (E5 - Mi) - 80ms sonra çalarak tınıyı zenginleştirir
+        setTimeout(() => {
+            try {
+                const osc2 = audioCtx.createOscillator();
+                const gain2 = audioCtx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime);
+                gain2.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.20);
+                osc2.connect(gain2);
+                gain2.connect(audioCtx.destination);
+                osc2.start();
+                osc2.stop(audioCtx.currentTime + 0.20);
+            } catch (e) {}
+        }, 80);
+    } catch (err) {
+        console.warn('Web Audio API desteklenmiyor veya engellendi:', err);
+    }
+}
+
+// Sekme başlığının (title) yanıp sönmesini başlat
+function startTitleAlert(senderName) {
+    if (titleAlertInterval) clearInterval(titleAlertInterval);
+    
+    let showingAlert = false;
+    titleAlertInterval = setInterval(() => {
+        document.title = showingAlert 
+            ? originalTitle 
+            : `💬 (1) ${senderName} mesaj yazdı...`;
+        showingAlert = !showingAlert;
+    }, 1000);
+}
+
+// Sekme başlığını orijinal haline döndür
+function stopTitleAlert() {
+    if (titleAlertInterval) {
+        clearInterval(titleAlertInterval);
+        titleAlertInterval = null;
+    }
+    document.title = originalTitle;
+}
+
+// Kullanıcı pencereyi/sekmesini aktifleştirdiğinde başlık uyarısını temizle
+window.addEventListener('focus', () => {
+    stopTitleAlert();
+});
+
 // --- UYGULAMAYI BAŞLATMA VE VERİ ÇEKME ---
 
 async function initApp() {
@@ -410,6 +478,11 @@ async function initApp() {
             myAvatar.innerHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
         } else {
             myAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+        }
+
+        // Masaüstü bildirim izni iste
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
         }
 
         showScreen('chat');
@@ -448,12 +521,41 @@ async function initApp() {
         // SUNUCUDAN ANLIK MESAJ GELDİĞİNDE çalışan olay
         socket.on('receive_message', (msg) => {
             // Gelen mesaj şu an sohbet penceresi açık olan kişiden mi geldi?
-            if (activeChatPartnerId === msg.sender_id) {
+            const isCurrentChat = (activeChatPartnerId === msg.sender_id);
+            
+            if (isCurrentChat) {
                 messages.push(msg);
                 renderMessages(); // Mesajı ekrana anında çiz ve kaydır
             } else {
-                // Başka birinden geldiyse, kullanıcı listesini güncelle (çevrimiçi/çevrimdışı ve son durumlar için)
+                // Başka birinden geldiyse, kullanıcı listesini güncelle
                 loadUsers();
+            }
+
+            // --- BİLDİRİM VE SES TETİKLEMELERİ ---
+            // Eğer sekme arka plandaysa (kullanıcı başka sekmedeyse) veya sohbet o kişiyle açık değilse uyar
+            if (document.hidden || !isCurrentChat) {
+                // Ses çal
+                playNotificationSound();
+                
+                // Gönderenin adını bul
+                const sender = users.find(u => u.id === msg.sender_id);
+                const senderName = sender ? sender.username : 'Bir arkadaşınız';
+
+                // Sekme başlığını titret
+                startTitleAlert(senderName);
+
+                // Eğer izin verildiyse masaüstü bildirim yolla
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    const notification = new Notification(senderName, {
+                        body: msg.message,
+                        tag: `msg-${msg.sender_id}`, // Aynı kişiden gelen bildirimleri üst üste yığmak için
+                        renotify: true
+                    });
+                    notification.onclick = () => {
+                        window.focus();
+                        if (sender) selectUserChat(sender);
+                    };
+                }
             }
         });
 
