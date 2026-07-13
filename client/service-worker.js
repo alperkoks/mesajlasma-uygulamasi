@@ -42,3 +42,17 @@ self.addEventListener('notificationclick', (event) => {
         })
     );
 });
+
+// PWA Standalone Yükleme Kriterleri (Install, Activate ve Fetch Dinleyicileri)
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+    // İstekleri normal şekilde ağa iletiyoruz
+    event.respondWith(fetch(event.request));
+});
