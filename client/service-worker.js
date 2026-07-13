@@ -20,14 +20,7 @@ self.addEventListener('push', (event) => {
     };
 
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            const isAppFocused = clientList.some(c => c.focused);
-            if (isAppFocused) {
-                console.log('Uygulama aktif olarak açık, arka plan bildirimi pas geçildi.');
-                return;
-            }
-            return self.registration.showNotification(title, options);
-        })
+        self.registration.showNotification(title, options)
     );
 });
 

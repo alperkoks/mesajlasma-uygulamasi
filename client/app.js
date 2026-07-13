@@ -785,8 +785,12 @@ async function initApp() {
                     loadGroups();
                 }
                 
-                if (document.hidden || !isCurrentGroup) {
+                // Sadece başkası gönderdiyse ses çal
+                if (msg.sender_id !== currentUser.id) {
                     playNotificationSound();
+                }
+
+                if (document.hidden || !isCurrentGroup) {
                     const senderName = msg.sender_name || 'Grup Üyesi';
                     startTitleAlert(senderName);
 
@@ -828,11 +832,13 @@ async function initApp() {
             }
 
             // --- BİLDİRİM VE SES TETİKLEMELERİ ---
+            // Sadece başkası gönderdiyse ses çal
+            if (msg.sender_id !== currentUser.id) {
+                playNotificationSound();
+            }
+
             // Eğer sekme arka plandaysa (kullanıcı başka sekmedeyse) veya sohbet o kişiyle açık değilse uyar
             if (document.hidden || !isCurrentChat) {
-                // Ses çal
-                playNotificationSound();
-                
                 // Gönderenin adını bul
                 const sender = users.find(u => u.id === msg.sender_id);
                 const senderName = sender ? sender.username : 'Bir arkadaşınız';
