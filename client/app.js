@@ -657,7 +657,10 @@ async function initApp() {
         // Bağlantı hatası alırsak (örneğin token geçersizse) otomatik çıkış yap
         socket.on('connect_error', (err) => {
             console.error('Soket bağlantı hatası:', err.message);
-            logoutBtn.click();
+            // Sadece kimlik doğrulama/token yetki hatalarında çıkış yap, geçici ağ kesintilerinde çıkış yapma!
+            if (err.message === 'Yetkisiz bağlantı.' || err.message === 'Geçersiz anahtar.') {
+                logoutBtn.click();
+            }
         });
 
         // Başka bir kullanıcının ÇEVRİMİÇİ/ÇEVRİMDIŞI durumu değiştiğinde çalışan olay
