@@ -125,6 +125,7 @@ const btnUploadPhoto = document.getElementById('btn-upload-photo');
 const lightboxModal = document.getElementById('lightbox-modal');
 const lightboxImg = document.getElementById('lightbox-img');
 const closeLightbox = document.getElementById('close-lightbox');
+const btnRequestNotifications = document.getElementById('btn-request-notifications');
 
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
@@ -280,6 +281,24 @@ logoutBtn.addEventListener('click', () => {
     
     showScreen('auth');
 });
+
+// Bildirim İzni İsteme (Zil ikonu tıklaması)
+if (btnRequestNotifications) {
+    btnRequestNotifications.addEventListener('click', async () => {
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                alert('Harika! Anlık bildirimler başarıyla etkinleştirildi.');
+                btnRequestNotifications.classList.add('hidden');
+                await initPushNotifications();
+            } else {
+                alert('Bildirim izni reddedildi. Bildirim almak için tarayıcı ayarlarından izin vermeniz gerekmektedir.');
+            }
+        } catch (err) {
+            alert('Bildirim etkinleştirilemedi: ' + err.message);
+        }
+    });
+}
 
 // Arkadaşlıktan Çıkarma Butonunu Dinle
 btnUnfriend.addEventListener('click', async () => {
@@ -547,6 +566,19 @@ async function initPushNotifications() {
         return;
     }
 
+    // Bildirim izni verilmediyse veya sorulmadıysa zil simgesini göster (kullanıcı jesti gerekliliği)
+    if (Notification.permission !== 'granted') {
+        if (btnRequestNotifications) {
+            btnRequestNotifications.classList.remove('hidden');
+        }
+        return;
+    }
+
+    // Zaten izin verilmişse zili gizle ve sessizce kaydol
+    if (btnRequestNotifications) {
+        btnRequestNotifications.classList.add('hidden');
+    }
+
     try {
         // Service worker dosyasını kaydet
         const registration = await navigator.serviceWorker.register('/service-worker.js');
@@ -555,13 +587,6 @@ async function initPushNotifications() {
         const keyData = await apiCall('/push/public-key');
         const publicKey = keyData.publicKey;
         if (!publicKey) return;
-
-        // Bildirim izni iste
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            console.log('Bildirim izni reddedildi.');
-            return;
-        }
 
         // Mevcut aboneliği kontrol et veya yeni abonelik oluştur
         let subscription = await registration.pushManager.getSubscription();
