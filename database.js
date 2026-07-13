@@ -511,35 +511,37 @@ const dbQueries = {
     // Arkadaş Listesini Getir (onaylı arkadaşlıklar)
     async getFriends(userId) {
         const queryStr = `
-            SELECT 
-                users.id, 
-                users.username, 
-                users.profile_pic,
-                COALESCE((
-                    SELECT COUNT(*) FROM messages 
-                    WHERE messages.sender_id = users.id 
-                      AND messages.receiver_id = $1 
-                      AND messages.is_read = 0
-                ), 0) AS unread_count,
-                (
-                    SELECT message FROM messages 
-                    WHERE (messages.sender_id = users.id AND messages.receiver_id = $1)
-                       OR (messages.sender_id = $1 AND messages.receiver_id = users.id)
-                    ORDER BY messages.created_at DESC 
-                    LIMIT 1
-                ) AS last_message,
-                (
-                    SELECT created_at FROM messages 
-                    WHERE (messages.sender_id = users.id AND messages.receiver_id = $1)
-                       OR (messages.sender_id = $1 AND messages.receiver_id = users.id)
-                    ORDER BY messages.created_at DESC 
-                    LIMIT 1
-                ) AS last_message_time
-            FROM friendships 
-            JOIN users ON (users.id = friendships.user_id AND friendships.friend_id = $1) 
-                       OR (users.id = friendships.friend_id AND friendships.user_id = $1)
-            WHERE friendships.status = 'accepted'
-            ORDER BY CASE WHEN last_message_time IS NULL THEN 1 ELSE 0 END, last_message_time DESC, users.username ASC
+            SELECT * FROM (
+                SELECT 
+                    users.id, 
+                    users.username, 
+                    users.profile_pic,
+                    COALESCE((
+                        SELECT COUNT(*) FROM messages 
+                        WHERE messages.sender_id = users.id 
+                          AND messages.receiver_id = $1 
+                          AND messages.is_read = 0
+                    ), 0) AS unread_count,
+                    (
+                        SELECT message FROM messages 
+                        WHERE (messages.sender_id = users.id AND messages.receiver_id = $1)
+                           OR (messages.sender_id = $1 AND messages.receiver_id = users.id)
+                        ORDER BY messages.created_at DESC 
+                        LIMIT 1
+                    ) AS last_message,
+                    (
+                        SELECT created_at FROM messages 
+                        WHERE (messages.sender_id = users.id AND messages.receiver_id = $1)
+                           OR (messages.sender_id = $1 AND messages.receiver_id = users.id)
+                        ORDER BY messages.created_at DESC 
+                        LIMIT 1
+                    ) AS last_message_time
+                FROM friendships 
+                JOIN users ON (users.id = friendships.user_id AND friendships.friend_id = $1) 
+                           OR (users.id = friendships.friend_id AND friendships.user_id = $1)
+                WHERE friendships.status = 'accepted'
+            ) friends_subquery
+            ORDER BY CASE WHEN last_message_time IS NULL THEN 1 ELSE 0 END, last_message_time DESC, username ASC
         `;
         
         if (isPostgres) {
