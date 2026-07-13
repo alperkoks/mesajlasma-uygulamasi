@@ -954,6 +954,8 @@ messageForm.addEventListener('submit', async (e) => {
             partner.last_message_time = newMsg.created_at;
             renderUsersList();
         }
+    } catch (err) {
+        console.error('Mesaj gönderilemedi', err);
     }
 });
 
