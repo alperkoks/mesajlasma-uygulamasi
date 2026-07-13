@@ -879,6 +879,13 @@ async function selectUserChat(user) {
     activeChatPartner = user.username;
     activeChatPartnerId = user.id;
 
+    // Okunmamış mesaj sayısını sıfırla
+    user.unread_count = 0;
+    const localUser = users.find(u => u.id === user.id);
+    if (localUser) {
+        localUser.unread_count = 0;
+    }
+
     renderUsersList();
 
     activeChatName.textContent = user.username;
