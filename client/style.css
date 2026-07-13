@@ -1101,3 +1101,17 @@ body {
         transform: scale(1);
     }
 }
+
+/* SOHBET SEÇENEKLERİ AÇILIR MENÜ (DROPDOWN) STİLLERİ */
+.dropdown-item {
+    display: flex !important;
+}
+.dropdown-item.hidden {
+    display: none !important;
+}
+.dropdown-item:hover {
+    background-color: var(--bg-hover) !important;
+}
+.dropdown-item-danger:hover {
+    background-color: var(--danger-light) !important;
+}

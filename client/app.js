@@ -126,6 +126,8 @@ const lightboxModal = document.getElementById('lightbox-modal');
 const lightboxImg = document.getElementById('lightbox-img');
 const closeLightbox = document.getElementById('close-lightbox');
 const btnRequestNotifications = document.getElementById('btn-request-notifications');
+const btnChatOptions = document.getElementById('btn-chat-options');
+const chatOptionsDropdown = document.getElementById('chat-options-dropdown');
 
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
@@ -923,7 +925,7 @@ async function initApp() {
         });
         
     } catch (err) {
-        logoutBtn.click();
+        console.error('Uygulama başlatma hatası:', err);
     }
 }
 
@@ -1760,6 +1762,28 @@ async function selectGroupChat(group) {
     } catch (err) {
         alert("Hata (selectGroupChat): " + err.message);
     }
+}
+
+// --- SOHBET ÜÇ NOKTA SEÇENEKLER MENÜSÜ ---
+if (btnChatOptions && chatOptionsDropdown) {
+    btnChatOptions.addEventListener('click', (e) => {
+        e.stopPropagation();
+        chatOptionsDropdown.classList.toggle('hidden');
+    });
+
+    // Menü dışına tıklandığında kapat
+    document.addEventListener('click', (e) => {
+        if (!chatOptionsDropdown.classList.contains('hidden') && !chatOptionsDropdown.contains(e.target) && e.target !== btnChatOptions) {
+            chatOptionsDropdown.classList.add('hidden');
+        }
+    });
+
+    // Butonlardan birine tıklandığında menüyü kapat
+    chatOptionsDropdown.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            chatOptionsDropdown.classList.add('hidden');
+        });
+    });
 }
 
 // --- ARAMA VE SOHBET TEMİZLEME UI İŞLEMLERİ ---

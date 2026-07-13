@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=8">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -173,12 +173,18 @@
                                 <span class="active-chat-status" id="active-chat-status">çevrimiçi</span>
                             </div>
                         </div>
-                        <div class="chat-header-actions" style="display: flex; gap: 0.5rem; align-items: center;">
-                            <button id="btn-group-settings" class="btn-icon hidden" title="Grup Bilgileri & Ayarları" style="font-size: 1.25rem; padding: 0.3rem;">⚙️</button>
-                            <button id="btn-toggle-search" class="btn-icon" title="Mesajlarda Ara" style="font-size: 1.2rem; padding: 0.3rem;">🔍</button>
-                            <button id="btn-clear-chat" class="btn-icon" title="Sohbeti Temizle" style="font-size: 1.2rem; padding: 0.3rem;">🗑️</button>
-                            <button id="btn-unfriend" class="btn-action-danger" title="Arkadaşlıktan Çıkar">❌ <span>Çıkar</span></button>
-                            <button id="btn-block" class="btn-action-danger" title="Engelle">🚫 <span>Engelle</span></button>
+                        <div class="chat-header-actions" style="position: relative; display: flex; align-items: center;">
+                            <!-- Üç Nokta Menü Butonu -->
+                            <button id="btn-chat-options" class="btn-icon" title="Seçenekler" style="font-size: 1.35rem; padding: 0.3rem; z-index: 10;">⋮</button>
+                            
+                            <!-- Açılır Menü (Dropdown) -->
+                            <div id="chat-options-dropdown" class="hidden" style="position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; min-width: 180px; z-index: 100; overflow: hidden; padding: 0.25rem 0;">
+                                <button id="btn-group-settings" class="dropdown-item hidden" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">⚙️ <span>Grup Ayarları</span></button>
+                                <button id="btn-toggle-search" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🔍 <span>Mesajlarda Ara</span></button>
+                                <button id="btn-clear-chat" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🗑️ <span>Sohbeti Temizle</span></button>
+                                <button id="btn-unfriend" class="dropdown-item dropdown-item-danger" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--danger-color); cursor: pointer; transition: background-color 0.2s;">❌ <span>Arkadaştan Çıkar</span></button>
+                                <button id="btn-block" class="dropdown-item dropdown-item-danger" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--danger-color); cursor: pointer; transition: background-color 0.2s;">🚫 <span>Engelle</span></button>
+                            </div>
                         </div>
                     </header>
 
@@ -325,6 +331,6 @@
 
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>
