@@ -290,12 +290,10 @@
                 </div>
 
                 <!-- Grup Adı Düzenleme -->
-                <div class="input-group">
+                <div class="input-group" style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
                     <label for="group-settings-name-input">Grup Adı</label>
-                    <div style="display: flex; gap: 0.5rem; width: 100%;">
-                        <input type="text" id="group-settings-name-input" placeholder="Grup adını girin..." style="flex: 1;" autocomplete="off">
-                        <button id="btn-group-name-update" class="btn btn-primary" style="display: none; padding: 0 1rem; font-size: 0.85rem;">Güncelle</button>
-                    </div>
+                    <input type="text" id="group-settings-name-input" placeholder="Grup adını girin..." style="width: 100%; box-sizing: border-box; display: block;" autocomplete="off">
+                    <button id="btn-group-name-update" class="btn btn-primary" style="display: none; width: 100%; box-sizing: border-box; padding: 0.6rem; font-size: 0.9rem; margin-top: 0.25rem;">Grup Adını Güncelle</button>
                 </div>
 
                 <!-- Üyeler Listesi -->
@@ -315,6 +313,6 @@
 
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=10"></script>
+    <script src="app.js?v=11"></script>
 </body>
 </html>

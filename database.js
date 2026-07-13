@@ -92,6 +92,17 @@ async function initDatabase() {
                     UNIQUE(group_id, user_id)
                 )
             `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS deleted_messages (
+                    id SERIAL PRIMARY KEY,
+                    message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE,
+                    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    UNIQUE(message_id, user_id)
+                )
+            `);
             // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
             await client.query(`ALTER TABLE messages ALTER COLUMN receiver_id DROP NOT NULL`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read INTEGER DEFAULT 0`);
@@ -231,6 +242,18 @@ async function initDatabase() {
                 FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
                 UNIQUE(group_id, user_id)
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS deleted_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(message_id) REFERENCES messages(id) ON DELETE CASCADE,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(message_id, user_id)
             )
         `);
 
@@ -411,24 +434,24 @@ const dbQueries = {
         }
     },
 
-    // İki kullanıcı arasındaki mesaj geçmişini getirme
-    async getMessageHistory(user1Id, user2Id) {
+    // İki kullanıcı arasındaki mesaj geçmişini getirme (Kullanıcının kendisi için sildiği mesajları filtreleyerek)
+    async getMessageHistory(userId, partnerId) {
         if (isPostgres) {
             const res = await dbPostgresPool.query(
                 `SELECT * FROM messages 
-                 WHERE (sender_id = $1 AND receiver_id = $2) 
-                    OR (sender_id = $3 AND receiver_id = $4) 
+                 WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)) AND group_id IS NULL
+                   AND id NOT IN (SELECT message_id FROM deleted_messages WHERE user_id = $1)
                  ORDER BY created_at ASC`,
-                [user1Id, user2Id, user2Id, user1Id]
+                [userId, partnerId]
             );
             return res.rows;
         } else {
             return await dbSqlite.all(
                 `SELECT * FROM messages 
-                 WHERE (sender_id = ? AND receiver_id = ?) 
-                    OR (sender_id = ? AND receiver_id = ?) 
+                 WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) AND group_id IS NULL
+                   AND id NOT IN (SELECT message_id FROM deleted_messages WHERE user_id = ?)
                  ORDER BY created_at ASC`,
-                [user1Id, user2Id, user2Id, user1Id]
+                [userId, partnerId, partnerId, userId, userId]
             );
         }
     },
@@ -516,6 +539,7 @@ const dbQueries = {
             JOIN users ON (users.id = friendships.user_id AND friendships.friend_id = $1) 
                        OR (users.id = friendships.friend_id AND friendships.user_id = $1)
             WHERE friendships.status = 'accepted'
+            ORDER BY CASE WHEN last_message_time IS NULL THEN 1 ELSE 0 END, last_message_time DESC, users.username ASC
         `;
         
         if (isPostgres) {
@@ -748,43 +772,58 @@ const dbQueries = {
         }
     },
 
-    // Grubun mesaj geçmişini getir
-    async getGroupMessageHistory(groupId) {
+    // Grubun mesaj geçmişini getir (Kullanıcının kendisi için sildiği mesajları filtreleyerek)
+    async getGroupMessageHistory(groupId, userId) {
         const queryStr = `
             SELECT messages.*, users.username AS sender_name 
             FROM messages 
             JOIN users ON users.id = messages.sender_id 
             WHERE messages.group_id = $1 
+              AND messages.id NOT IN (SELECT message_id FROM deleted_messages WHERE user_id = $2)
             ORDER BY messages.created_at ASC
         `;
         if (isPostgres) {
-            const res = await dbPostgresPool.query(queryStr, [groupId]);
+            const res = await dbPostgresPool.query(queryStr, [groupId, userId]);
             return res.rows;
         } else {
-            const queryStrSqlite = queryStr.replace(/\$1/g, '?');
-            return await dbSqlite.all(queryStrSqlite, [groupId]);
+            const queryStrSqlite = queryStr.replace(/\$1/g, '?').replace(/\$2/g, '?');
+            return await dbSqlite.all(queryStrSqlite, [groupId, userId]);
         }
     },
 
-    // Sohbet geçmişini tamamen temizle (sil)
+    // Sohbet geçmişini temizle (Sadece temizleyen kullanıcı için silinmiş gösterir)
     async clearChatHistory(userId, receiverId = null, groupId = null) {
         if (groupId) {
             if (isPostgres) {
-                await dbPostgresPool.query('DELETE FROM messages WHERE group_id = $1', [groupId]);
+                await dbPostgresPool.query(`
+                    INSERT INTO deleted_messages (message_id, user_id)
+                    SELECT id, $1 FROM messages
+                    WHERE group_id = $2
+                    ON CONFLICT (message_id, user_id) DO NOTHING
+                `, [userId, groupId]);
             } else {
-                await dbSqlite.run('DELETE FROM messages WHERE group_id = ?', [groupId]);
+                await dbSqlite.run(`
+                    INSERT INTO deleted_messages (message_id, user_id)
+                    SELECT id, ? FROM messages
+                    WHERE group_id = ?
+                    ON CONFLICT(message_id, user_id) DO NOTHING
+                `, [userId, groupId]);
             }
         } else if (receiverId) {
             if (isPostgres) {
-                await dbPostgresPool.query(
-                    'DELETE FROM messages WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)) AND group_id IS NULL',
-                    [userId, receiverId]
-                );
+                await dbPostgresPool.query(`
+                    INSERT INTO deleted_messages (message_id, user_id)
+                    SELECT id, $1 FROM messages
+                    WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)) AND group_id IS NULL
+                    ON CONFLICT (message_id, user_id) DO NOTHING
+                `, [userId, receiverId]);
             } else {
-                await dbSqlite.run(
-                    'DELETE FROM messages WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) AND group_id IS NULL',
-                    [userId, receiverId, receiverId, userId]
-                );
+                await dbSqlite.run(`
+                    INSERT INTO deleted_messages (message_id, user_id)
+                    SELECT id, ? FROM messages
+                    WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) AND group_id IS NULL
+                    ON CONFLICT(message_id, user_id) DO NOTHING
+                `, [userId, userId, receiverId, receiverId, userId]);
             }
         }
     },

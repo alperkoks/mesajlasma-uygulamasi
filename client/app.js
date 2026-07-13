@@ -866,6 +866,16 @@ function renderUsersList() {
     // Arayüzde sadece kendimiz dışındaki kişileri listeliyoruz (zaten API sadece arkadaşlarımızı dönüyor)
     const otherUsers = users.filter(user => user.username !== currentUser.username);
     
+    // Arkadaşları son mesaj tarihine göre sırala (en yeni mesaj atan en üstte olsun)
+    otherUsers.sort((a, b) => {
+        const timeA = a.last_message_time ? new Date(a.last_message_time).getTime() : 0;
+        const timeB = b.last_message_time ? new Date(b.last_message_time).getTime() : 0;
+        if (timeA !== timeB) {
+            return timeB - timeA;
+        }
+        return a.username.localeCompare(b.username);
+    });
+    
     if (otherUsers.length === 0) {
         usersList.innerHTML = '<li class="user-item placeholder">Henüz arkadaş eklemediniz. Yukarıdan aratıp ekleyebilirsiniz!</li>';
         return;
@@ -1521,6 +1531,17 @@ async function loadGroups() {
 // Grup Listesini Ekrana Çiz
 function renderGroupsList() {
     groupsList.innerHTML = '';
+    
+    // Grupları son mesaj tarihine göre sırala (en yeni mesaj gelen en üstte olsun)
+    groups.sort((a, b) => {
+        const timeA = a.last_message_time ? new Date(a.last_message_time).getTime() : 0;
+        const timeB = b.last_message_time ? new Date(b.last_message_time).getTime() : 0;
+        if (timeA !== timeB) {
+            return timeB - timeA;
+        }
+        return a.name.localeCompare(b.name);
+    });
+
     if (groups.length === 0) {
         groupsList.innerHTML = '<li class="user-item placeholder">Henüz bir gruba dahil değilsiniz.</li>';
         return;
@@ -1876,7 +1897,7 @@ async function loadGroupMembers(group) {
         if (isUserAdmin) {
             lblGroupPic.style.display = 'inline-block';
             groupSettingsNameInput.removeAttribute('disabled');
-            btnGroupNameUpdate.style.display = 'inline-block';
+            btnGroupNameUpdate.style.display = 'block';
             btnLeaveGroup.textContent = isFounder ? 'Grubu Sil / Ayrıl' : 'Gruptan Ayrıl';
         } else {
             lblGroupPic.style.display = 'none';

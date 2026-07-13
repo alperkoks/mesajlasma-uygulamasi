@@ -1173,16 +1173,12 @@ app.delete('/api/messages/clear', authenticateToken, async (req, res) => {
     try {
         await dbQueries.clearChatHistory(currentUserId, receiverId, groupId);
 
-        // --- SOKET ÜZERİNDEN DİĞER KULLANICILARA DUYUR ---
-        if (groupId) {
-            io.to(`group_${groupId}`).emit('chat_cleared', { groupId });
-        } else if (receiverId) {
-            const receiverSockets = userSockets.get(receiverId);
-            if (receiverSockets && receiverSockets.size > 0) {
-                receiverSockets.forEach(socketId => {
-                    io.to(socketId).emit('chat_cleared', { senderId: currentUserId });
-                });
-            }
+        // Sadece temizleme işlemini yapan kullanıcının açık olan tüm sekmelerine haber ver
+        const mySockets = userSockets.get(currentUserId);
+        if (mySockets && mySockets.size > 0) {
+            mySockets.forEach(socketId => {
+                io.to(socketId).emit('chat_cleared', { receiverId, groupId });
+            });
         }
 
         res.json({ message: 'Sohbet geçmişi başarıyla temizlendi.' });
