@@ -886,36 +886,40 @@ function renderSearchResult(user) {
 }
 
 async function selectUserChat(user) {
-    activeChatPartner = user.username;
-    activeChatPartnerId = user.id;
+    try {
+        activeChatPartner = user.username;
+        activeChatPartnerId = user.id;
 
-    // Okunmamış mesaj sayısını sıfırla
-    user.unread_count = 0;
-    const localUser = users.find(u => u.id === user.id);
-    if (localUser) {
-        localUser.unread_count = 0;
+        // Okunmamış mesaj sayısını sıfırla
+        user.unread_count = 0;
+        const localUser = users.find(u => u.id === user.id);
+        if (localUser) {
+            localUser.unread_count = 0;
+        }
+
+        renderUsersList();
+
+        // Mobilde sohbet alanını öne getirmek için container'a sınıf ekle
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            chatContainer.classList.add('mobile-chat-active');
+        }
+
+        activeChatName.textContent = user.username;
+        if (user.profile_pic) {
+            activeChatAvatar.innerHTML = `<img src="${user.profile_pic}" alt="${user.username}" class="avatar-img">`;
+        } else {
+            activeChatAvatar.textContent = user.username.substring(0, 2).toUpperCase();
+        }
+        activeChatStatus.textContent = user.isOnline ? 'çevrimiçi' : 'çevrimdışı';
+
+        noChatSelectedScreen.classList.add('hidden');
+        chatActiveScreen.classList.remove('hidden');
+
+        await loadMessages();
+    } catch (err) {
+        alert("Hata (selectUserChat): " + err.message + "\nStack: " + err.stack);
     }
-
-    renderUsersList();
-
-    // Mobilde sohbet alanını öne getirmek için container'a sınıf ekle
-    const chatContainer = document.querySelector('.chat-container');
-    if (chatContainer) {
-        chatContainer.classList.add('mobile-chat-active');
-    }
-
-    activeChatName.textContent = user.username;
-    if (user.profile_pic) {
-        activeChatAvatar.innerHTML = `<img src="${user.profile_pic}" alt="${user.username}" class="avatar-img">`;
-    } else {
-        activeChatAvatar.textContent = user.username.substring(0, 2).toUpperCase();
-    }
-    activeChatStatus.textContent = user.isOnline ? 'çevrimiçi' : 'çevrimdışı';
-
-    noChatSelectedScreen.classList.add('hidden');
-    chatActiveScreen.classList.remove('hidden');
-
-    await loadMessages();
 }
 
 // Mobilde sohbet alanından arkadaş listesine geri dönme butonu
