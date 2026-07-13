@@ -13,6 +13,25 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// KARANLIK / AYDINLIK TEMA YÖNETİMİ
+const savedTheme = localStorage.getItem('theme') || 'light';
+if (savedTheme === 'dark') {
+    document.body.classList.add('dark-theme');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    if (themeBtn) {
+        themeBtn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        themeBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            const isDark = document.body.classList.contains('dark-theme');
+            themeBtn.textContent = isDark ? '☀️' : '🌙';
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        });
+    }
+});
+
 // EKRANLAR VE ELEMENTLER
 const authScreen = document.getElementById('auth-screen');
 const chatScreen = document.getElementById('chat-screen');
@@ -42,6 +61,7 @@ const messageInput = document.getElementById('message-input');
 const btnUnfriend = document.getElementById('btn-unfriend');
 const btnBlock = document.getElementById('btn-block');
 const mobileBackBtn = document.getElementById('mobile-back-btn');
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
 
 // ARKADAŞLIK SİSTEMİ ELEMENTLERİ
 const friendSearchForm = document.getElementById('friend-search-form');

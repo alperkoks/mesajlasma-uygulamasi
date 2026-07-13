@@ -1,18 +1,30 @@
 /* GLOBAL STYLES & VARIABLES */
 :root {
-    --primary-color: #4f46e5; /* Modern İndigo Mavisi */
-    --primary-hover: #4338ca;
-    --bg-light: #f3f4f6; /* Hafif Açık Gri Arka Plan */
+    --primary-color: #6366f1; /* Modern Indigo */
+    --primary-hover: #4f46e5;
+    --bg-light: #f8fafc; /* Slate 50 */
     --bg-white: #ffffff;
-    --text-main: #1f2937; /* Koyu Gri (Neredeyse Siyah) */
-    --text-muted: #6b7280; /* Orta Gri */
-    --border-color: #e5e7eb; /* İnce Çizgi Grisi */
-    --online-color: #10b981; /* Canlı Yeşil */
-    --offline-color: #9ca3af; /* Donuk Gri */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --text-main: #0f172a; /* Slate 900 */
+    --text-muted: #64748b; /* Slate 500 */
+    --border-color: #e2e8f0; /* Slate 200 */
+    --online-color: #10b981;
+    --offline-color: #94a3b8;
+    --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     --font-family: 'Inter', sans-serif;
+}
+
+/* ELİT KARANLIK MOD TEMA DEĞİŞKENLERİ */
+body.dark-theme {
+    --bg-light: #0b0f19; /* Çok şık koyu lacivert/siyah */
+    --bg-white: #131c2e; /* Slate 800 tınısı */
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --border-color: #1e293b;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px 0 rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 30px 0 rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -26,16 +38,19 @@ body {
     background-color: var(--bg-light);
     color: var(--text-main);
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* EKRAN YÖNETİMİ */
 .screen {
     width: 100%;
-    height: 100%;
+    height: 100vh;
+    height: 100dvh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -892,6 +907,7 @@ body {
         display: flex;
         width: 100vw;
         height: 100vh;
+        height: 100dvh;
         overflow: hidden;
     }
 
@@ -902,6 +918,7 @@ body {
         flex: 1 !important;
         display: flex !important;
         height: 100% !important;
+        height: 100dvh !important;
         border-right: none;
     }
 
@@ -920,6 +937,7 @@ body {
         width: 100% !important;
         flex: 1 !important;
         height: 100% !important;
+        height: 100dvh !important;
         background-color: var(--bg-white);
     }
 
@@ -940,5 +958,21 @@ body {
 
     .message-bubble {
         max-width: 85%;
+    }
+
+    /* Çıkar/Engelle Butonlarının Mobilde Küçültülmesi ve Sadece İkon Gösterilmesi */
+    .chat-header-actions .btn-action-danger {
+        padding: 0.4rem;
+        border-radius: 50%;
+        width: 34px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+    }
+    
+    .chat-header-actions .btn-action-danger span {
+        display: none;
     }
 }
