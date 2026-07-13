@@ -506,6 +506,9 @@ app.get('/api/users', authenticateToken, async (req, res) => {
             id: friend.id,
             username: friend.username,
             profile_pic: friend.profile_pic,
+            unread_count: parseInt(friend.unread_count || 0),
+            last_message: friend.last_message || null,
+            last_message_time: friend.last_message_time || null,
             isOnline: onlineUsers.has(friend.id) // Kümede bu ID varsa çevrimiçi
         }));
         res.json(friendsWithStatus);
@@ -765,9 +768,13 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
     const receiverId = parseInt(req.params.receiverId);
 
     try {
+        // Mesaj geçmişini getirmeden önce karşı taraftan gelen okunmamış mesajları okundu olarak işaretle
+        await dbQueries.markMessagesAsRead(receiverId, senderId);
+        
         const messages = await dbQueries.getMessageHistory(senderId, receiverId);
         res.json(messages);
     } catch (error) {
+        console.error('Mesaj geçmişi getirme hatası:', error);
         res.status(500).json({ message: 'Mesaj geçmişi getirilirken hata oluştu.' });
     }
 });

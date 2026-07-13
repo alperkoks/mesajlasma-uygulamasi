@@ -72,8 +72,8 @@ async function initDatabase() {
                     UNIQUE(user_id, blocked_id)
                 )
             `);
-            
             // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(100) UNIQUE`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT`);
@@ -144,6 +144,13 @@ async function initDatabase() {
                 FOREIGN KEY(receiver_id) REFERENCES users(id)
             )
         `);
+
+        // SQLite için messages tablosuna is_read kolonu ekle
+        const tableInfoMsg = await dbSqlite.all("PRAGMA table_info(messages)");
+        const columnsMsg = tableInfoMsg.map(col => col.name);
+        if (!columnsMsg.includes('is_read')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_read INTEGER DEFAULT 0");
+        }
 
         await dbSqlite.exec(`
             CREATE TABLE IF NOT EXISTS friendships (
@@ -409,24 +416,58 @@ const dbQueries = {
 
     // Arkadaş Listesini Getir (onaylı arkadaşlıklar)
     async getFriends(userId) {
+        const queryStr = `
+            SELECT 
+                users.id, 
+                users.username, 
+                users.profile_pic,
+                COALESCE((
+                    SELECT COUNT(*) FROM messages 
+                    WHERE messages.sender_id = users.id 
+                      AND messages.receiver_id = $1 
+                      AND messages.is_read = 0
+                ), 0) AS unread_count,
+                (
+                    SELECT message FROM messages 
+                    WHERE (messages.sender_id = users.id AND messages.receiver_id = $1)
+                       OR (messages.sender_id = $1 AND messages.receiver_id = users.id)
+                    ORDER BY messages.created_at DESC 
+                    LIMIT 1
+                ) AS last_message,
+                (
+                    SELECT created_at FROM messages 
+                    WHERE (messages.sender_id = users.id AND messages.receiver_id = $1)
+                       OR (messages.sender_id = $1 AND messages.receiver_id = users.id)
+                    ORDER BY messages.created_at DESC 
+                    LIMIT 1
+                ) AS last_message_time
+            FROM friendships 
+            JOIN users ON (users.id = friendships.user_id AND friendships.friend_id = $1) 
+                       OR (users.id = friendships.friend_id AND friendships.user_id = $1)
+            WHERE friendships.status = 'accepted'
+        `;
+        
         if (isPostgres) {
-            const res = await dbPostgresPool.query(
-                `SELECT users.id, users.username, users.profile_pic 
-                 FROM friendships 
-                 JOIN users ON (users.id = friendships.user_id AND friendships.friend_id = $1) 
-                            OR (users.id = friendships.friend_id AND friendships.user_id = $2)
-                 WHERE friendships.status = 'accepted'`,
-                [userId, userId]
-            );
+            const res = await dbPostgresPool.query(queryStr, [userId]);
             return res.rows;
         } else {
-            return await dbSqlite.all(
-                `SELECT users.id, users.username, users.profile_pic 
-                 FROM friendships 
-                 JOIN users ON (users.id = friendships.user_id AND friendships.friend_id = ?) 
-                            OR (users.id = friendships.friend_id AND friendships.user_id = ?)
-                 WHERE friendships.status = 'accepted'`,
-                [userId, userId]
+            // SQLite $1 yerine ? bekler
+            const queryStrSqlite = queryStr.replace(/\$1/g, '?');
+            return await dbSqlite.all(queryStrSqlite, [userId]);
+        }
+    },
+
+    // Belirli bir kullanıcıdan gelen tüm okunmamış mesajları okundu olarak işaretle
+    async markMessagesAsRead(senderId, receiverId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'UPDATE messages SET is_read = 1 WHERE sender_id = $1 AND receiver_id = $2 AND is_read = 0',
+                [senderId, receiverId]
+            );
+        } else {
+            await dbSqlite.run(
+                'UPDATE messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 0',
+                [senderId, receiverId]
             );
         }
     },

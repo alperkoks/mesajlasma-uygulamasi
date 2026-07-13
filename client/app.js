@@ -526,8 +526,22 @@ async function initApp() {
             if (isCurrentChat) {
                 messages.push(msg);
                 renderMessages(); // Mesajı ekrana anında çiz ve kaydır
+                
+                // Mesajı okuduğumuzu sunucuya bildir (arka planda)
+                apiCall(`/messages/${msg.sender_id}`).catch(() => {});
+            }
+            
+            // Son mesaj içeriğini ve zamanını yerel listede güncelle
+            const sender = users.find(u => u.id === msg.sender_id);
+            if (sender) {
+                sender.last_message = msg.message;
+                sender.last_message_time = msg.created_at;
+                if (!isCurrentChat) {
+                    sender.unread_count = (sender.unread_count || 0) + 1;
+                }
+                renderUsersList();
             } else {
-                // Başka birinden geldiyse, kullanıcı listesini güncelle
+                // Eğer listede yoksa baştan çek
                 loadUsers();
             }
 
@@ -639,6 +653,14 @@ async function loadUsers() {
     }
 }
 
+function formatMessageTime(timeStr) {
+    if (!timeStr) return '';
+    const date = new Date(timeStr);
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
 function renderUsersList() {
     usersList.innerHTML = '';
     // Arayüzde sadece kendimiz dışındaki kişileri listeliyoruz (zaten API sadece arkadaşlarımızı dönüyor)
@@ -655,7 +677,20 @@ function renderUsersList() {
         
         const initial = user.username.substring(0, 2).toUpperCase();
         const statusClass = user.isOnline ? 'online' : 'offline';
-        const statusText = user.isOnline ? 'çevrimiçi' : 'çevrimdışı';
+
+        // Okunmamış mesaj sayısı rozeti (Badge)
+        const badgeHTML = user.unread_count > 0 
+            ? `<div class="unread-badge">${user.unread_count}</div>` 
+            : '';
+
+        // Son mesaj içeriği veya çevrimiçi durumu
+        const lastMsgText = user.last_message 
+            ? user.last_message 
+            : (user.isOnline ? 'çevrimiçi' : 'çevrimdışı');
+
+        const lastMsgTimeText = user.last_message_time 
+            ? formatMessageTime(user.last_message_time) 
+            : '';
 
         const avatarHTML = user.profile_pic 
             ? `<img src="${user.profile_pic}" alt="${user.username}" class="avatar-img">`
@@ -666,10 +701,11 @@ function renderUsersList() {
             <div class="user-item-info">
                 <div class="user-item-header">
                     <span class="name">${user.username}</span>
-                    <span class="last-msg-time"></span>
+                    <span class="last-msg-time">${lastMsgTimeText}</span>
                 </div>
-                <span class="last-msg">${statusText}</span>
+                <span class="last-msg">${lastMsgText}</span>
             </div>
+            ${badgeHTML}
             <div class="user-item-status-dot ${statusClass}"></div>
         `;
 
@@ -910,9 +946,14 @@ messageForm.addEventListener('submit', async (e) => {
         messages.push(newMsg);
         renderMessages();
         messageInput.value = '';
-        
-    } catch (err) {
-        console.error('Mesaj gönderilemedi', err);
+
+        // Gönderdiğimiz mesajı listedeki son mesaj olarak güncelle
+        const partner = users.find(u => u.id === activeChatPartnerId);
+        if (partner) {
+            partner.last_message = newMsg.message;
+            partner.last_message_time = newMsg.created_at;
+            renderUsersList();
+        }
     }
 });
 
