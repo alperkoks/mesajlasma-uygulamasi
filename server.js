@@ -1003,6 +1003,20 @@ app.post('/api/groups/:groupId/remove-member', authenticateToken, async (req, re
             return res.status(403).json({ message: 'Yalnızca grup yöneticisi üye çıkartabilir.' });
         }
 
+        // Grup kurucusu gruptan çıkarılamaz (kendi isteğiyle ayrılmak hariç)
+        if (targetUserId !== currentUserId && targetUserId === group.created_by) {
+            return res.status(403).json({ message: 'Grup kurucusu gruptan çıkarılamaz.' });
+        }
+
+        // Yöneticileri gruptan sadece grup kurucusu çıkartabilir (kendileri hariç)
+        const targetMember = members.find(m => m.id === targetUserId);
+        const isTargetAdmin = targetMember && targetMember.is_admin === 1;
+        const isCallerFounder = group.created_by === currentUserId;
+
+        if (targetUserId !== currentUserId && isTargetAdmin && !isCallerFounder) {
+            return res.status(403).json({ message: 'Diğer yöneticileri gruptan sadece grup kurucusu çıkartabilir.' });
+        }
+
         // Eğer kurucu yönetici (group.created_by) kendisi ayrılmaya çalışıyorsa ve grupta başkaları varsa, önce kurucu devretmeli veya gruptan çıkmamalı (eğer başka yönetici yoksa devretmeli)
         if (targetUserId === currentUserId && group.created_by === currentUserId) {
             if (members.length > 1) {
@@ -1085,6 +1099,39 @@ app.post('/api/groups/:groupId/add-member', authenticateToken, async (req, res) 
     } catch (error) {
         console.error('Üye ekleme hatası:', error);
         res.status(500).json({ message: 'Üye gruba eklenirken hata oluştu.' });
+    }
+});
+
+// 3.14.2 YÖNETİCİLİKTEN AL (DEMOTE)
+app.post('/api/groups/:groupId/demote-member', authenticateToken, async (req, res) => {
+    const groupId = parseInt(req.params.groupId);
+    const currentUserId = req.user.id;
+    const targetUserId = parseInt(req.body.userId);
+
+    if (!targetUserId) return res.status(400).json({ message: 'Kullanıcı ID zorunludur.' });
+
+    try {
+        const group = await dbQueries.getGroupById(groupId);
+        if (!group) return res.status(404).json({ message: 'Grup bulunamadı.' });
+
+        // Sadece kurucu bir yöneticiyi görevden alabilir
+        if (group.created_by !== currentUserId) {
+            return res.status(403).json({ message: 'Sadece grup kurucusu yöneticilik yetkisini alabilir.' });
+        }
+
+        if (targetUserId === group.created_by) {
+            return res.status(400).json({ message: 'Grup kurucusunun yöneticilik yetkisi geri alınamaz.' });
+        }
+
+        // Tabloda is_admin = 0 olarak güncelle
+        await dbQueries.addGroupMember(groupId, targetUserId, 0);
+
+        io.to(`group_${groupId}`).emit('member_demoted', { groupId, userId: targetUserId });
+
+        res.json({ message: 'Kullanıcının yöneticilik yetkisi başarıyla geri alındı.' });
+    } catch (error) {
+        console.error('Yöneticilik alma hatası:', error);
+        res.status(500).json({ message: 'Yöneticilik yetkisi geri alınırken hata oluştu.' });
     }
 });
 

@@ -2067,7 +2067,16 @@ async function loadGroupMembers(group) {
             if (isMemberFounder) {
                 actionHTML = '<span style="font-size: 0.75rem; background-color: var(--primary-light); color: var(--primary-color); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold;">Grup Kurucusu</span>';
             } else if (isMemberAdmin) {
-                actionHTML = '<span style="font-size: 0.75rem; background-color: var(--primary-light); color: var(--primary-color); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold;">Yönetici</span>';
+                if (isFounder) {
+                    actionHTML = `
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button class="btn btn-demote-admin" data-uid="${member.id}" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; background-color: var(--primary-light); color: var(--primary-color); border: none; border-radius: 4px; cursor: pointer;">Yöneticiliği Al</button>
+                            <button class="btn btn-kick-member" data-uid="${member.id}" style="font-size: 0.75rem; padding: 0.2rem 0.4rem; background-color: var(--danger-light); color: var(--danger-color); border: none; border-radius: 4px; cursor: pointer;">Çıkar</button>
+                        </div>
+                    `;
+                } else {
+                    actionHTML = '<span style="font-size: 0.75rem; background-color: var(--primary-light); color: var(--primary-color); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: bold;">Yönetici</span>';
+                }
             } else if (isUserAdmin) {
                 actionHTML = `
                     <div style="display: flex; gap: 0.25rem;">
@@ -2096,16 +2105,32 @@ async function loadGroupMembers(group) {
         groupMembersListContainer.querySelectorAll('.btn-make-admin').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const targetUserId = e.target.getAttribute('data-uid');
-                if (!confirm('Bu üyeye yöneticilik yetkisi vermek istediğinize emin misiniz? Kendiniz de yönetici kalacaksınız.')) return;
+                if (!confirm('Bu üyeye yöneticilik yetkisi vermek istediğinize emin misiniz?')) return;
 
                 try {
                     await apiCall(`/groups/${group.id}/update`, 'POST', {
                         createdBy: targetUserId
                     });
-                    await loadGroups();
-                    await openGroupSettings();
+                    await loadGroupMembers(group);
                 } catch (err) {
                     alert('Yöneticilik verilemedi: ' + err.message);
+                }
+            });
+        });
+
+        // Yöneticilikten Düşürme (Demote) Olayları
+        groupMembersListContainer.querySelectorAll('.btn-demote-admin').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const targetUserId = e.target.getAttribute('data-uid');
+                if (!confirm('Bu kullanıcının yöneticilik yetkisini geri almak istediğinize emin misiniz?')) return;
+
+                try {
+                    await apiCall(`/groups/${group.id}/demote-member`, 'POST', {
+                        userId: targetUserId
+                    });
+                    await loadGroupMembers(group);
+                } catch (err) {
+                    alert('Yöneticilik yetkisi geri alınamadı: ' + err.message);
                 }
             });
         });
