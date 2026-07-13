@@ -1,3 +1,12 @@
+// SERVICE WORKER KAYDI (PWA DESTEĞİ İÇİN)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('✅ Service Worker başarıyla kaydedildi:', reg.scope))
+            .catch((err) => console.error('❌ Service Worker kaydı başarısız:', err));
+    });
+}
+
 // EKRANLAR VE ELEMENTLER
 const authScreen = document.getElementById('auth-screen');
 const chatScreen = document.getElementById('chat-screen');
