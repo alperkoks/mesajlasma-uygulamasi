@@ -527,9 +527,31 @@ lightboxModal.addEventListener('click', (e) => {
 // --- BİLDİRİM VE SES YARDIMCI FONKSİYONLARI ---
 
 // Web Audio API ile programatik, tatlı bir bildirim melodisi sentezle
+let globalAudioContext = null;
+
+function initAudioContext() {
+    try {
+        if (!globalAudioContext) {
+            globalAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (globalAudioContext.state === 'suspended') {
+            globalAudioContext.resume();
+        }
+    } catch (e) {
+        console.warn('AudioContext başlatılamadı:', e);
+    }
+}
+
+// Kullanıcının ekrana ilk dokunuşunda ses motorunu uyandır
+document.addEventListener('click', initAudioContext);
+document.addEventListener('touchstart', initAudioContext);
+
 function playNotificationSound() {
     try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        initAudioContext();
+        if (!globalAudioContext) return;
+        
+        const audioCtx = globalAudioContext;
         
         // 1. Nota (C5 - Do)
         const osc1 = audioCtx.createOscillator();
@@ -546,6 +568,7 @@ function playNotificationSound() {
         // 2. Nota (E5 - Mi) - 80ms sonra çalarak tınıyı zenginleştirir
         setTimeout(() => {
             try {
+                if (audioCtx.state === 'suspended') return;
                 const osc2 = audioCtx.createOscillator();
                 const gain2 = audioCtx.createGain();
                 osc2.type = 'sine';
