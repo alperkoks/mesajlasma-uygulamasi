@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -269,7 +269,7 @@
     </div>
 
     <!-- 4. EKRAN: BÜYÜK FOTOĞRAF ÖNİZLEME MODALI (LIGHTBOX) -->
-    <div id="lightbox-modal" class="modal hidden" style="background-color: rgba(0,0,0,0.85);">
+    <div id="lightbox-modal" class="modal hidden" style="background-color: rgba(0,0,0,0.85); z-index: 11000;">
         <div class="lightbox-content" style="position: relative; text-align: center;">
             <span id="close-lightbox" class="close-btn" style="position: absolute; top: -45px; right: 10px; color: white; font-size: 3rem;">&times;</span>
             <img id="lightbox-img" src="" alt="Büyük profil fotoğrafı" style="max-width: 90vw; max-height: 80vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); object-fit: contain;">
@@ -400,6 +400,6 @@
 
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=26"></script>
+    <script src="app.js?v=27"></script>
 </body>
 </html>
