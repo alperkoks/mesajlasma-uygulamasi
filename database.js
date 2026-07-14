@@ -143,6 +143,7 @@ async function initDatabase() {
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS show_last_seen INTEGER DEFAULT 1`);
             await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
             await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0`);
 
@@ -202,6 +203,9 @@ async function initDatabase() {
         }
         if (!columns.includes('last_seen')) {
             await dbSqlite.exec("ALTER TABLE users ADD COLUMN last_seen TEXT");
+        }
+        if (!columns.includes('show_last_seen')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN show_last_seen INTEGER DEFAULT 1");
         }
 
         await dbSqlite.exec(`
@@ -585,6 +589,7 @@ const dbQueries = {
                     users.profile_pic,
                     users.bio,
                     users.last_seen,
+                    users.show_last_seen,
                     COALESCE((
                         SELECT COUNT(*) FROM messages 
                         WHERE messages.sender_id = users.id 
@@ -1049,6 +1054,25 @@ const dbQueries = {
             await dbPostgresPool.query('DELETE FROM messages WHERE id = $1 AND sender_id = $2', [messageId, senderId]);
         } else {
             await dbSqlite.run('DELETE FROM messages WHERE id = ? AND sender_id = ?', [messageId, senderId]);
+        }
+    },
+
+    // Kullanıcı son görülme gizlilik ayarını güncelle
+    async updateShowLastSeen(userId, val) {
+        if (isPostgres) {
+            await dbPostgresPool.query('UPDATE users SET show_last_seen = $1 WHERE id = $2', [val, userId]);
+        } else {
+            await dbSqlite.run('UPDATE users SET show_last_seen = ? WHERE id = ?', [val, userId]);
+        }
+    },
+
+    // ID'ye göre kullanıcı bilgilerini getir
+    async getUserById(userId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query('SELECT id, username, profile_pic, bio, last_seen, show_last_seen, email FROM users WHERE id = $1', [userId]);
+            return res.rows[0];
+        } else {
+            return await dbSqlite.get('SELECT id, username, profile_pic, bio, last_seen, show_last_seen, email FROM users WHERE id = ?', [userId]);
         }
     }
 };

@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="stylesheet" href="style.css?v=20">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -254,6 +254,11 @@
                         <input type="text" id="settings-bio" maxlength="150" placeholder="Kendinizden bahsedin...">
                     </div>
 
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem;">
+                        <input type="checkbox" id="settings-show-last-seen" style="width: 16px; height: 16px; cursor: pointer; margin: 0; accent-color: var(--primary-color);">
+                        <label for="settings-show-last-seen" style="margin: 0; cursor: pointer; font-size: 0.85rem; color: var(--text-main); font-weight: 500; user-select: none;">Son görülme zamanımı başkalarıyla paylaş</label>
+                    </div>
+
                     <div class="input-group">
                         <label for="settings-volume">Uygulama İçi Ses Seviyesi (<span id="settings-volume-value">100%</span>)</label>
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -400,6 +405,6 @@
 
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=27"></script>
+    <script src="app.js?v=28"></script>
 </body>
 </html>

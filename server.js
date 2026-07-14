@@ -285,12 +285,19 @@ io.on('connection', (socket) => {
                 console.log(`🔌 Soket Bağlantısı Koptu: ${socket.user.username} (ID: ${userId}) tamamen çevrimdışı oldu.`);
                 
                 const lastSeenTime = new Date().toISOString();
-                dbQueries.updateLastSeen(userId, lastSeenTime).catch(err => {
-                    console.error('Son görülme veritabanı güncelleme hatası:', err);
+                dbQueries.getUserById(userId).then(dbUser => {
+                    const showLastSeen = dbUser ? dbUser.show_last_seen !== 0 : true;
+                    return dbQueries.updateLastSeen(userId, lastSeenTime).then(() => {
+                        io.emit('user_status_change', { 
+                            userId: userId, 
+                            isOnline: false, 
+                            last_seen: showLastSeen ? lastSeenTime : null 
+                        });
+                    });
+                }).catch(err => {
+                    console.error('Son görülme güncellenirken hata:', err);
+                    io.emit('user_status_change', { userId: userId, isOnline: false, last_seen: null });
                 });
-
-                // Diğer tüm kullanıcılara bu kişinin çevrimdışı olduğunu ve son görülme zamanını duyur
-                io.emit('user_status_change', { userId: userId, isOnline: false, last_seen: lastSeenTime });
             } else {
                 console.log(`🔌 Soket Bağlantısı Koptu: ${socket.user.username} (ID: ${userId}) bir sekmesi kapatıldı, diğerleri hala açık.`);
             }
@@ -514,6 +521,24 @@ app.post('/api/profile/update-bio', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Biyografi güncelleme hatası:', error);
         res.status(500).json({ message: 'Biyografi güncellenirken sunucu hatası oluştu.' });
+    }
+});
+
+// 2.1.3 GİZLİLİK AYARLARINI GÜNCELLE
+app.post('/api/profile/update-privacy', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { showLastSeen } = req.body;
+    const val = showLastSeen ? 1 : 0;
+
+    try {
+        await dbQueries.updateShowLastSeen(userId, val);
+        res.json({
+            message: 'Gizlilik ayarlarınız başarıyla güncellendi!',
+            show_last_seen: val
+        });
+    } catch (error) {
+        console.error('Gizlilik ayarları güncelleme hatası:', error);
+        res.status(500).json({ message: 'Gizlilik ayarları güncellenirken sunucu hatası oluştu.' });
     }
 });
 

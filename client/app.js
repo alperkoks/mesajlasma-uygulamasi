@@ -135,6 +135,7 @@ const settingsVolumeValue = document.getElementById('settings-volume-value');
 
 // PROFİL BİYOGRAFİ, ALINTILI YANIT VE CONTEXT MENU ELEMENTLERİ
 const settingsBio = document.getElementById('settings-bio');
+const settingsShowLastSeen = document.getElementById('settings-show-last-seen');
 const replyPreviewContainer = document.getElementById('reply-preview-container');
 const replyPreviewSender = document.getElementById('reply-preview-sender');
 const replyPreviewText = document.getElementById('reply-preview-text');
@@ -469,6 +470,10 @@ openSettingsBtn.addEventListener('click', () => {
     }
     btnUploadPhoto.classList.add('hidden'); // Yükle butonu gizli başlasın
     
+    if (settingsShowLastSeen) {
+        settingsShowLastSeen.checked = currentUser.show_last_seen !== 0;
+    }
+    
     if (settingsVolume && settingsVolumeValue) {
         settingsVolume.value = appVolume;
         settingsVolumeValue.textContent = Math.round(appVolume * 100) + '%';
@@ -579,6 +584,20 @@ settingsForm.addEventListener('submit', async (e) => {
             hasChanges = true;
         } catch (err) {
             console.error('Biyografi güncellenemedi:', err);
+        }
+    }
+
+    // Son Görülme Paylaşımı Değiştiyse Kaydet
+    const newShowLastSeen = settingsShowLastSeen ? settingsShowLastSeen.checked : true;
+    const oldShowLastSeen = currentUser.show_last_seen !== 0;
+    if (settingsShowLastSeen && newShowLastSeen !== oldShowLastSeen) {
+        try {
+            await apiCall('/profile/update-privacy', 'POST', { showLastSeen: newShowLastSeen });
+            currentUser.show_last_seen = newShowLastSeen ? 1 : 0;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            hasChanges = true;
+        } catch (err) {
+            console.error('Gizlilik ayarı güncellenemedi:', err);
         }
     }
 
