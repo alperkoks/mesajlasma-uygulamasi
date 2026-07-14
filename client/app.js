@@ -136,6 +136,7 @@ const settingsVolumeValue = document.getElementById('settings-volume-value');
 // PROFİL BİYOGRAFİ, ALINTILI YANIT VE CONTEXT MENU ELEMENTLERİ
 const settingsBio = document.getElementById('settings-bio');
 const settingsShowLastSeen = document.getElementById('settings-show-last-seen');
+const settingsShowOnline = document.getElementById('settings-show-online');
 const replyPreviewContainer = document.getElementById('reply-preview-container');
 const replyPreviewSender = document.getElementById('reply-preview-sender');
 const replyPreviewText = document.getElementById('reply-preview-text');
@@ -473,6 +474,9 @@ openSettingsBtn.addEventListener('click', () => {
     if (settingsShowLastSeen) {
         settingsShowLastSeen.checked = currentUser.show_last_seen !== 0;
     }
+    if (settingsShowOnline) {
+        settingsShowOnline.checked = currentUser.show_online !== 0;
+    }
     
     if (settingsVolume && settingsVolumeValue) {
         settingsVolume.value = appVolume;
@@ -587,17 +591,23 @@ settingsForm.addEventListener('submit', async (e) => {
         }
     }
 
-    // Son Görülme Paylaşımı Değiştiyse Kaydet
+    // Gizlilik Ayarları (Son Görülme ve Çevrimiçi Durumu) Değiştiyse Kaydet
     const newShowLastSeen = settingsShowLastSeen ? settingsShowLastSeen.checked : true;
     const oldShowLastSeen = currentUser.show_last_seen !== 0;
-    if (settingsShowLastSeen && newShowLastSeen !== oldShowLastSeen) {
+    const newShowOnline = settingsShowOnline ? settingsShowOnline.checked : true;
+    const oldShowOnline = currentUser.show_online !== 0;
+
+    if ((settingsShowLastSeen && newShowLastSeen !== oldShowLastSeen) || (settingsShowOnline && newShowOnline !== oldShowOnline)) {
         try {
-            await apiCall('/profile/update-privacy', 'POST', { showLastSeen: newShowLastSeen });
-            currentUser.show_last_seen = newShowLastSeen ? 1 : 0;
+            const res = await apiCall('/profile/update-privacy', 'POST', { 
+                showLastSeen: newShowLastSeen,
+                showOnline: newShowOnline
+            });
+            currentUser = res.user;
             localStorage.setItem('currentUser', JSON.stringify(currentUser));
             hasChanges = true;
         } catch (err) {
-            console.error('Gizlilik ayarı güncellenemedi:', err);
+            console.error('Gizlilik ayarları güncellenemedi:', err);
         }
     }
 

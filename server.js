@@ -243,8 +243,16 @@ io.on('connection', (socket) => {
     onlineUsers.add(userId);
     console.log(`🔌 Soket Bağlantısı: ${socket.user.username} (ID: ${userId}) çevrimiçi oldu.`);
 
-    // Diğer tüm çevrimiçi kullanıcılara bu kişinin çevrimiçi olduğunu duyur
-    io.emit('user_status_change', { userId: userId, isOnline: true });
+    // Diğer tüm çevrimiçi kullanıcılara bu kişinin çevrimiçi olduğunu (gizlemediyse) duyur
+    dbQueries.getUserById(userId).then(dbUser => {
+        const showOnline = dbUser ? dbUser.show_online !== 0 : true;
+        if (showOnline) {
+            io.emit('user_status_change', { userId: userId, isOnline: true });
+        }
+    }).catch(err => {
+        console.error('Soket çevrimiçi durumu kontrol hatası:', err);
+        io.emit('user_status_change', { userId: userId, isOnline: true });
+    });
 
     // Kullanıcının dahil olduğu gruplara soket oda kaydı yap
     dbQueries.getUserGroups(userId).then(groups => {
@@ -443,7 +451,15 @@ app.post('/api/auth/login', async (req, res) => {
         res.json({
             message: 'Giriş başarılı!',
             token: token,
-            user: { id: user.id, username: user.username, email: user.email, profile_pic: user.profile_pic }
+            user: { 
+                id: user.id, 
+                username: user.username, 
+                email: user.email, 
+                profile_pic: user.profile_pic,
+                bio: user.bio || '',
+                show_last_seen: user.show_last_seen,
+                show_online: user.show_online
+            }
         });
     } catch (error) {
         console.error('Giriş hatası:', error);
@@ -487,10 +503,11 @@ app.post('/api/profile/update-username', authenticateToken, async (req, res) => 
             newUsername: trimmedUsername
         });
 
+        const dbUser = await dbQueries.getUserById(userId);
         res.json({
             message: 'Kullanıcı adınız başarıyla güncellendi!',
             token: token,
-            user: { id: userId, username: trimmedUsername, email: req.user.email, profile_pic: req.user.profile_pic }
+            user: dbUser
         });
     } catch (error) {
         console.error('Kullanıcı adı güncelleme hatası:', error);
@@ -527,14 +544,32 @@ app.post('/api/profile/update-bio', authenticateToken, async (req, res) => {
 // 2.1.3 GİZLİLİK AYARLARINI GÜNCELLE
 app.post('/api/profile/update-privacy', authenticateToken, async (req, res) => {
     const userId = req.user.id;
-    const { showLastSeen } = req.body;
-    const val = showLastSeen ? 1 : 0;
+    const { showLastSeen, showOnline } = req.body;
 
     try {
-        await dbQueries.updateShowLastSeen(userId, val);
+        if (showLastSeen !== undefined) {
+            const valLastSeen = showLastSeen ? 1 : 0;
+            await dbQueries.updateShowLastSeen(userId, valLastSeen);
+        }
+        if (showOnline !== undefined) {
+            const valOnline = showOnline ? 1 : 0;
+            await dbQueries.updateShowOnline(userId, valOnline);
+            
+            // Eğer çevrimiçi olma durumunu kapattıysa, hemen diğer kullanıcılara çevrimdışı yapalım
+            if (!valOnline) {
+                io.emit('user_status_change', { userId: userId, isOnline: false, last_seen: null });
+            } else {
+                // Eğer açtıysa ve çevrimiçiyse çevrimiçi duyurusu yapalım
+                if (onlineUsers.has(userId)) {
+                    io.emit('user_status_change', { userId: userId, isOnline: true });
+                }
+            }
+        }
+
+        const dbUser = await dbQueries.getUserById(userId);
         res.json({
             message: 'Gizlilik ayarlarınız başarıyla güncellendi!',
-            show_last_seen: val
+            user: dbUser
         });
     } catch (error) {
         console.error('Gizlilik ayarları güncelleme hatası:', error);
@@ -642,17 +677,23 @@ app.get('/api/users', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     try {
         const friends = await dbQueries.getFriends(userId);
-        const friendsWithStatus = friends.map(friend => ({
-            id: friend.id,
-            username: friend.username,
-            profile_pic: friend.profile_pic,
-            bio: friend.bio || '',
-            last_seen: friend.last_seen || null,
-            unread_count: parseInt(friend.unread_count || 0),
-            last_message: friend.last_message || null,
-            last_message_time: friend.last_message_time || null,
-            isOnline: onlineUsers.has(friend.id) // Kümede bu ID varsa çevrimiçi
-        }));
+        const friendsWithStatus = friends.map(friend => {
+            const isOnlineActual = onlineUsers.has(friend.id);
+            const showOnline = friend.show_online !== 0;
+            return {
+                id: friend.id,
+                username: friend.username,
+                profile_pic: friend.profile_pic,
+                bio: friend.bio || '',
+                last_seen: friend.show_last_seen !== 0 ? (friend.last_seen || null) : null,
+                unread_count: parseInt(friend.unread_count || 0),
+                last_message: friend.last_message || null,
+                last_message_time: friend.last_message_time || null,
+                isOnline: isOnlineActual && showOnline,
+                show_last_seen: friend.show_last_seen,
+                show_online: friend.show_online
+            };
+        });
         res.json(friendsWithStatus);
     } catch (error) {
         console.error('Arkadaş listesi getirme hatası:', error);
