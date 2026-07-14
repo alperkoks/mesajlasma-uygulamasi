@@ -1357,6 +1357,14 @@ app.post('/api/messages/:messageId/edit', authenticateToken, async (req, res) =>
             return res.status(403).json({ message: 'Bu işlem için yetkiniz yok.' });
         }
 
+        // Son 5 dakika içinde mi gönderilmiş?
+        const msgTime = new Date(msgObj.created_at);
+        const now = new Date();
+        const diffMins = (now - msgTime) / 60000;
+        if (diffMins > 5) {
+            return res.status(400).json({ message: 'Mesajlar yalnızca gönderildikten sonraki ilk 5 dakika içinde düzenlenebilir.' });
+        }
+
         await dbQueries.updateMessageContent(messageId, senderId, message.trim());
 
         const updatedMsg = {

@@ -144,6 +144,17 @@ const ctxBtnReply = document.getElementById('ctx-btn-reply');
 const ctxBtnEdit = document.getElementById('ctx-btn-edit');
 const ctxBtnDelete = document.getElementById('ctx-btn-delete');
 
+// BAŞKA KULLANICI PROFİL MODAL ELEMENTLERİ
+const userProfileModal = document.getElementById('user-profile-modal');
+const closeProfileModal = document.getElementById('close-profile-modal');
+const profileModalAvatar = document.getElementById('profile-modal-avatar');
+const profileModalUsername = document.getElementById('profile-modal-username');
+const profileModalStatus = document.getElementById('profile-modal-status');
+const profileModalBio = document.getElementById('profile-modal-bio');
+const btnProfileSendMessage = document.getElementById('btn-profile-send-message');
+const btnProfileUnfriend = document.getElementById('btn-profile-unfriend');
+const btnProfileBlock = document.getElementById('btn-profile-block');
+
 // UYGULAMA DURUMU (STATE)
 let currentUser = null;
 let deferredPrompt = null;
@@ -1240,6 +1251,15 @@ function renderUsersList() {
         `;
 
         li.addEventListener('click', () => selectUserChat(user));
+
+        const avatarEl = li.querySelector('.avatar');
+        if (avatarEl) {
+            avatarEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showUserProfile(user);
+            });
+        }
+
         usersList.appendChild(li);
     });
     updateTabBadges();
@@ -2501,7 +2521,15 @@ function showContextMenu(x, y, msg) {
     // Menünün butonlarını yetkiye göre aç/kapa
     const isMyMessage = msg.sender_id === currentUser.id;
     if (isMyMessage) {
-        ctxBtnEdit.style.display = 'block';
+        const msgTime = new Date(msg.created_at);
+        const now = new Date();
+        const diffMins = (now - msgTime) / 60000;
+        
+        if (diffMins <= 5 && (!msg.message_type || msg.message_type === 'text')) {
+            ctxBtnEdit.style.display = 'block';
+        } else {
+            ctxBtnEdit.style.display = 'none';
+        }
         ctxBtnDelete.style.display = 'block';
     } else {
         ctxBtnEdit.style.display = 'none';
@@ -2614,6 +2642,141 @@ if (btnReplyPreviewClose) {
         replyingMessageId = null;
         replyPreviewContainer.classList.add('hidden');
         messageInput.placeholder = 'Mesajınızı yazın...';
+    });
+}
+
+// --- KULLANICI PROFİL GÖSTERİM SİSTEMİ ---
+let activeProfileUser = null; // Profil detayları gösterilen kullanıcı
+
+function showUserProfile(user) {
+    if (!userProfileModal) return;
+    activeProfileUser = user;
+
+    profileModalUsername.textContent = user.username;
+    
+    const statusText = user.isOnline 
+        ? 'çevrimiçi' 
+        : (user.last_seen ? `son görülme ${formatLastSeen(user.last_seen)}` : 'çevrimdışı');
+    profileModalStatus.textContent = statusText;
+    profileModalStatus.style.color = user.isOnline ? '#10B981' : 'var(--text-muted)';
+
+    profileModalBio.textContent = user.bio || 'Biyografi bulunmuyor.';
+
+    const initial = user.username.substring(0, 2).toUpperCase();
+    if (user.profile_pic) {
+        profileModalAvatar.innerHTML = `<img src="${user.profile_pic}" alt="${user.username}" style="width:100%; height:100%; object-fit:cover;">`;
+        profileModalAvatar.style.cursor = 'pointer';
+    } else {
+        profileModalAvatar.innerHTML = initial;
+        profileModalAvatar.style.cursor = 'default';
+    }
+
+    userProfileModal.classList.remove('hidden');
+}
+
+// Profil Kapatma
+if (closeProfileModal) {
+    closeProfileModal.addEventListener('click', () => {
+        userProfileModal.classList.add('hidden');
+        activeProfileUser = null;
+    });
+}
+
+userProfileModal.addEventListener('click', (e) => {
+    if (e.target === userProfileModal) {
+        userProfileModal.classList.add('hidden');
+        activeProfileUser = null;
+    }
+});
+
+// Profil Fotoğrafına Tıklayınca Lightbox'ta Büyüt
+if (profileModalAvatar) {
+    profileModalAvatar.addEventListener('click', () => {
+        if (activeProfileUser && activeProfileUser.profile_pic) {
+            lightboxImg.src = activeProfileUser.profile_pic;
+            lightboxModal.classList.remove('hidden');
+        }
+    });
+}
+
+// Mesaj Gönder Butonu
+if (btnProfileSendMessage) {
+    btnProfileSendMessage.addEventListener('click', () => {
+        if (!activeProfileUser) return;
+        userProfileModal.classList.add('hidden');
+        selectUserChat(activeProfileUser);
+    });
+}
+
+// Arkadaşı Çıkar Butonu
+if (btnProfileUnfriend) {
+    btnProfileUnfriend.addEventListener('click', async () => {
+        if (!activeProfileUser) return;
+        const confirmRemove = confirm(`"${activeProfileUser.username}" adlı kullanıcıyı arkadaşlarınızdan çıkarmak istediğinize emin misiniz?`);
+        if (!confirmRemove) return;
+
+        try {
+            const res = await apiCall('/friends/remove', 'POST', { friendId: activeProfileUser.id });
+            alert(res.message);
+            
+            if (activeChatPartnerId === activeProfileUser.id) {
+                activeChatPartner = null;
+                activeChatPartnerId = null;
+                chatActiveScreen.classList.add('hidden');
+                noChatSelectedScreen.classList.remove('hidden');
+            }
+            
+            userProfileModal.classList.add('hidden');
+            await loadUsers();
+        } catch (err) {
+            alert('Arkadaşlıktan çıkarılamadı: ' + err.message);
+        }
+    });
+}
+
+// Engelle Butonu
+if (btnProfileBlock) {
+    btnProfileBlock.addEventListener('click', async () => {
+        if (!activeProfileUser) return;
+        const confirmBlock = confirm(`"${activeProfileUser.username}" adlı kullanıcıyı engellemek istediğinize emin misiniz? Bu işlem arkadaşlığınızı sonlandıracak ve size mesaj atmasını engelleyecektir.`);
+        if (!confirmBlock) return;
+
+        try {
+            const res = await apiCall('/friends/block', 'POST', { blockedId: activeProfileUser.id });
+            alert(res.message);
+
+            if (activeChatPartnerId === activeProfileUser.id) {
+                activeChatPartner = null;
+                activeChatPartnerId = null;
+                chatActiveScreen.classList.add('hidden');
+                noChatSelectedScreen.classList.remove('hidden');
+            }
+
+            userProfileModal.classList.add('hidden');
+            await loadUsers();
+        } catch (err) {
+            alert('Kullanıcı engellenemedi: ' + err.message);
+        }
+    });
+}
+
+// Tepedeki Aktif Sohbet İsmi ve Avatara Tıklayınca Profil Açılması
+if (activeChatName) {
+    activeChatName.style.cursor = 'pointer';
+    activeChatName.addEventListener('click', () => {
+        if (activeChatPartnerId) {
+            const user = users.find(u => u.id === activeChatPartnerId);
+            if (user) showUserProfile(user);
+        }
+    });
+}
+if (activeChatAvatar) {
+    activeChatAvatar.style.cursor = 'pointer';
+    activeChatAvatar.addEventListener('click', () => {
+        if (activeChatPartnerId) {
+            const user = users.find(u => u.id === activeChatPartnerId);
+            if (user) showUserProfile(user);
+        }
     });
 }
 

@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=17">
+    <link rel="stylesheet" href="style.css?v=18">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -361,8 +361,45 @@
         <button type="button" id="ctx-btn-delete" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: #ff4d4d; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">🗑️</span> Sil</button>
     </div>
 
+    <!-- 7. EKRAN: BAŞKA KULLANICI PROFİL MODALI (Varsayılan olarak gizli) -->
+    <div id="user-profile-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 380px; text-align: center;">
+            <div class="modal-header">
+                <h3>Kullanıcı Profili</h3>
+                <span id="close-profile-modal" class="close-btn" title="Kapat">&times;</span>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 1.25rem; padding-top: 1rem;">
+                <!-- Büyük Avatar -->
+                <div id="profile-modal-avatar" style="width: 110px; height: 110px; border-radius: 50%; background-color: var(--primary-light); color: var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; overflow: hidden; cursor: pointer; border: 3px solid var(--border-color); box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s;">
+                    <!-- Dinamik doldurulacak -->
+                </div>
+                
+                <!-- Kullanıcı Adı ve Durumu -->
+                <div>
+                    <h2 id="profile-modal-username" style="font-size: 1.35rem; color: var(--text-main); margin-bottom: 0.25rem;">Kullanıcı Adı</h2>
+                    <div id="profile-modal-status" style="font-size: 0.8rem; color: var(--text-muted);">çevrimdışı</div>
+                </div>
+
+                <!-- Biyografi / Hakkımda Alanı -->
+                <div style="width: 100%; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 1rem 0; text-align: left;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.35rem; text-transform: uppercase;">Biyografi (Hakkımda)</div>
+                    <div id="profile-modal-bio" style="font-size: 0.9rem; color: var(--text-main); line-height: 1.4; word-break: break-word;">Biyografi bulunmuyor.</div>
+                </div>
+
+                <!-- Aksiyon Butonları -->
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%;">
+                    <button type="button" id="btn-profile-send-message" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem;">💬 Mesaj Gönder</button>
+                    <div style="display: flex; gap: 0.75rem; width: 100%;">
+                        <button type="button" id="btn-profile-unfriend" class="btn btn-action-danger" style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.85rem;">Arkadaşı Çıkar</button>
+                        <button type="button" id="btn-profile-block" class="btn btn-action-danger" style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.85rem;">Engelle</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=25"></script>
+    <script src="app.js?v=26"></script>
 </body>
 </html>
