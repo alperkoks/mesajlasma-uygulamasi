@@ -283,8 +283,14 @@ io.on('connection', (socket) => {
                 userSockets.delete(userId);
                 onlineUsers.delete(userId);
                 console.log(`🔌 Soket Bağlantısı Koptu: ${socket.user.username} (ID: ${userId}) tamamen çevrimdışı oldu.`);
-                // Diğer tüm kullanıcılara bu kişinin çevrimdışı olduğunu duyur
-                io.emit('user_status_change', { userId: userId, isOnline: false });
+                
+                const lastSeenTime = new Date().toISOString();
+                dbQueries.updateLastSeen(userId, lastSeenTime).catch(err => {
+                    console.error('Son görülme veritabanı güncelleme hatası:', err);
+                });
+
+                // Diğer tüm kullanıcılara bu kişinin çevrimdışı olduğunu ve son görülme zamanını duyur
+                io.emit('user_status_change', { userId: userId, isOnline: false, last_seen: lastSeenTime });
             } else {
                 console.log(`🔌 Soket Bağlantısı Koptu: ${socket.user.username} (ID: ${userId}) bir sekmesi kapatıldı, diğerleri hala açık.`);
             }
@@ -485,6 +491,32 @@ app.post('/api/profile/update-username', authenticateToken, async (req, res) => 
     }
 });
 
+// 2.1.2 BİYOGRAFİ GÜNCELLEME
+app.post('/api/profile/update-bio', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { bio } = req.body;
+
+    const trimmedBio = bio !== undefined ? bio.trim().substring(0, 255) : '';
+
+    try {
+        await dbQueries.updateBio(userId, trimmedBio);
+
+        // Soket üzerinden diğer kullanıcılara duyur
+        io.emit('user_bio_changed', {
+            userId: userId,
+            bio: trimmedBio
+        });
+
+        res.json({
+            message: 'Biyografiniz başarıyla güncellendi!',
+            bio: trimmedBio
+        });
+    } catch (error) {
+        console.error('Biyografi güncelleme hatası:', error);
+        res.status(500).json({ message: 'Biyografi güncellenirken sunucu hatası oluştu.' });
+    }
+});
+
 // 2.2 PROFİL FOTOĞRAFI YÜKLEME
 app.post('/api/profile/upload-pic', authenticateToken, upload.single('profile_pic'), async (req, res) => {
     const userId = req.user.id;
@@ -589,6 +621,8 @@ app.get('/api/users', authenticateToken, async (req, res) => {
             id: friend.id,
             username: friend.username,
             profile_pic: friend.profile_pic,
+            bio: friend.bio || '',
+            last_seen: friend.last_seen || null,
             unread_count: parseInt(friend.unread_count || 0),
             last_message: friend.last_message || null,
             last_message_time: friend.last_message_time || null,
@@ -1216,7 +1250,7 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
 app.post('/api/messages', authenticateToken, async (req, res) => {
     const senderId = req.user.id;
     const receiverId = req.body.receiverId ? parseInt(req.body.receiverId) : null;
-    const { message, groupId, messageType, fileUrl } = req.body;
+    const { message, groupId, messageType, fileUrl, parentMessageId } = req.body;
 
     if (!groupId && !receiverId) {
         return res.status(400).json({ message: 'Alıcı ID veya Grup ID zorunludur.' });
@@ -1241,7 +1275,8 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
             message || '', 
             groupId || null, 
             messageType || 'text', 
-            fileUrl || null
+            fileUrl || null,
+            parentMessageId || null
         );
         
         // --- GERÇEK ZAMANLI SOKET İLETİMİ ---
@@ -1300,6 +1335,102 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Mesaj gönderme hatası:', error);
         res.status(500).json({ message: 'Mesaj kaydedilirken hata oluştu.' });
+    }
+});
+
+// 5.0.1 MESAJ DÜZENLE (EDIT)
+app.post('/api/messages/:messageId/edit', authenticateToken, async (req, res) => {
+    const senderId = req.user.id;
+    const messageId = parseInt(req.params.messageId);
+    const { message } = req.body;
+
+    if (!message || message.trim() === '') {
+        return res.status(400).json({ message: 'Mesaj içeriği boş olamaz.' });
+    }
+
+    try {
+        const msgObj = await dbQueries.getMessageById(messageId);
+        if (!msgObj) {
+            return res.status(404).json({ message: 'Mesaj bulunamadı.' });
+        }
+        if (msgObj.sender_id !== senderId) {
+            return res.status(403).json({ message: 'Bu işlem için yetkiniz yok.' });
+        }
+
+        await dbQueries.updateMessageContent(messageId, senderId, message.trim());
+
+        const updatedMsg = {
+            messageId,
+            message: message.trim(),
+            groupId: msgObj.group_id || null,
+            receiverId: msgObj.receiver_id || null,
+            is_edited: 1
+        };
+
+        // --- SOKET İLE ANLIK DUYUR (Ekranların güncellenmesi için) ---
+        if (msgObj.group_id) {
+            io.to(`group_${msgObj.group_id}`).emit('message_edited', updatedMsg);
+        } else {
+            // Hem alıcıya hem göndericiye gönder
+            const targets = [msgObj.sender_id, msgObj.receiver_id];
+            targets.forEach(tId => {
+                const sockets = userSockets.get(tId);
+                if (sockets) {
+                    sockets.forEach(sId => {
+                        io.to(sId).emit('message_edited', updatedMsg);
+                    });
+                }
+            });
+        }
+
+        res.json({ message: 'Mesaj başarıyla düzenlendi.', updatedMessage: updatedMsg });
+    } catch (error) {
+        console.error('Mesaj düzenleme hatası:', error);
+        res.status(500).json({ message: 'Mesaj düzenlenirken sunucu hatası oluştu.' });
+    }
+});
+
+// 5.0.2 MESAJ SİL (DELETE)
+app.post('/api/messages/:messageId/delete', authenticateToken, async (req, res) => {
+    const senderId = req.user.id;
+    const messageId = parseInt(req.params.messageId);
+
+    try {
+        const msgObj = await dbQueries.getMessageById(messageId);
+        if (!msgObj) {
+            return res.status(404).json({ message: 'Mesaj bulunamadı.' });
+        }
+        if (msgObj.sender_id !== senderId) {
+            return res.status(403).json({ message: 'Bu işlem için yetkiniz yok.' });
+        }
+
+        await dbQueries.deleteMessageById(messageId, senderId);
+
+        const deletedInfo = {
+            messageId,
+            groupId: msgObj.group_id || null,
+            receiverId: msgObj.receiver_id || null
+        };
+
+        // --- SOKET İLE ANLIK SİL (Ekranlardan kaldırılması için) ---
+        if (msgObj.group_id) {
+            io.to(`group_${msgObj.group_id}`).emit('message_deleted', deletedInfo);
+        } else {
+            const targets = [msgObj.sender_id, msgObj.receiver_id];
+            targets.forEach(tId => {
+                const sockets = userSockets.get(tId);
+                if (sockets) {
+                    sockets.forEach(sId => {
+                        io.to(sId).emit('message_deleted', deletedInfo);
+                    });
+                }
+            });
+        }
+
+        res.json({ message: 'Mesaj başarıyla silindi.', deletedInfo });
+    } catch (error) {
+        console.error('Mesaj silme hatası:', error);
+        res.status(500).json({ message: 'Mesaj silinirken sunucu hatası oluştu.' });
     }
 });
 

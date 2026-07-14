@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=16">
+    <link rel="stylesheet" href="style.css?v=17">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -203,6 +203,15 @@
 
                     <!-- Mesaj Gönderme Kutusu -->
                     <footer class="chat-footer">
+                        <!-- Alıntılı Yanıt Önizleme Alanı -->
+                        <div id="reply-preview-container" class="hidden" style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background-color: var(--bg-hover); border-left: 4px solid var(--primary-color); border-bottom: 1px solid var(--border-color); font-size: 0.85rem; border-radius: 6px 6px 0 0; margin-bottom: 0.5rem;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 600; color: var(--primary-color); margin-bottom: 0.15rem;">Yanıtlanan Kişi: <span id="reply-preview-sender"></span></div>
+                                <div id="reply-preview-text" style="color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></div>
+                            </div>
+                            <button type="button" id="btn-reply-preview-close" class="btn-icon" style="font-size: 1.25rem; font-weight: bold; padding: 0 0.5rem; cursor: pointer; border: none; background: transparent; color: var(--text-muted);">×</button>
+                        </div>
+
                         <form id="message-form">
                             <input type="file" id="file-input" style="display:none;" accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
                             <button type="button" id="btn-attach" class="btn-icon" title="Resim/Dosya Gönder" style="width: auto; min-width: 44px; margin-right: 0.25rem; font-size: 1.35rem; padding: 0.25rem;">📎</button>
@@ -238,6 +247,11 @@
                     <div class="input-group">
                         <label for="settings-username">Kullanıcı Adı</label>
                         <input type="text" id="settings-username" required autocomplete="off" placeholder="Yeni kullanıcı adı">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="settings-bio">Biyografi (Hakkımda)</label>
+                        <input type="text" id="settings-bio" maxlength="150" placeholder="Kendinizden bahsedin...">
                     </div>
 
                     <div class="input-group">
@@ -340,8 +354,15 @@
         </div>
     </div>
 
+    <!-- 6. EKRAN: GENEL SOHBET CONTEXT MENU (Düzenle, Sil, Yanıtla popover'ı) -->
+    <div id="chat-context-menu" class="hidden" style="position: absolute; z-index: 10000; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 140px; overflow: hidden; display: flex; flex-direction: column;">
+        <button type="button" id="ctx-btn-reply" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">↩️</span> Yanıtla</button>
+        <button type="button" id="ctx-btn-edit" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">✏️</span> Düzenle</button>
+        <button type="button" id="ctx-btn-delete" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: #ff4d4d; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">🗑️</span> Sil</button>
+    </div>
+
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=24"></script>
+    <script src="app.js?v=25"></script>
 </body>
 </html>

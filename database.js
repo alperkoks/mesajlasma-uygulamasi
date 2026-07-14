@@ -119,18 +119,30 @@ async function initDatabase() {
                     UNIQUE(user_id, subscription)
                 )
             `);
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS muted_chats (
+                    user_id INTEGER NOT NULL,
+                    target_id INTEGER NOT NULL,
+                    target_type VARCHAR(10) NOT NULL,
+                    PRIMARY KEY (user_id, target_id, target_type)
+                )
+            `);
             // Mevcut veritabanı şemasına yeni kolonları güvenli bir şekilde ekle
             await client.query(`ALTER TABLE messages ALTER COLUMN receiver_id DROP NOT NULL`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS group_id INTEGER`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(20) DEFAULT 'text'`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS file_url TEXT`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_edited INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS parent_message_id INTEGER`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(100) UNIQUE`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_token TEXT`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_password_expires TIMESTAMP`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`);
             await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
             await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0`);
 
@@ -185,6 +197,12 @@ async function initDatabase() {
         if (!columns.includes('profile_pic')) {
             await dbSqlite.exec("ALTER TABLE users ADD COLUMN profile_pic TEXT");
         }
+        if (!columns.includes('bio')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN bio TEXT");
+        }
+        if (!columns.includes('last_seen')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN last_seen TEXT");
+        }
 
         await dbSqlite.exec(`
             CREATE TABLE IF NOT EXISTS messages (
@@ -212,6 +230,12 @@ async function initDatabase() {
         }
         if (!columnsMsg.includes('file_url')) {
             await dbSqlite.exec("ALTER TABLE messages ADD COLUMN file_url TEXT");
+        }
+        if (!columnsMsg.includes('is_edited')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_edited INTEGER DEFAULT 0");
+        }
+        if (!columnsMsg.includes('parent_message_id')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN parent_message_id INTEGER");
         }
 
         await dbSqlite.exec(`
@@ -288,6 +312,15 @@ async function initDatabase() {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
                 UNIQUE(user_id, subscription)
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS muted_chats (
+                user_id INTEGER,
+                target_id INTEGER,
+                target_type TEXT,
+                PRIMARY KEY (user_id, target_id, target_type)
             )
         `);
 
@@ -449,20 +482,20 @@ const dbQueries = {
         }
     },
 
-    // Yeni mesaj kaydetme (Grup ve dosya tipleri desteğiyle)
-    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null) {
+    // Yeni mesaj kaydetme (Grup, dosya tipleri ve alıntılama desteğiyle)
+    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null, parentMessageId = null) {
         if (isPostgres) {
             const finalReceiverId = groupId ? null : receiverId;
             const res = await dbPostgresPool.query(
-                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId]
             );
             return res.rows[0];
         } else {
             const finalReceiverId = groupId ? 0 : receiverId;
             const result = await dbSqlite.run(
-                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url) VALUES (?, ?, ?, ?, ?, ?)',
-                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId]
             );
             return await dbSqlite.get('SELECT * FROM messages WHERE id = ?', [result.lastID]);
         }
@@ -550,6 +583,8 @@ const dbQueries = {
                     users.id, 
                     users.username, 
                     users.profile_pic,
+                    users.bio,
+                    users.last_seen,
                     COALESCE((
                         SELECT COUNT(*) FROM messages 
                         WHERE messages.sender_id = users.id 
@@ -962,6 +997,58 @@ const dbQueries = {
                 'DELETE FROM group_members WHERE group_id = ? AND user_id = ?',
                 [groupId, userId]
             );
+        }
+    },
+
+    // Kullanıcı biyografisini güncelle
+    async updateBio(userId, bio) {
+        if (isPostgres) {
+            await dbPostgresPool.query('UPDATE users SET bio = $1 WHERE id = $2', [bio, userId]);
+        } else {
+            await dbSqlite.run('UPDATE users SET bio = ? WHERE id = ?', [bio, userId]);
+        }
+    },
+
+    // Kullanıcı son görülme zamanını güncelle
+    async updateLastSeen(userId, lastSeen) {
+        if (isPostgres) {
+            await dbPostgresPool.query('UPDATE users SET last_seen = $1 WHERE id = $2', [lastSeen, userId]);
+        } else {
+            await dbSqlite.run('UPDATE users SET last_seen = ? WHERE id = ?', [lastSeen, userId]);
+        }
+    },
+
+    // ID'ye göre tek mesaj getir
+    async getMessageById(messageId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query('SELECT * FROM messages WHERE id = $1', [messageId]);
+            return res.rows[0];
+        } else {
+            return await dbSqlite.get('SELECT * FROM messages WHERE id = ?', [messageId]);
+        }
+    },
+
+    // Mesaj içeriğini güncelle (Düzenleme)
+    async updateMessageContent(messageId, senderId, message) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'UPDATE messages SET message = $1, is_edited = 1 WHERE id = $2 AND sender_id = $3',
+                [message, messageId, senderId]
+            );
+        } else {
+            await dbSqlite.run(
+                'UPDATE messages SET message = ?, is_edited = 1 WHERE id = ? AND sender_id = ?',
+                [message, messageId, senderId]
+            );
+        }
+    },
+
+    // Mesajı kalıcı sil (Silme)
+    async deleteMessageById(messageId, senderId) {
+        if (isPostgres) {
+            await dbPostgresPool.query('DELETE FROM messages WHERE id = $1 AND sender_id = $2', [messageId, senderId]);
+        } else {
+            await dbSqlite.run('DELETE FROM messages WHERE id = ? AND sender_id = ?', [messageId, senderId]);
         }
     }
 };
