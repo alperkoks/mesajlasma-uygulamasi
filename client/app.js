@@ -478,6 +478,11 @@ openSettingsBtn.addEventListener('click', () => {
         settingsShowOnline.checked = currentUser.show_online !== 0;
     }
     
+    const settingsLang = document.getElementById('settings-lang');
+    if (settingsLang) {
+        settingsLang.value = currentUser.language || 'tr';
+    }
+    
     if (settingsVolume && settingsVolumeValue) {
         settingsVolume.value = appVolume;
         settingsVolumeValue.textContent = Math.round(appVolume * 100) + '%';
@@ -608,6 +613,22 @@ settingsForm.addEventListener('submit', async (e) => {
             hasChanges = true;
         } catch (err) {
             console.error('Gizlilik ayarları güncellenemedi:', err);
+        }
+    }
+
+    // Dil Değiştiyse Kaydet
+    const settingsLang = document.getElementById('settings-lang');
+    const newLang = settingsLang ? settingsLang.value : 'tr';
+    if (settingsLang && newLang !== (currentUser.language || 'tr')) {
+        try {
+            await apiCall('/profile/update-language', 'POST', { language: newLang });
+            currentUser.language = newLang;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            currentLanguage = newLang;
+            translatePage();
+            hasChanges = true;
+        } catch (err) {
+            console.error('Dil güncellenemedi:', err);
         }
     }
 
@@ -837,6 +858,767 @@ function urlBase64ToUint8Array(base64String) {
     return outputArray;
 }
 
+// ==========================================
+// FAZ 2, FAZ 3 VE FAZ 4 PREMIUM ÖZELLİKLERİ
+// ==========================================
+
+// 1. ÇOKLU DİL (i18n) SÖZLÜĞÜ VE YERELLEŞTİRME
+const i18n = {
+    tr: {
+        settings_title: "Profil Ayarları",
+        settings_username: "Kullanıcı Adı",
+        settings_bio: "Biyografi (Hakkımda)",
+        settings_show_last_seen: "Son görülme zamanımı başkalarıyla paylaş",
+        settings_show_online: "Çevrimiçi olduğumu başkalarıyla paylaş",
+        settings_lang: "Dil / Language",
+        settings_volume: "Uygulama İçi Ses Seviyesi",
+        settings_save: "Değişiklikleri Kaydet",
+        group_create_title: "Yeni Grup Oluştur",
+        group_create_name: "Grup Adı",
+        group_create_friends: "Gruba Eklenecek Arkadaşlar",
+        group_create_submit: "Grubu Oluştur",
+        group_is_channel: "Kanal Olarak Oluştur (Yalnızca yöneticiler yazabilir)",
+        call_voice: "Sesli Ara",
+        call_video: "Görüntülü Ara",
+        disappearing_messages: "Süreli Mesajlar",
+        e2ee_on: "E2EE Şifreleme: Açık",
+        e2ee_off: "E2EE Şifreleme: Kapalı",
+        typing: "yazıyor...",
+        channel_only_admin: "Bu kanalda sadece yöneticiler mesaj gönderebilir.",
+        placeholder_message: "Mesajınızı yazın...",
+        voice_message: "Sesli Mesaj"
+    },
+    en: {
+        settings_title: "Profile Settings",
+        settings_username: "Username",
+        settings_bio: "Biography (About Me)",
+        settings_show_last_seen: "Share my last seen status with others",
+        settings_show_online: "Share my online status with others",
+        settings_lang: "Language / Dil",
+        settings_volume: "In-App Audio Volume",
+        settings_save: "Save Changes",
+        group_create_title: "Create New Group",
+        group_create_name: "Group Name",
+        group_create_friends: "Friends to Add to Group",
+        group_create_submit: "Create Group",
+        group_is_channel: "Create as Channel (Only admins can post)",
+        call_voice: "Voice Call",
+        call_video: "Video Call",
+        disappearing_messages: "Disappearing Messages",
+        e2ee_on: "E2EE Encryption: Enabled",
+        e2ee_off: "E2EE Encryption: Disabled",
+        typing: "typing...",
+        channel_only_admin: "Only admins can post in this channel.",
+        placeholder_message: "Type a message...",
+        voice_message: "Voice Message"
+    }
+};
+
+let currentLanguage = 'tr';
+
+function translatePage() {
+    const langData = i18n[currentLanguage];
+    
+    const updateText = (id, key) => {
+        const el = document.getElementById(id);
+        if (el && langData[key]) el.textContent = langData[key];
+    };
+
+    const settingsHeader = document.querySelector('#settings-modal h3');
+    if (settingsHeader) settingsHeader.textContent = langData.settings_title;
+    
+    const lblUser = document.querySelector('label[for="settings-username"]');
+    if (lblUser) lblUser.textContent = langData.settings_username;
+    
+    const lblBio = document.querySelector('label[for="settings-bio"]');
+    if (lblBio) lblBio.textContent = langData.settings_bio;
+    
+    const lblLastSeen = document.querySelector('label[for="settings-show-last-seen"]');
+    if (lblLastSeen) lblLastSeen.textContent = langData.settings_show_last_seen;
+    
+    const lblOnline = document.querySelector('label[for="settings-show-online"]');
+    if (lblOnline) lblOnline.textContent = langData.settings_show_online;
+    
+    const lblLang = document.querySelector('label[for="settings-lang"]');
+    if (lblLang) lblLang.textContent = langData.settings_lang;
+    
+    const btnSave = document.querySelector('#settings-form button[type="submit"]');
+    if (btnSave) btnSave.textContent = langData.settings_save;
+
+    const groupHeader = document.querySelector('#group-create-modal h3');
+    if (groupHeader) groupHeader.textContent = langData.group_create_title;
+    
+    const lblGroupName = document.querySelector('label[for="group-name-input"]');
+    if (lblGroupName) lblGroupName.textContent = langData.group_create_name;
+    
+    const lblChannel = document.querySelector('label[for="group-is-channel"]');
+    if (lblChannel) lblChannel.textContent = langData.group_is_channel;
+    
+    const btnCreateGroup = document.querySelector('#group-create-modal button[type="submit"]');
+    if (btnCreateGroup) btnCreateGroup.textContent = langData.group_create_submit;
+
+    const spanDis = document.querySelector('#btn-disappearing-messages span');
+    if (spanDis) spanDis.textContent = langData.disappearing_messages;
+
+    const btnCallVoice = document.getElementById('btn-call-voice');
+    if (btnCallVoice) btnCallVoice.title = langData.call_voice;
+    
+    const btnCallVideo = document.getElementById('btn-call-video');
+    if (btnCallVideo) btnCallVideo.title = langData.call_video;
+
+    if (messageInput) {
+        if (!messageInput.disabled) {
+            messageInput.placeholder = langData.placeholder_message;
+        }
+    }
+}
+
+// 2. KANAL YAZMA YETKİSİ KONTROLÜ
+function checkChannelPostPermission() {
+    if (activeChatGroupId) {
+        const group = groups.find(g => g.id === activeChatGroupId);
+        if (group && group.is_channel === 1) {
+            const members = groupMembers.get(activeChatGroupId) || [];
+            const me = members.find(m => m.id === currentUser.id);
+            const isAdmin = me ? me.is_admin === 1 : (group.created_by === currentUser.id);
+            
+            if (!isAdmin) {
+                messageInput.disabled = true;
+                messageInput.placeholder = i18n[currentLanguage].channel_only_admin;
+                document.querySelector('#message-form button[type="submit"]').disabled = true;
+                
+                const btnMic = document.getElementById('btn-mic');
+                if (btnMic) btnMic.style.display = 'none';
+                const btnGif = document.getElementById('btn-gif');
+                if (btnGif) btnGif.style.display = 'none';
+                return;
+            }
+        }
+    }
+    
+    messageInput.disabled = false;
+    messageInput.placeholder = i18n[currentLanguage].placeholder_message;
+    document.querySelector('#message-form button[type="submit"]').disabled = false;
+    const btnMic = document.getElementById('btn-mic');
+    if (btnMic) btnMic.style.display = 'flex';
+    const btnGif = document.getElementById('btn-gif');
+    if (btnGif) btnGif.style.display = 'flex';
+}
+
+// 3. TENOR GIF ENTEGRASYONU
+const btnGif = document.getElementById('btn-gif');
+const gifPopover = document.getElementById('gif-popover');
+const btnGifPopoverClose = document.getElementById('btn-gif-popover-close');
+const gifSearchInput = document.getElementById('gif-search-input');
+const gifResultsGrid = document.getElementById('gif-results-grid');
+
+if (btnGif) {
+    btnGif.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        gifPopover.classList.toggle('hidden');
+        if (!gifPopover.classList.contains('hidden')) {
+            gifSearchInput.value = '';
+            await loadTrendingGifs();
+        }
+    });
+}
+
+if (btnGifPopoverClose) {
+    btnGifPopoverClose.addEventListener('click', () => {
+        gifPopover.classList.add('hidden');
+    });
+}
+
+async function loadTrendingGifs() {
+    try {
+        const response = await fetch('/api/gifs/trending');
+        const gifs = await response.json();
+        renderGifs(gifs);
+    } catch (err) {
+        console.error('Trend GIFler yüklenemedi:', err);
+    }
+}
+
+let gifSearchTimeout = null;
+if (gifSearchInput) {
+    gifSearchInput.addEventListener('input', () => {
+        clearTimeout(gifSearchTimeout);
+        gifSearchTimeout = setTimeout(async () => {
+            const query = gifSearchInput.value.trim();
+            if (!query) {
+                await loadTrendingGifs();
+                return;
+            }
+            try {
+                const response = await fetch(`/api/gifs/search?q=${encodeURIComponent(query)}`);
+                const gifs = await response.json();
+                renderGifs(gifs);
+            } catch (err) {
+                console.error('GIF arama hatası:', err);
+            }
+        }, 500);
+    });
+}
+
+function renderGifs(gifs) {
+    if (!gifResultsGrid) return;
+    gifResultsGrid.innerHTML = '';
+    if (gifs.length === 0) {
+        gifResultsGrid.innerHTML = '<div style="grid-column: span 2; text-align: center; color: var(--text-muted); font-size: 0.85rem;">GIF bulunamadı.</div>';
+        return;
+    }
+    gifs.forEach(gif => {
+        const img = document.createElement('img');
+        img.src = gif.preview;
+        img.style.width = '100%';
+        img.style.borderRadius = '8px';
+        img.style.cursor = 'pointer';
+        img.style.transition = 'transform 0.15s';
+        img.addEventListener('mouseover', () => img.style.transform = 'scale(1.03)');
+        img.addEventListener('mouseout', () => img.style.transform = 'scale(1)');
+        img.addEventListener('click', async () => {
+            gifPopover.classList.add('hidden');
+            await sendGifMessage(gif.url);
+        });
+        gifResultsGrid.appendChild(img);
+    });
+}
+
+async function sendGifMessage(url) {
+    try {
+        const res = await apiCall('/messages', 'POST', {
+            receiverId: activeChatPartnerId,
+            groupId: activeChatGroupId,
+            messageType: 'image',
+            fileUrl: url,
+            message: '🎬 GIF'
+        });
+        messages.push(res);
+        await renderMessages();
+        socket.emit('send_message', res);
+    } catch (err) {
+        console.error('GIF gönderilemedi:', err);
+    }
+}
+
+// 4. SÜRELİ KENDİNİ SİLEN MESAJLAR
+let activeDisappearingDuration = 0;
+const btnDisappearingMessages = document.getElementById('btn-disappearing-messages');
+if (btnDisappearingMessages) {
+    btnDisappearingMessages.addEventListener('click', () => {
+        chatOptionsDropdown.classList.add('hidden');
+        const input = prompt(
+            currentLanguage === 'tr' 
+                ? "Süreli mesaj modunu saniye cinsinden girin (Örn: 10, 60, 3600). Kapatmak için 0 yazın:" 
+                : "Enter disappearing message duration in seconds (e.g., 10, 60, 3600). Write 0 to disable:", 
+            activeDisappearingDuration.toString()
+        );
+        if (input !== null) {
+            const val = parseInt(input);
+            if (!isNaN(val) && val >= 0) {
+                activeDisappearingDuration = val;
+                const timerSpan = document.querySelector('#btn-disappearing-messages span');
+                if (timerSpan) {
+                    timerSpan.textContent = val > 0 
+                        ? `${i18n[currentLanguage].disappearing_messages} (${val}s)` 
+                        : i18n[currentLanguage].disappearing_messages;
+                }
+                alert(
+                    currentLanguage === 'tr'
+                        ? (val > 0 ? `Süreli mesajlar ${val} saniye olarak ayarlandı.` : "Süreli mesajlar kapatıldı.")
+                        : (val > 0 ? `Disappearing messages set to ${val} seconds.` : "Disappearing messages disabled.")
+                );
+            }
+        }
+    });
+}
+
+socket.on('message_deleted', ({ messageId }) => {
+    messages = messages.filter(m => m.id !== messageId);
+    renderMessages();
+});
+
+// 5. SES KAYDETME (MediaRecorder) VE CUSTOM SESLİ OYNATICI
+const btnMic = document.getElementById('btn-mic');
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+
+if (btnMic) {
+    btnMic.addEventListener('click', async () => {
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.addEventListener('dataavailable', (e) => {
+                    audioChunks.push(e.data);
+                });
+                
+                mediaRecorder.addEventListener('stop', async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const file = new File([audioBlob], 'voice-message.webm', { type: 'audio/webm' });
+                    
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    
+                    try {
+                        const uploadResponse = await fetch('/api/messages/upload', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            },
+                            body: formData
+                        });
+                        const uploadResult = await uploadResponse.json();
+                        
+                        const res = await apiCall('/messages', 'POST', {
+                            receiverId: activeChatPartnerId,
+                            groupId: activeChatGroupId,
+                            messageType: 'voice',
+                            fileUrl: uploadResult.fileUrl,
+                            message: i18n[currentLanguage].voice_message
+                        });
+                        messages.push(res);
+                        await renderMessages();
+                        socket.emit('send_message', res);
+                    } catch (err) {
+                        console.error('Sesli mesaj gönderilemedi:', err);
+                    }
+                });
+
+                mediaRecorder.start();
+                isRecording = true;
+                btnMic.style.color = '#ef4444';
+                btnMic.style.transform = 'scale(1.25)';
+            } catch (err) {
+                console.error('Mikrofon erişim hatası:', err);
+                alert(currentLanguage === 'tr' ? 'Mikrofon izni verilmedi!' : 'Microphone permission denied!');
+            }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            btnMic.style.color = 'var(--text-main)';
+            btnMic.style.transform = 'scale(1)';
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
+    });
+}
+
+function playVoice(url, btnElement, progressElement, durationElement) {
+    let audio = btnElement._audio;
+    if (!audio) {
+        audio = new Audio(url);
+        btnElement._audio = audio;
+        
+        audio.addEventListener('timeupdate', () => {
+            const percent = (audio.currentTime / audio.duration) * 100;
+            progressElement.style.width = `${percent}%`;
+            
+            const formatTime = (secs) => {
+                if (isNaN(secs)) return '0:00';
+                const m = Math.floor(secs / 60);
+                const s = Math.floor(secs % 60);
+                return `${m}:${s < 10 ? '0' : ''}${s}`;
+            };
+            durationElement.textContent = formatTime(audio.currentTime);
+        });
+        
+        audio.addEventListener('ended', () => {
+            btnElement.textContent = '▶️';
+            progressElement.style.width = '0%';
+        });
+    }
+    
+    if (audio.paused) {
+        audio.play();
+        btnElement.textContent = '⏸️';
+    } else {
+        audio.pause();
+        btnElement.textContent = '▶️';
+    }
+}
+
+// 6. UÇTAN UCA ŞİFRELEME (E2EE) KODLARI
+let activeE2eeEnabled = false;
+const btnToggleE2ee = document.getElementById('btn-toggle-e2ee');
+const e2eeStatusText = document.getElementById('e2ee-status-text');
+
+if (btnToggleE2ee) {
+    btnToggleE2ee.addEventListener('click', () => {
+        chatOptionsDropdown.classList.add('hidden');
+        if (activeChatGroupId) {
+            alert(currentLanguage === 'tr' ? "Şifreleme şu an sadece özel sohbetlerde geçerlidir!" : "Encryption is currently only available for private chats!");
+            return;
+        }
+        activeE2eeEnabled = !activeE2eeEnabled;
+        e2eeStatusText.textContent = activeE2eeEnabled 
+            ? i18n[currentLanguage].e2ee_on 
+            : i18n[currentLanguage].e2ee_off;
+        
+        alert(
+            activeE2eeEnabled 
+                ? (currentLanguage === 'tr' ? "E2EE şifreleme aktif! Mesajlar yerel olarak şifrelenecek." : "E2EE encryption active! Messages will be encrypted locally.")
+                : (currentLanguage === 'tr' ? "E2EE şifreleme kapatıldı." : "E2EE encryption disabled.")
+        );
+    });
+}
+
+async function getE2eeKey() {
+    const partnerId = activeChatPartnerId || 0;
+    const userId = currentUser.id || 0;
+    const minId = Math.min(userId, partnerId);
+    const maxId = Math.max(userId, partnerId);
+    const secretSeed = `AgChatSeed_${minId}_${maxId}`;
+    
+    const encoder = new TextEncoder();
+    const data = encoder.encode(secretSeed);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    
+    return await crypto.subtle.importKey(
+        'raw', 
+        hash, 
+        { name: 'AES-GCM' }, 
+        false, 
+        ['encrypt', 'decrypt']
+    );
+}
+
+async function encryptText(text) {
+    try {
+        const key = await getE2eeKey();
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encoder = new TextEncoder();
+        const encodedText = encoder.encode(text);
+        
+        const encrypted = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            encodedText
+        );
+        
+        const ivHex = Array.from(iv).map(b => b.toString(16).padStart(2, '0')).join('');
+        const cipherBytes = new Uint8Array(encrypted);
+        let cipherBinary = '';
+        for (let i = 0; i < cipherBytes.byteLength; i++) {
+            cipherBinary += String.fromCharCode(cipherBytes[i]);
+        }
+        const cipherBase64 = btoa(cipherBinary);
+        
+        return `__E2EE__:${ivHex}:${cipherBase64}`;
+    } catch (err) {
+        console.error('Şifreleme hatası:', err);
+        return text;
+    }
+}
+
+async function decryptText(encryptedText, senderId) {
+    if (!encryptedText || !encryptedText.startsWith('__E2EE__:')) return encryptedText;
+    try {
+        const partnerId = senderId;
+        const userId = currentUser.id;
+        const minId = Math.min(userId, partnerId);
+        const maxId = Math.max(userId, partnerId);
+        const secretSeed = `AgChatSeed_${minId}_${maxId}`;
+        
+        const encoder = new TextEncoder();
+        const hash = await crypto.subtle.digest('SHA-256', encoder.encode(secretSeed));
+        
+        const key = await crypto.subtle.importKey(
+            'raw', 
+            hash, 
+            { name: 'AES-GCM' }, 
+            false, 
+            ['encrypt', 'decrypt']
+        );
+
+        const parts = encryptedText.split(':');
+        const ivHex = parts[1];
+        const cipherBase64 = parts[2];
+        
+        const iv = new Uint8Array(ivHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        
+        const cipherBinary = atob(cipherBase64);
+        const cipherBytes = new Uint8Array(cipherBinary.length);
+        for (let i = 0; i < cipherBinary.length; i++) {
+            cipherBytes[i] = cipherBinary.charCodeAt(i);
+        }
+        
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            cipherBytes
+        );
+        
+        const decoder = new TextDecoder();
+        return decoder.decode(decrypted);
+    } catch (err) {
+        console.error('Şifre çözme hatası:', err);
+        return '🔑 [Şifrelenmiş Mesaj - Çözülemedi]';
+    }
+}
+
+// 7. WEBRTC SESLİ VE GÖRÜNTÜLÜ ARAMA MANTIĞI
+let localStream = null;
+let peerConnection = null;
+let callActive = false;
+let isVideoCallActive = false;
+let currentCallPartnerId = null;
+let incomingOfferSignal = null;
+
+const webrtcCallScreen = document.getElementById('webrtc-call-screen');
+const callPartnerAvatar = document.getElementById('call-partner-avatar');
+const callPartnerUsername = document.getElementById('call-partner-username');
+const callStatus = document.getElementById('call-status');
+const callVideosContainer = document.getElementById('call-videos-container');
+const localVideo = document.getElementById('local-video');
+const remoteVideo = document.getElementById('remote-video');
+const incomingCallButtons = document.getElementById('incoming-call-buttons');
+const activeCallButtons = document.getElementById('active-call-buttons');
+
+const btnCallVoice = document.getElementById('btn-call-voice');
+const btnCallVideo = document.getElementById('btn-call-video');
+const btnAcceptCall = document.getElementById('btn-accept-call');
+const btnRejectCall = document.getElementById('btn-reject-call');
+const btnEndCall = document.getElementById('btn-end-call');
+const btnToggleMic = document.getElementById('btn-toggle-mic');
+const btnToggleVideo = document.getElementById('btn-toggle-video');
+
+const rtcConfig = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+    ]
+};
+
+if (btnCallVoice) {
+    btnCallVoice.addEventListener('click', () => startWebRtcCall(false));
+}
+if (btnCallVideo) {
+    btnCallVideo.addEventListener('click', () => startWebRtcCall(true));
+}
+
+async function startWebRtcCall(isVideo) {
+    if (!activeChatPartnerId) return;
+    currentCallPartnerId = activeChatPartnerId;
+    isVideoCallActive = isVideo;
+    
+    const partnerUser = users.find(u => u.id === activeChatPartnerId);
+    showCallScreen(partnerUser, isVideo, false);
+    
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: isVideo
+        });
+        
+        if (isVideo && localVideo) {
+            localVideo.srcObject = localStream;
+        }
+        
+        initPeerConnection(activeChatPartnerId);
+        
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        
+        socket.emit('call_user', {
+            targetUserId: activeChatPartnerId,
+            signalData: offer,
+            isVideoCall: isVideo
+        });
+        
+        callStatus.textContent = currentLanguage === 'tr' ? 'Arama Yapılıyor...' : 'Calling...';
+    } catch (err) {
+        console.error('Arama başlatma hatası:', err);
+        endCallSession();
+    }
+}
+
+function showCallScreen(partnerUser, isVideo, isIncoming) {
+    webrtcCallScreen.classList.remove('hidden');
+    callPartnerUsername.textContent = partnerUser ? partnerUser.username : 'Kullanıcı';
+    
+    if (partnerUser && partnerUser.profile_pic) {
+        callPartnerAvatar.innerHTML = `<img src="${partnerUser.profile_pic}" style="width:100%; height:100%; object-fit:cover;">`;
+    } else {
+        callPartnerAvatar.textContent = partnerUser ? partnerUser.username.substring(0, 2).toUpperCase() : 'U';
+    }
+    
+    if (isVideo) {
+        callVideosContainer.classList.remove('hidden');
+    } else {
+        callVideosContainer.classList.add('hidden');
+    }
+    
+    if (isIncoming) {
+        incomingCallButtons.classList.remove('hidden');
+        activeCallButtons.classList.add('hidden');
+        callStatus.textContent = currentLanguage === 'tr' ? 'Gelen Arama...' : 'Incoming Call...';
+    } else {
+        incomingCallButtons.classList.add('hidden');
+        activeCallButtons.classList.remove('hidden');
+    }
+}
+
+function initPeerConnection(partnerId) {
+    peerConnection = new RTCPeerConnection(rtcConfig);
+    
+    localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+    });
+    
+    peerConnection.addEventListener('track', (e) => {
+        if (remoteVideo) {
+            remoteVideo.srcObject = e.streams[0];
+        }
+    });
+    
+    peerConnection.addEventListener('icecandidate', (e) => {
+        if (e.candidate) {
+            socket.emit('webrtc_ice_candidate', {
+                targetUserId: partnerId,
+                candidate: e.candidate
+            });
+        }
+    });
+}
+
+if (btnAcceptCall) {
+    btnAcceptCall.addEventListener('click', async () => {
+        if (!currentCallPartnerId || !incomingOfferSignal) return;
+        incomingCallButtons.classList.add('hidden');
+        activeCallButtons.classList.remove('hidden');
+        callStatus.textContent = currentLanguage === 'tr' ? 'Bağlanıyor...' : 'Connecting...';
+        
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: isVideoCallActive
+            });
+            
+            if (isVideoCallActive && localVideo) {
+                localVideo.srcObject = localStream;
+            }
+            
+            initPeerConnection(currentCallPartnerId);
+            
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOfferSignal));
+            
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            
+            socket.emit('accept_call', {
+                targetUserId: currentCallPartnerId,
+                signalData: answer
+            });
+            
+            callStatus.textContent = currentLanguage === 'tr' ? 'Görüşme' : 'Connected';
+            callActive = true;
+        } catch (err) {
+            console.error('Arama kabul edilme hatası:', err);
+            socket.emit('reject_call', { targetUserId: currentCallPartnerId });
+            endCallSession();
+        }
+    });
+}
+
+if (btnRejectCall) {
+    btnRejectCall.addEventListener('click', () => {
+        if (currentCallPartnerId) {
+            socket.emit('reject_call', { targetUserId: currentCallPartnerId });
+        }
+        endCallSession();
+    });
+}
+
+if (btnEndCall) {
+    btnEndCall.addEventListener('click', () => {
+        if (currentCallPartnerId) {
+            socket.emit('end_call', { targetUserId: currentCallPartnerId });
+        }
+        endCallSession();
+    });
+}
+
+if (btnToggleMic) {
+    btnToggleMic.addEventListener('click', () => {
+        if (localStream) {
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                btnToggleMic.style.backgroundColor = audioTrack.enabled ? 'rgba(255,255,255,0.15)' : '#ef4444';
+            }
+        }
+    });
+}
+
+if (btnToggleVideo) {
+    btnToggleVideo.addEventListener('click', () => {
+        if (localStream) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                btnToggleVideo.style.backgroundColor = videoTrack.enabled ? 'rgba(255,255,255,0.15)' : '#ef4444';
+            }
+        }
+    });
+}
+
+socket.on('call_incoming', ({ fromUserId, fromUsername, signalData, isVideoCall }) => {
+    currentCallPartnerId = fromUserId;
+    isVideoCallActive = isVideoCall;
+    incomingOfferSignal = signalData;
+    
+    const callerUser = { username: fromUsername };
+    showCallScreen(callerUser, isVideoCall, true);
+});
+
+socket.on('call_accepted', async ({ signalData }) => {
+    callStatus.textContent = currentLanguage === 'tr' ? 'Görüşme' : 'Connected';
+    callActive = true;
+    if (peerConnection) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData));
+    }
+});
+
+socket.on('call_rejected', () => {
+    alert(currentLanguage === 'tr' ? 'Arama reddedildi.' : 'Call rejected.');
+    endCallSession();
+});
+
+socket.on('call_ended', () => {
+    endCallSession();
+});
+
+socket.on('webrtc_ice_candidate', async ({ candidate }) => {
+    if (peerConnection) {
+        try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+            console.error('ICE adayı eklenirken hata oluştu:', err);
+        }
+    }
+});
+
+function endCallSession() {
+    webrtcCallScreen.classList.add('hidden');
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+    }
+    if (peerConnection) {
+        peerConnection.close();
+    }
+    localStream = null;
+    peerConnection = null;
+    callActive = false;
+    currentCallPartnerId = null;
+    incomingOfferSignal = null;
+    
+    if (btnToggleMic) btnToggleMic.style.backgroundColor = 'rgba(255,255,255,0.15)';
+    if (btnToggleVideo) btnToggleVideo.style.backgroundColor = 'rgba(255,255,255,0.15)';
+}
+
 // --- UYGULAMAYI BAŞLATMA VE VERİ ÇEKME ---
 
 async function initApp() {
@@ -847,6 +1629,10 @@ async function initApp() {
 
     try {
         currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (currentUser && currentUser.language) {
+            currentLanguage = currentUser.language;
+            translatePage();
+        }
         myUsernameEl.textContent = currentUser.username;
         if (currentUser.profile_pic) {
             myAvatar.innerHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
@@ -1470,6 +2256,24 @@ async function selectUserChat(user) {
         btnUnfriend.classList.remove('hidden');
         btnBlock.classList.remove('hidden');
         if (btnGroupSettings) btnGroupSettings.classList.add('hidden');
+        
+        const btnCallVoice = document.getElementById('btn-call-voice');
+        const btnCallVideo = document.getElementById('btn-call-video');
+        if (btnCallVoice) btnCallVoice.style.display = 'flex';
+        if (btnCallVideo) btnCallVideo.style.display = 'flex';
+        
+        const btnToggleE2ee = document.getElementById('btn-toggle-e2ee');
+        if (btnToggleE2ee) {
+            btnToggleE2ee.classList.remove('hidden');
+            const e2eeStatusText = document.getElementById('e2ee-status-text');
+            if (e2eeStatusText) {
+                e2eeStatusText.textContent = activeE2eeEnabled 
+                    ? i18n[currentLanguage].e2ee_on 
+                    : i18n[currentLanguage].e2ee_off;
+            }
+        }
+        
+        checkChannelPostPermission();
 
         // Okunmamış mesaj sayısını sıfırla
         user.unread_count = 0;
@@ -1550,7 +2354,14 @@ async function loadMessages() {
     }
 }
 
-function renderMessages() {
+async function renderMessages() {
+    // Tüm şifreli mesajları arka planda çöz
+    for (const msg of messages) {
+        if (msg.is_encrypted === 1 && !msg.decrypted_message) {
+            msg.decrypted_message = await decryptText(msg.message, msg.sender_id);
+        }
+    }
+
     messagesHistory.innerHTML = '';
     
     const searchQuery = chatSearchInput ? chatSearchInput.value.toLowerCase().trim() : '';
@@ -1607,12 +2418,25 @@ function renderMessages() {
         }
 
         let msgContentHTML = '';
+        const displayText = msg.decrypted_message || msg.message;
+        
         if (msg.message_type === 'image') {
             msgContentHTML = `<img src="${msg.file_url}" alt="görsel" style="max-width:100%; max-height:240px; border-radius:8px; display:block; cursor:pointer; margin-bottom: 2px;" onclick="window.open('${msg.file_url}', '_blank')">`;
         } else if (msg.message_type === 'file') {
-            msgContentHTML = `<a href="${msg.file_url}" target="_blank" style="color:inherit; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; word-break:break-all;">📁 ${escapeHTML(msg.message)}</a>`;
+            msgContentHTML = `<a href="${msg.file_url}" target="_blank" style="color:inherit; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; word-break:break-all;">📁 ${escapeHTML(displayText)}</a>`;
+        } else if (msg.message_type === 'voice') {
+            const uniqueId = `voice_${msg.id}`;
+            msgContentHTML = `
+                <div class="voice-player">
+                    <button type="button" class="voice-play-btn" id="btn-play-${uniqueId}">▶️</button>
+                    <div class="voice-progress-container" id="progress-container-${uniqueId}">
+                        <div class="voice-progress-bar" id="progress-bar-${uniqueId}"></div>
+                    </div>
+                    <span class="voice-duration" id="duration-${uniqueId}">0:00</span>
+                </div>
+            `;
         } else {
-            msgContentHTML = escapeHTML(msg.message);
+            msgContentHTML = escapeHTML(displayText);
         }
 
         let senderNameHTML = '';
@@ -1621,6 +2445,7 @@ function renderMessages() {
         }
 
         let editedBadge = msg.is_edited === 1 ? '<span class="msg-edited-badge" style="font-size:0.65rem; color:var(--text-muted); margin-left: 4px; font-style: italic;">(düzenlendi)</span>' : '';
+        let e2eeIcon = msg.is_encrypted === 1 ? '<span class="message-encrypted-badge" title="Uçtan Uca Şifreli" style="font-size: 0.7rem; color: #10b981; display: inline-flex; align-items: center; gap: 0.2rem;">🔒 E2EE</span>' : '';
 
         row.innerHTML = `
             <div class="message-bubble" data-msg-id="${msg.id}" data-sender-id="${msg.sender_id}">
@@ -1628,6 +2453,7 @@ function renderMessages() {
                 ${senderNameHTML}
                 <div class="message-text">${msgContentHTML}</div>
                 <span class="message-time" style="display:inline-flex; align-items:center; gap: 2px;">
+                    ${e2eeIcon}
                     ${msgTime}
                     ${editedBadge}
                     ${ticksHTML}
@@ -1635,6 +2461,19 @@ function renderMessages() {
             </div>
         `;
         messagesHistory.appendChild(row);
+
+        // Sesli mesaj olay bağlama
+        if (msg.message_type === 'voice') {
+            const uniqueId = `voice_${msg.id}`;
+            const playBtn = document.getElementById(`btn-play-${uniqueId}`);
+            const progress = document.getElementById(`progress-bar-${uniqueId}`);
+            const duration = document.getElementById(`duration-${uniqueId}`);
+            if (playBtn && progress && duration) {
+                playBtn.addEventListener('click', () => {
+                    playVoice(msg.file_url, playBtn, progress, duration);
+                });
+            }
+        }
 
         // Olay Dinleyicileri Ekle
         const bubbleEl = row.querySelector('.message-bubble');
@@ -1712,13 +2551,26 @@ messageForm.addEventListener('submit', async (e) => {
         }
 
         // Eğer Alıntılı Yanıt Modundaysak
+        let finalMsgText = text;
+        let isEncryptedVal = 0;
+        if (activeE2eeEnabled && !activeChatGroupId) {
+            finalMsgText = await encryptText(text);
+            isEncryptedVal = 1;
+        }
+
         const requestBody = {
             receiverId: activeChatPartnerId,
             groupId: activeChatGroupId,
-            message: text
+            message: finalMsgText
         };
         if (replyingMessageId) {
             requestBody.parentMessageId = replyingMessageId;
+        }
+        if (activeDisappearingDuration > 0) {
+            requestBody.durationSeconds = activeDisappearingDuration;
+        }
+        if (isEncryptedVal === 1) {
+            requestBody.isEncrypted = 1;
         }
 
         const newMsg = await apiCall('/messages', 'POST', requestBody);
@@ -1968,9 +2820,13 @@ if (groupCreateForm) {
         const memberIds = Array.from(checkedBoxes).map(cb => cb.value);
 
         try {
+            const isChannelCheckbox = document.getElementById('group-is-channel');
+            const isChannel = isChannelCheckbox ? isChannelCheckbox.checked : false;
+
             const newGroup = await apiCall('/groups/create', 'POST', {
                 name: groupName,
-                memberIds: memberIds
+                memberIds: memberIds,
+                isChannel: isChannel
             });
 
             groupCreateModal.classList.add('hidden');
@@ -2127,6 +2983,18 @@ async function selectGroupChat(group) {
         btnUnfriend.classList.add('hidden');
         btnBlock.classList.add('hidden');
         if (btnGroupSettings) btnGroupSettings.classList.remove('hidden');
+
+        const btnCallVoice = document.getElementById('btn-call-voice');
+        const btnCallVideo = document.getElementById('btn-call-video');
+        if (btnCallVoice) btnCallVoice.style.display = 'none';
+        if (btnCallVideo) btnCallVideo.style.display = 'none';
+
+        const btnToggleE2ee = document.getElementById('btn-toggle-e2ee');
+        if (btnToggleE2ee) {
+            btnToggleE2ee.classList.add('hidden');
+        }
+
+        checkChannelPostPermission();
 
         noChatSelectedScreen.classList.add('hidden');
         chatActiveScreen.classList.remove('hidden');

@@ -147,6 +147,14 @@ async function initDatabase() {
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online INTEGER DEFAULT 1`);
             await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
             await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'tr'`);
+            await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS is_channel INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS custom_title TEXT DEFAULT NULL`);
+            await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS can_send_messages INTEGER DEFAULT 1`);
+            await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS can_send_media INTEGER DEFAULT 1`);
+            await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS can_add_users INTEGER DEFAULT 1`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT NULL`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_encrypted INTEGER DEFAULT 0`);
 
             console.log('PostgreSQL Tabloları kontrol edildi/oluşturuldu.');
         } finally {
@@ -211,6 +219,9 @@ async function initDatabase() {
         if (!columns.includes('show_online')) {
             await dbSqlite.exec("ALTER TABLE users ADD COLUMN show_online INTEGER DEFAULT 1");
         }
+        if (!columns.includes('language')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'tr'");
+        }
 
         await dbSqlite.exec(`
             CREATE TABLE IF NOT EXISTS messages (
@@ -244,6 +255,12 @@ async function initDatabase() {
         }
         if (!columnsMsg.includes('parent_message_id')) {
             await dbSqlite.exec("ALTER TABLE messages ADD COLUMN parent_message_id INTEGER");
+        }
+        if (!columnsMsg.includes('expires_at')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN expires_at TEXT DEFAULT NULL");
+        }
+        if (!columnsMsg.includes('is_encrypted')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_encrypted INTEGER DEFAULT 0");
         }
 
         await dbSqlite.exec(`
@@ -337,11 +354,26 @@ async function initDatabase() {
         if (!columnsGroups.includes('profile_pic')) {
             await dbSqlite.exec("ALTER TABLE groups ADD COLUMN profile_pic TEXT");
         }
+        if (!columnsGroups.includes('is_channel')) {
+            await dbSqlite.exec("ALTER TABLE groups ADD COLUMN is_channel INTEGER DEFAULT 0");
+        }
 
         const tableInfoMembers = await dbSqlite.all("PRAGMA table_info(group_members)");
         const columnsMembers = tableInfoMembers.map(col => col.name);
         if (!columnsMembers.includes('is_admin')) {
             await dbSqlite.exec("ALTER TABLE group_members ADD COLUMN is_admin INTEGER DEFAULT 0");
+        }
+        if (!columnsMembers.includes('custom_title')) {
+            await dbSqlite.exec("ALTER TABLE group_members ADD COLUMN custom_title TEXT DEFAULT NULL");
+        }
+        if (!columnsMembers.includes('can_send_messages')) {
+            await dbSqlite.exec("ALTER TABLE group_members ADD COLUMN can_send_messages INTEGER DEFAULT 1");
+        }
+        if (!columnsMembers.includes('can_send_media')) {
+            await dbSqlite.exec("ALTER TABLE group_members ADD COLUMN can_send_media INTEGER DEFAULT 1");
+        }
+        if (!columnsMembers.includes('can_add_users')) {
+            await dbSqlite.exec("ALTER TABLE group_members ADD COLUMN can_add_users INTEGER DEFAULT 1");
         }
 
         console.log('SQLite Tabloları kontrol edildi/oluşturuldu.');
@@ -490,20 +522,20 @@ const dbQueries = {
         }
     },
 
-    // Yeni mesaj kaydetme (Grup, dosya tipleri ve alıntılama desteğiyle)
-    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null, parentMessageId = null) {
+    // Yeni mesaj kaydetme (Grup, dosya tipleri, alıntılama, süreli mesaj ve şifreleme desteğiyle)
+    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null, parentMessageId = null, expiresAt = null, isEncrypted = 0) {
         if (isPostgres) {
             const finalReceiverId = groupId ? null : receiverId;
             const res = await dbPostgresPool.query(
-                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted]
             );
             return res.rows[0];
         } else {
             const finalReceiverId = groupId ? 0 : receiverId;
             const result = await dbSqlite.run(
-                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted]
             );
             return await dbSqlite.get('SELECT * FROM messages WHERE id = ?', [result.lastID]);
         }
@@ -771,18 +803,18 @@ const dbQueries = {
         }
     },
 
-    // Yeni grup oluştur
-    async createGroup(name, createdBy) {
+    // Yeni grup veya kanal oluştur
+    async createGroup(name, createdBy, isChannel = 0) {
         if (isPostgres) {
             const res = await dbPostgresPool.query(
-                'INSERT INTO groups (name, created_by) VALUES ($1, $2) RETURNING *',
-                [name, createdBy]
+                'INSERT INTO groups (name, created_by, is_channel) VALUES ($1, $2, $3) RETURNING *',
+                [name, createdBy, isChannel]
             );
             return res.rows[0];
         } else {
             const result = await dbSqlite.run(
-                'INSERT INTO groups (name, created_by) VALUES (?, ?)',
-                [name, createdBy]
+                'INSERT INTO groups (name, created_by, is_channel) VALUES (?, ?, ?)',
+                [name, createdBy, isChannel]
             );
             return await dbSqlite.get('SELECT * FROM groups WHERE id = ?', [result.lastID]);
         }
@@ -811,6 +843,7 @@ const dbQueries = {
                 groups.name,
                 groups.profile_pic,
                 groups.created_by,
+                groups.is_channel,
                 (
                     SELECT message FROM messages 
                     WHERE messages.group_id = groups.id 
@@ -841,13 +874,19 @@ const dbQueries = {
     async getGroupMembers(groupId) {
         if (isPostgres) {
             const res = await dbPostgresPool.query(
-                'SELECT users.id, users.username, users.profile_pic, group_members.is_admin FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = $1',
+                `SELECT users.id, users.username, users.profile_pic, 
+                        group_members.is_admin, group_members.custom_title, 
+                        group_members.can_send_messages, group_members.can_send_media, group_members.can_add_users 
+                 FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = $1`,
                 [groupId]
             );
             return res.rows;
         } else {
             return await dbSqlite.all(
-                'SELECT users.id, users.username, users.profile_pic, group_members.is_admin FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = ?',
+                `SELECT users.id, users.username, users.profile_pic, 
+                        group_members.is_admin, group_members.custom_title, 
+                        group_members.can_send_messages, group_members.can_send_media, group_members.can_add_users 
+                 FROM group_members JOIN users ON users.id = group_members.user_id WHERE group_members.group_id = ?`,
                 [groupId]
             );
         }
@@ -1083,10 +1122,54 @@ const dbQueries = {
     // ID'ye göre kullanıcı bilgilerini getir
     async getUserById(userId) {
         if (isPostgres) {
-            const res = await dbPostgresPool.query('SELECT id, username, profile_pic, bio, last_seen, show_last_seen, show_online, email FROM users WHERE id = $1', [userId]);
+            const res = await dbPostgresPool.query('SELECT id, username, profile_pic, bio, last_seen, show_last_seen, show_online, language, email FROM users WHERE id = $1', [userId]);
             return res.rows[0];
         } else {
-            return await dbSqlite.get('SELECT id, username, profile_pic, bio, last_seen, show_last_seen, show_online, email FROM users WHERE id = ?', [userId]);
+            return await dbSqlite.get('SELECT id, username, profile_pic, bio, last_seen, show_last_seen, show_online, language, email FROM users WHERE id = ?', [userId]);
+        }
+    },
+
+    // Kullanıcı dil tercihini güncelle
+    async updateUserLanguage(userId, lang) {
+        if (isPostgres) {
+            await dbPostgresPool.query('UPDATE users SET language = $1 WHERE id = $2', [lang, userId]);
+        } else {
+            await dbSqlite.run('UPDATE users SET language = ? WHERE id = ?', [lang, userId]);
+        }
+    },
+
+    // Grup üyesi yetkilerini ve unvanını güncelle
+    async updateGroupMemberPermissions(groupId, userId, customTitle, canSendMessages, canSendMedia, canAddUsers) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                `UPDATE group_members 
+                 SET custom_title = $1, can_send_messages = $2, can_send_media = $3, can_add_users = $4
+                 WHERE group_id = $5 AND user_id = $6`,
+                [customTitle, canSendMessages, canSendMedia, canAddUsers, groupId, userId]
+            );
+        } else {
+            await dbSqlite.run(
+                `UPDATE group_members 
+                 SET custom_title = ?, can_send_messages = ?, can_send_media = ?, can_add_users = ?
+                 WHERE group_id = ? AND user_id = ?`,
+                [customTitle, canSendMessages, canSendMedia, canAddUsers, groupId, userId]
+            );
+        }
+    },
+
+    // Grup üyesi yetkilerini getir
+    async getGroupMemberPermissions(groupId, userId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                'SELECT is_admin, custom_title, can_send_messages, can_send_media, can_add_users FROM group_members WHERE group_id = $1 AND user_id = $2',
+                [groupId, userId]
+            );
+            return res.rows[0];
+        } else {
+            return await dbSqlite.get(
+                'SELECT is_admin, custom_title, can_send_messages, can_send_media, can_add_users FROM group_members WHERE group_id = ? AND user_id = ?',
+                [groupId, userId]
+            );
         }
     }
 };

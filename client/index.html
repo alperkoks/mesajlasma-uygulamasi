@@ -175,6 +175,10 @@
                             </div>
                         </div>
                         <div class="chat-header-actions" style="position: relative; display: flex; align-items: center;">
+                            <!-- Sesli Arama Butonu -->
+                            <button id="btn-call-voice" class="btn-icon" title="Sesli Ara" style="font-size: 1.25rem; padding: 0.3rem; margin-right: 0.25rem; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: var(--text-main);">📞</button>
+                            <!-- Görüntülü Arama Butonu -->
+                            <button id="btn-call-video" class="btn-icon" title="Görüntülü Ara" style="font-size: 1.25rem; padding: 0.3rem; margin-right: 0.5rem; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: var(--text-main);">📹</button>
                             <!-- Üç Nokta Menü Butonu -->
                             <button id="btn-chat-options" class="btn-icon" title="Seçenekler" style="font-size: 1.35rem; padding: 0.3rem; z-index: 10;">⋮</button>
                             
@@ -182,6 +186,8 @@
                             <div id="chat-options-dropdown" class="hidden" style="position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: flex; flex-direction: column; min-width: 180px; z-index: 100; overflow: hidden; padding: 0.25rem 0;">
                                 <button id="btn-group-settings" class="dropdown-item hidden" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">⚙️ <span>Grup Ayarları</span></button>
                                 <button id="btn-mute-chat" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🔕 <span>Sessize Al</span></button>
+                                <button id="btn-disappearing-messages" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">⏱️ <span>Süreli Mesajlar</span></button>
+                                <button id="btn-toggle-e2ee" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🔐 <span id="e2ee-status-text">E2EE Şifreleme: Kapalı</span></button>
                                 <button id="btn-toggle-search" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🔍 <span>Mesajlarda Ara</span></button>
                                 <button id="btn-clear-chat" class="dropdown-item" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--text-main); cursor: pointer; transition: background-color 0.2s;">🗑️ <span>Sohbeti Temizle</span></button>
                                 <button id="btn-unfriend" class="dropdown-item dropdown-item-danger" style="align-items: center; gap: 0.6rem; width: 100%; padding: 0.75rem 1rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; font-weight: 500; color: var(--danger-color); cursor: pointer; transition: background-color 0.2s;">❌ <span>Arkadaştan Çıkar</span></button>
@@ -212,11 +218,24 @@
                             <button type="button" id="btn-reply-preview-close" class="btn-icon" style="font-size: 1.25rem; font-weight: bold; padding: 0 0.5rem; cursor: pointer; border: none; background: transparent; color: var(--text-muted);">×</button>
                         </div>
 
-                        <form id="message-form">
+                        <form id="message-form" style="position: relative;">
                             <input type="file" id="file-input" style="display:none;" accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-                            <button type="button" id="btn-attach" class="btn-icon" title="Resim/Dosya Gönder" style="width: auto; min-width: 44px; margin-right: 0.25rem; font-size: 1.35rem; padding: 0.25rem;">📎</button>
+                            <button type="button" id="btn-attach" class="btn-icon" title="Resim/Dosya Gönder" style="width: auto; min-width: 44px; margin-right: 0.25rem; font-size: 1.35rem; padding: 0.25rem; color: var(--text-main);">📎</button>
+                            <button type="button" id="btn-gif" class="btn-icon" title="GIF Gönder" style="width: auto; min-width: 44px; margin-right: 0.25rem; font-size: 1.35rem; padding: 0.25rem; color: var(--text-main);">🎬</button>
                             <input type="text" id="message-input" autocomplete="off" placeholder="Mesajınızı yazın...">
+                            <button type="button" id="btn-mic" class="btn-icon" title="Ses Kaydet" style="width: auto; min-width: 44px; margin-left: 0.25rem; font-size: 1.35rem; padding: 0.25rem; color: var(--text-main); transition: transform 0.2s;">🎤</button>
                             <button type="submit" class="btn btn-send">Gönder</button>
+
+                            <!-- GIF Arama Popover'ı -->
+                            <div id="gif-popover" class="hidden" style="position: absolute; bottom: 100%; left: 0; margin-bottom: 0.5rem; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); width: 320px; z-index: 1000; display: flex; flex-direction: column; overflow: hidden; height: 350px;">
+                                <div style="display: flex; gap: 0.5rem; padding: 0.5rem; border-bottom: 1px solid var(--border-color); background-color: var(--bg-hover);">
+                                    <input type="text" id="gif-search-input" placeholder="Tenor'da GIF ara..." style="flex: 1; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.85rem; outline: none; background-color: var(--bg-white); color: var(--text-main);">
+                                    <button type="button" id="btn-gif-popover-close" style="background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted);">×</button>
+                                </div>
+                                <div id="gif-results-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.35rem; padding: 0.5rem;">
+                                    <!-- Dinamik yükleme -->
+                                </div>
+                            </div>
                         </form>
                     </footer>
                 </div>
@@ -265,6 +284,14 @@
                     </div>
 
                     <div class="input-group">
+                        <label for="settings-lang">Dil / Language</label>
+                        <select id="settings-lang" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main); font-weight: 500; font-size: 0.9rem; outline: none; margin-bottom: 0.5rem; cursor: pointer; accent-color: var(--primary-color);">
+                            <option value="tr">Türkçe</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
                         <label for="settings-volume">Uygulama İçi Ses Seviyesi (<span id="settings-volume-value">100%</span>)</label>
                         <div style="display: flex; align-items: center; gap: 0.75rem;">
                             <span>🔈</span>
@@ -298,6 +325,11 @@
                     <div class="input-group">
                         <label for="group-name-input">Grup Adı</label>
                         <input type="text" id="group-name-input" required placeholder="Grup adını yazın..." autocomplete="off">
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: -0.5rem; margin-bottom: 0.5rem;">
+                        <input type="checkbox" id="group-is-channel" style="width: 16px; height: 16px; cursor: pointer; margin: 0; accent-color: var(--primary-color);">
+                        <label for="group-is-channel" style="margin: 0; cursor: pointer; font-size: 0.85rem; color: var(--text-main); font-weight: 500; user-select: none;">Kanal Olarak Oluştur (Yalnızca yöneticiler yazabilir)</label>
                     </div>
                     
                     <div class="input-group" style="display: flex; flex-direction: column; height: 200px;">
@@ -404,6 +436,33 @@
                         <button type="button" id="btn-profile-block" class="btn btn-action-danger" style="flex: 1; padding: 0.6rem 0.5rem; font-size: 0.85rem;">Engelle</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. EKRAN: WEBRTC SESLİ VE GÖRÜNTÜLÜ ARAMA EKRANI -->
+    <div id="webrtc-call-screen" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1e1b4b, #311042); z-index: 12000; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 2.5rem 1.5rem; color: white; text-align: center; font-family: 'Inter', sans-serif;">
+        <div style="margin-top: 2rem;">
+            <div id="call-partner-avatar" style="width: 100px; height: 100px; border-radius: 50%; background-color: var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; margin: 0 auto 1rem; border: 3px solid rgba(255,255,255,0.2); overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);"></div>
+            <h2 id="call-partner-username" style="font-size: 1.5rem; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Kullanıcı</h2>
+            <div id="call-status" style="font-size: 0.95rem; color: #a5b4fc; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Arama Yapılıyor...</div>
+        </div>
+
+        <div id="call-videos-container" class="hidden" style="position: relative; width: 100%; max-width: 480px; aspect-ratio: 3/4; border-radius: 16px; overflow: hidden; background-color: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+            <video id="remote-video" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+            <video id="local-video" autoplay muted playsinline style="position: absolute; top: 10px; right: 10px; width: 100px; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10;"></video>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; max-width: 320px;">
+            <div id="incoming-call-buttons" class="hidden" style="display: flex; justify-content: space-around; width: 100%;">
+                <button type="button" id="btn-accept-call" class="btn" style="width: 64px; height: 64px; border-radius: 50%; background-color: #10b981; border: none; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(16,185,129,0.4); color: white;">📞</button>
+                <button type="button" id="btn-reject-call" class="btn" style="width: 64px; height: 64px; border-radius: 50%; background-color: #ef4444; border: none; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(239,68,68,0.4); color: white;">🛑</button>
+            </div>
+
+            <div id="active-call-buttons" style="display: flex; justify-content: space-around; align-items: center; width: 100%;">
+                <button type="button" id="btn-toggle-mic" class="btn-icon" style="width: 50px; height: 50px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; font-size: 1.25rem; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;">🎙️</button>
+                <button type="button" id="btn-end-call" class="btn" style="width: 64px; height: 64px; border-radius: 50%; background-color: #ef4444; border: none; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(239,68,68,0.4); color: white;">🛑</button>
+                <button type="button" id="btn-toggle-video" class="btn-icon" style="width: 50px; height: 50px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; font-size: 1.25rem; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;">📷</button>
             </div>
         </div>
     </div>

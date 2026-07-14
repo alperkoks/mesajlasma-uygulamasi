@@ -282,6 +282,63 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- WEBRTC SESLİ VE GÖRÜNTÜLÜ ARAMA SİNYALLEŞMESİ ---
+    socket.on('call_user', ({ targetUserId, signalData, isVideoCall }) => {
+        const targetSockets = userSockets.get(Number(targetUserId));
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(socketId => {
+                io.to(socketId).emit('call_incoming', {
+                    fromUserId: userId,
+                    fromUsername: socket.user.username,
+                    signalData: signalData,
+                    isVideoCall: isVideoCall
+                });
+            });
+        }
+    });
+
+    socket.on('accept_call', ({ targetUserId, signalData }) => {
+        const targetSockets = userSockets.get(Number(targetUserId));
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(socketId => {
+                io.to(socketId).emit('call_accepted', {
+                    signalData: signalData
+                });
+            });
+        }
+    });
+
+    socket.on('reject_call', ({ targetUserId }) => {
+        const targetSockets = userSockets.get(Number(targetUserId));
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(socketId => {
+                io.to(socketId).emit('call_rejected', {
+                    fromUserId: userId
+                });
+            });
+        }
+    });
+
+    socket.on('end_call', ({ targetUserId }) => {
+        const targetSockets = userSockets.get(Number(targetUserId));
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(socketId => {
+                io.to(socketId).emit('call_ended');
+            });
+        }
+    });
+
+    socket.on('webrtc_ice_candidate', ({ targetUserId, candidate }) => {
+        const targetSockets = userSockets.get(Number(targetUserId));
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(socketId => {
+                io.to(socketId).emit('webrtc_ice_candidate', {
+                    candidate: candidate
+                });
+            });
+        }
+    });
+
     // Bağlantı koptuğunda (Sayfa kapatıldığında veya çıkış yapıldığında)
     socket.on('disconnect', () => {
         const sockets = userSockets.get(userId);
@@ -960,7 +1017,8 @@ app.get('/api/groups', authenticateToken, async (req, res) => {
 // 3.10 YENİ GRUP OLUŞTUR
 app.post('/api/groups/create', authenticateToken, async (req, res) => {
     const creatorId = req.user.id;
-    const { name, memberIds } = req.body;
+    const { name, memberIds, isChannel } = req.body;
+    const isChannelVal = isChannel ? 1 : 0;
 
     if (!name || name.trim() === '') {
         return res.status(400).json({ message: 'Grup ismi zorunludur.' });
@@ -968,7 +1026,7 @@ app.post('/api/groups/create', authenticateToken, async (req, res) => {
 
     try {
         // Grubu veritabanında oluştur
-        const group = await dbQueries.createGroup(name.trim(), creatorId);
+        const group = await dbQueries.createGroup(name.trim(), creatorId, isChannelVal);
         const groupId = group.id;
 
         // Oluşturucuyu otomatik üye olarak ekle (is_admin = 1)
@@ -1316,7 +1374,7 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
 app.post('/api/messages', authenticateToken, async (req, res) => {
     const senderId = req.user.id;
     const receiverId = req.body.receiverId ? parseInt(req.body.receiverId) : null;
-    const { message, groupId, messageType, fileUrl, parentMessageId } = req.body;
+    const { message, groupId, messageType, fileUrl, parentMessageId, durationSeconds, isEncrypted } = req.body;
 
     if (!groupId && !receiverId) {
         return res.status(400).json({ message: 'Alıcı ID veya Grup ID zorunludur.' });
@@ -1326,13 +1384,52 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Özel mesaj ise engelleme kontrolü yap
-        if (!groupId && receiverId) {
+        // Grup/Kanal yetki ve engelleme kontrolleri
+        if (groupId) {
+            const parsedGroupId = parseInt(groupId);
+            const db = getDbInstance();
+            let groupObj;
+            if (isPostgres) {
+                const groupRes = await db.query('SELECT * FROM groups WHERE id = $1', [parsedGroupId]);
+                groupObj = groupRes.rows[0];
+            } else {
+                groupObj = await db.get('SELECT * FROM groups WHERE id = ?', [parsedGroupId]);
+            }
+
+            if (groupObj) {
+                const memberPerms = await dbQueries.getGroupMemberPermissions(parsedGroupId, senderId);
+                if (!memberPerms) {
+                    return res.status(403).json({ message: 'Bu grubun üyesi değilsiniz.' });
+                }
+
+                // 1. Kanal Kontrolü
+                if (groupObj.is_channel === 1 && memberPerms.is_admin === 0) {
+                    return res.status(403).json({ message: 'Bu kanalda sadece yöneticiler mesaj gönderebilir.' });
+                }
+
+                // 2. Mesaj Gönderme İzni
+                if (memberPerms.can_send_messages === 0) {
+                    return res.status(403).json({ message: 'Bu grupta mesaj gönderme yetkiniz kısıtlanmıştır.' });
+                }
+
+                // 3. Medya Paylaşma İzni
+                const isMedia = messageType && messageType !== 'text';
+                if (isMedia && memberPerms.can_send_media === 0) {
+                    return res.status(403).json({ message: 'Bu grupta medya paylaşma yetkiniz kısıtlanmıştır.' });
+                }
+            }
+        } else if (receiverId) {
             const isBlocked = await dbQueries.isBlocked(senderId, receiverId);
             if (isBlocked) {
                 return res.status(403).json({ message: 'Bu kullanıcıyla aranızda engelleme bulunduğu için mesaj gönderilemez.' });
             }
         }
+
+        let expiresAt = null;
+        if (durationSeconds) {
+            expiresAt = new Date(Date.now() + parseInt(durationSeconds) * 1000).toISOString();
+        }
+        const isEncryptedVal = isEncrypted ? 1 : 0;
 
         // Mesajı veritabanına kaydet
         const savedMessage = await dbQueries.saveMessage(
@@ -1342,7 +1439,9 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
             groupId || null, 
             messageType || 'text', 
             fileUrl || null,
-            parentMessageId || null
+            parentMessageId || null,
+            expiresAt,
+            isEncryptedVal
         );
         
         // --- GERÇEK ZAMANLI SOKET İLETİMİ ---
@@ -1635,6 +1734,42 @@ async function startServer() {
             vapidPrivateKey
         );
         console.log('✅ Web Push VAPID anahtarları başarıyla yapılandırıldı.');
+
+        // --- SÜRELİ (KENDİNİ SİLEN) MESAJ TEMİZLEME ZAMANLAYICISI ---
+        setInterval(async () => {
+            try {
+                const db = getDbInstance();
+                const nowStr = new Date().toISOString();
+                let expiredMessages = [];
+
+                if (isPostgres) {
+                    const res = await db.query('SELECT * FROM messages WHERE expires_at IS NOT NULL AND expires_at < $1', [new Date()]);
+                    expiredMessages = res.rows;
+                } else {
+                    expiredMessages = await db.all('SELECT * FROM messages WHERE expires_at IS NOT NULL AND expires_at < ?', [nowStr]);
+                }
+
+                if (expiredMessages.length > 0) {
+                    console.log(`⏰ ${expiredMessages.length} adet süresi dolmuş mesaj tespit edildi. Siliniyor...`);
+                    for (const msg of expiredMessages) {
+                        if (isPostgres) {
+                            await db.query('DELETE FROM messages WHERE id = $1', [msg.id]);
+                        } else {
+                            await db.run('DELETE FROM messages WHERE id = ?', [msg.id]);
+                        }
+                        
+                        // İstemcileri soketle haberdar et
+                        io.emit('message_deleted', {
+                            messageId: msg.id,
+                            groupId: msg.group_id || null,
+                            receiverId: msg.receiver_id || null
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('⏰ Süreli mesaj temizleme hatası:', err);
+            }
+        }, 3000);
 
         server.listen(PORT, () => {
             console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor!`);
