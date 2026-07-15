@@ -43,6 +43,17 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
         });
     }
+
+    // Duvar kağıdı seçim butonlarını dinle
+    document.querySelectorAll('.wp-select-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const wp = btn.getAttribute('data-wp');
+            applyWallpaper(wp);
+        });
+    });
+
+    // Varsayılan duvar kağıdını yükle
+    applyWallpaper(currentWallpaper);
 });
 
 // EKRANLAR VE ELEMENTLER
@@ -86,6 +97,29 @@ const btnEmojiPopoverClose = document.getElementById('btn-emoji-popover-close');
 const emojisGrid = document.getElementById('emojis-grid');
 const stickersGrid = document.getElementById('stickers-grid');
 
+// --- SOHBET ARKA PLANI DUVAR KAĞIDI MANTIĞI ---
+let currentWallpaper = localStorage.getItem('chatWallpaper') || 'wp-default';
+
+function applyWallpaper(wpClass) {
+    currentWallpaper = wpClass || 'wp-default';
+    localStorage.setItem('chatWallpaper', currentWallpaper);
+    
+    const messagesHistory = document.getElementById('messages-history');
+    if (messagesHistory) {
+        messagesHistory.classList.remove('wp-default', 'wp-neon', 'wp-sunset', 'wp-emerald', 'wp-abstract');
+        messagesHistory.classList.add(currentWallpaper);
+    }
+    
+    // Butonlardaki çerçeveyi güncelle
+    document.querySelectorAll('.wp-select-btn').forEach(btn => {
+        if (btn.getAttribute('data-wp') === currentWallpaper) {
+            btn.style.outline = '2px solid var(--primary-color)';
+            btn.style.outlineOffset = '1px';
+        } else {
+            btn.style.outline = 'none';
+        }
+    });
+}
 
 function clearMessageInput() {
     messageInput.value = '';
@@ -534,6 +568,9 @@ openSettingsBtn.addEventListener('click', () => {
         settingsVolumeValue.textContent = Math.round(appVolume * 100) + '%';
     }
     
+    // Duvar kağıdı aktif seçim butonunu görsel olarak işaretle
+    applyWallpaper(currentWallpaper);
+
     settingsModal.classList.remove('hidden');
 });
 

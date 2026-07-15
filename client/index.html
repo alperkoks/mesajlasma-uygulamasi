@@ -381,6 +381,18 @@
                         <button type="button" id="theme-toggle-btn" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background-color: var(--border-color); color: var(--text-main); font-weight: 600; padding: 0.6rem; cursor: pointer; border: none; border-radius: 8px;">🌙 <span>Karanlık Mod</span></button>
                     </div>
 
+                    <!-- Sohbet Arka Planı Seçeneği -->
+                    <div class="input-group" style="margin-bottom: 1.25rem;">
+                        <label>Sohbet Arka Planı / Wallpaper</label>
+                        <div style="display: flex; gap: 0.25rem; margin-top: 0.5rem; justify-content: space-between;">
+                            <button type="button" class="btn wp-select-btn" data-wp="wp-default" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: var(--bg-light); color: var(--text-main); border-radius: 6px; flex: 1;">Klasik</button>
+                            <button type="button" class="btn wp-select-btn" data-wp="wp-neon" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border-radius: 6px; flex: 1;">Neon</button>
+                            <button type="button" class="btn wp-select-btn" data-wp="wp-sunset" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #f43f5e, #f59e0b); color: white; border-radius: 6px; flex: 1;">Gün Batımı</button>
+                            <button type="button" class="btn wp-select-btn" data-wp="wp-emerald" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #10b981, #06b6d4); color: white; border-radius: 6px; flex: 1;">Zümrüt</button>
+                            <button type="button" class="btn wp-select-btn" data-wp="wp-abstract" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #ec4899); color: white; border-radius: 6px; flex: 1;">Soyut</button>
+                        </div>
+                    </div>
+
                     <!-- Bildirim ve Uygulama Yükleme Butonları -->
                     <div id="settings-actions-container" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
                         <button type="button" id="btn-request-notifications" class="btn btn-small hidden" style="width: 100%; background-color: #f59e0b; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 600; padding: 0.6rem; border: none; border-radius: 8px; cursor: pointer; animation: pulse 2s infinite;">🔔 Bildirimleri Etkinleştir</button>
