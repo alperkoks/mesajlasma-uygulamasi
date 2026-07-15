@@ -1683,6 +1683,58 @@ app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
     }
 });
 
+// 7. TENOR GIF PROXY ROTASI (Tenor v2 API kullanır)
+app.get('/api/gifs/trending', async (req, res) => {
+    try {
+        const apiKey = process.env.TENOR_API_KEY || "LIVDSRZULELA";
+        const url = `https://tenor.googleapis.com/v2/featured?key=${apiKey}&limit=15`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Tenor API error: ${response.statusText}`);
+        }
+        const data = await response.json();
+        const gifs = (data.results || []).map(item => {
+            const media = item.media_formats || {};
+            return {
+                id: item.id,
+                title: item.title || "",
+                url: (media.gif && media.gif.url) || "",
+                preview: (media.tinygif && media.tinygif.url) || (media.gif && media.gif.url) || ""
+            };
+        });
+        res.json(gifs);
+    } catch (error) {
+        console.error('GIF trending hatası:', error);
+        res.status(500).json({ message: 'GIFler getirilirken hata oluştu.' });
+    }
+});
+
+app.get('/api/gifs/search', async (req, res) => {
+    const q = req.query.q || '';
+    try {
+        const apiKey = process.env.TENOR_API_KEY || "LIVDSRZULELA";
+        const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${apiKey}&limit=15`;
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Tenor API error: ${response.statusText}`);
+        }
+        const data = await response.json();
+        const gifs = (data.results || []).map(item => {
+            const media = item.media_formats || {};
+            return {
+                id: item.id,
+                title: item.title || "",
+                url: (media.gif && media.gif.url) || "",
+                preview: (media.tinygif && media.tinygif.url) || (media.gif && media.gif.url) || ""
+            };
+        });
+        res.json(gifs);
+    } catch (error) {
+        console.error('GIF arama hatası:', error);
+        res.status(500).json({ message: 'GIFler aranırken hata oluştu.' });
+    }
+});
+
 // Web Push Bildirim Gönderme Yardımcısı
 async function sendPushNotification(recipientId, payload) {
     try {

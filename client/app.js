@@ -77,6 +77,14 @@ const mobileBackBtn = document.getElementById('mobile-back-btn');
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
 const fileInput = document.getElementById('file-input');
 const btnAttach = document.getElementById('btn-attach');
+const btnSend = document.getElementById('btn-send');
+
+
+function clearMessageInput() {
+    messageInput.value = '';
+    if (btnMic) btnMic.classList.remove('hidden');
+    if (btnSend) btnSend.classList.add('hidden');
+}
 
 // ARKADAŞLIK SİSTEMİ ELEMENTLERİ
 const friendSearchForm = document.getElementById('friend-search-form');
@@ -1517,6 +1525,10 @@ function initPeerConnection(partnerId) {
         if (remoteVideo) {
             remoteVideo.srcObject = e.streams[0];
         }
+        const remoteAudio = document.getElementById('remote-audio');
+        if (remoteAudio) {
+            remoteAudio.srcObject = e.streams[0];
+        }
     });
     
     peerConnection.addEventListener('icecandidate', (e) => {
@@ -2290,6 +2302,7 @@ function renderSearchResult(user) {
 
 async function selectUserChat(user) {
     try {
+        clearMessageInput();
         activeChatPartner = user.username;
         activeChatPartnerId = user.id;
         activeChatGroupId = null;
@@ -2591,7 +2604,7 @@ messageForm.addEventListener('submit', async (e) => {
             renderMessages();
             
             editingMessageId = null;
-            messageInput.value = '';
+            clearMessageInput();
             messageInput.style.border = '';
             messageInput.placeholder = 'Mesajınızı yazın...';
             return;
@@ -2627,7 +2640,7 @@ messageForm.addEventListener('submit', async (e) => {
             messages.push(newMsg);
             renderMessages();
         }
-        messageInput.value = '';
+        clearMessageInput();
 
         // Yanıt durumunu temizle
         if (replyingMessageId) {
@@ -2667,6 +2680,16 @@ let isCurrentlyTyping = false;
 
 if (messageInput) {
     messageInput.addEventListener('input', () => {
+        // Akıllı buton geçişi (Mic / Send)
+        const text = messageInput.value.trim();
+        if (text) {
+            if (btnMic) btnMic.classList.add('hidden');
+            if (btnSend) btnSend.classList.remove('hidden');
+        } else {
+            if (btnMic) btnMic.classList.remove('hidden');
+            if (btnSend) btnSend.classList.add('hidden');
+        }
+
         if (!isCurrentlyTyping && activeChatPartnerId) {
             isCurrentlyTyping = true;
             socket.emit('typing', { receiverId: activeChatPartnerId });
@@ -2987,6 +3010,7 @@ function updateTabBadges() {
 // Grup Sohbetini Aktifleştir
 async function selectGroupChat(group) {
     try {
+        clearMessageInput();
         activeChatPartner = null;
         activeChatPartnerId = null;
         activeChatGroupId = group.id;
