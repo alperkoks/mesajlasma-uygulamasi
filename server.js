@@ -3,6 +3,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const { Server } = require('socket.io'); // Socket.IO kütüphanesini dahil ettik
 const { initDatabase, dbQueries } = require('./database');
@@ -1683,16 +1684,33 @@ app.post('/api/push/unsubscribe', authenticateToken, async (req, res) => {
     }
 });
 
-// 7. TENOR GIF PROXY ROTASI (Tenor v2 API kullanır)
+// 7. HTTPS JSON GET YARDIMCISI (Eski Node sürümlerinde fetch hata vermesin diye)
+function httpsGetJson(url) {
+    return new Promise((resolve, reject) => {
+        https.get(url, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+                try {
+                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve(JSON.parse(data));
+                    } else {
+                        reject(new Error(`HTTPS isteği ${res.statusCode} ile başarısız oldu.`));
+                    }
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        }).on('error', reject);
+    });
+}
+
+// 7.1 TENOR GIF PROXY ROTASI (Tenor v2 API kullanır)
 app.get('/api/gifs/trending', async (req, res) => {
     try {
         const apiKey = process.env.TENOR_API_KEY || "LIVDSRZULELA";
         const url = `https://tenor.googleapis.com/v2/featured?key=${apiKey}&limit=15`;
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Tenor API error: ${response.statusText}`);
-        }
-        const data = await response.json();
+        const data = await httpsGetJson(url);
         const gifs = (data.results || []).map(item => {
             const media = item.media_formats || {};
             return {
@@ -1714,11 +1732,7 @@ app.get('/api/gifs/search', async (req, res) => {
     try {
         const apiKey = process.env.TENOR_API_KEY || "LIVDSRZULELA";
         const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${apiKey}&limit=15`;
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Tenor API error: ${response.statusText}`);
-        }
-        const data = await response.json();
+        const data = await httpsGetJson(url);
         const gifs = (data.results || []).map(item => {
             const media = item.media_formats || {};
             return {

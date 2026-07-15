@@ -78,6 +78,13 @@ const themeToggleBtn = document.getElementById('theme-toggle-btn');
 const fileInput = document.getElementById('file-input');
 const btnAttach = document.getElementById('btn-attach');
 const btnSend = document.getElementById('btn-send');
+const btnEmoji = document.getElementById('btn-emoji');
+const emojiPopover = document.getElementById('emoji-popover');
+const tabEmojis = document.getElementById('tab-emojis');
+const tabStickers = document.getElementById('tab-stickers');
+const btnEmojiPopoverClose = document.getElementById('btn-emoji-popover-close');
+const emojisGrid = document.getElementById('emojis-grid');
+const stickersGrid = document.getElementById('stickers-grid');
 
 
 function clearMessageInput() {
@@ -1048,6 +1055,7 @@ function checkChannelPostPermission() {
                 if (btnMic) btnMic.style.display = 'none';
                 const btnGif = document.getElementById('btn-gif');
                 if (btnGif) btnGif.style.display = 'none';
+                if (btnEmoji) btnEmoji.style.display = 'none';
                 return;
             }
         }
@@ -1060,6 +1068,7 @@ function checkChannelPostPermission() {
     if (btnMic) btnMic.style.display = 'flex';
     const btnGif = document.getElementById('btn-gif');
     if (btnGif) btnGif.style.display = 'flex';
+    if (btnEmoji) btnEmoji.style.display = 'flex';
 }
 
 // 3. TENOR GIF ENTEGRASYONU
@@ -1157,6 +1166,138 @@ async function sendGifMessage(url) {
         console.error('GIF gönderilemedi:', err);
     }
 }
+
+// 3.1 EMOJI & STICKER ENTEGRASYONU
+const emojiList = [
+    "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", 
+    "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", 
+    "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", 
+    "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", 
+    "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", 
+    "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", 
+    "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾",
+    "👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", 
+    "🖕", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", 
+    "💅", "🤳", "💪", "🦾", "🦿", "🦵", "🦶", "👂", "🦻", "👃", "🧠", "🫀", "🫁", "🦷", "🦴", "👀", 
+    "👁️", "👅", "👄", "💋", "🩸"
+];
+
+const stickerList = [
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3d0djhhdHFzN3g2cmx2Zm16OG5ubGkxejJ6dnAwa2FkMmdqenpjbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/13CoXDiaCcC2EA/giphy.gif",
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExYnQ1M3c5eTdtOHp1N2lqbGNjZHpqdjdpc24ydjF6aHZibGFvOHd4MSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/MDJ9IbhswvCfkGL7Go/giphy.gif",
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTBwdzUwbGZpY3ptOHJmYTVoMmR4dnpxaWVjZ2Y0NnFldXJzZWh6dyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/1d7F9xyq6j7C1wbIW1/giphy.gif",
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWp3dWlzbzh5ZmVhcHF1ODl4Y2w0ZzI1azV4cjEweXlrcXk1dWptMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/WYEWdb9F6n13W/giphy.gif",
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExcnF5aDFpcTFocHNuaDFtcmM5M29ubDZqbjNqbm8yMzd1aDk5aWlmNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/qscdhKw2oJGqiIJ1Kb/giphy.gif",
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExMGxpeDVsZHphYmszODRkNm41Nm43N2V5ZmN2azZtczkwZWhpcXl6OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/HHz0E2p3H8P4HhS7Ww/giphy.gif",
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWVmYXZoYmpyOHhveTVrc2c0dTRudmpyNW02NDc5cDF5YTA4cmk2YyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3ndAvMC5LFPNMCzq7m/giphy.gif",
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ3Nnb3A4Zm1xNTZ1bTZrdWZ1Yjh6ZTBpbmZ1NnpvYzJwbTRuNGM4biZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l2QDODC4jE8am08aA/giphy.gif",
+    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNXplZXRqazh6cTYwdjE5MTZrb3kybnk2NDk5d3NqZ3Yyb255cmZubyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/kegwX875t4j5bT263M/giphy.gif"
+];
+
+function populateEmojis() {
+    if (!emojisGrid) return;
+    emojisGrid.innerHTML = '';
+    emojiList.forEach(emoji => {
+        const span = document.createElement('span');
+        span.textContent = emoji;
+        span.style.padding = '0.2rem';
+        span.style.transition = 'transform 0.1s';
+        span.addEventListener('mouseover', () => span.style.transform = 'scale(1.2)');
+        span.addEventListener('mouseout', () => span.style.transform = 'scale(1)');
+        span.addEventListener('click', () => {
+            messageInput.value += emoji;
+            messageInput.dispatchEvent(new Event('input'));
+        });
+        emojisGrid.appendChild(span);
+    });
+}
+
+function populateStickers() {
+    if (!stickersGrid) return;
+    stickersGrid.innerHTML = '';
+    stickerList.forEach(url => {
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.width = '100%';
+        img.style.borderRadius = '8px';
+        img.style.cursor = 'pointer';
+        img.style.transition = 'transform 0.15s';
+        img.addEventListener('mouseover', () => img.style.transform = 'scale(1.05)');
+        img.addEventListener('mouseout', () => img.style.transform = 'scale(1)');
+        img.addEventListener('click', async () => {
+            emojiPopover.classList.add('hidden');
+            await sendStickerMessage(url);
+        });
+        stickersGrid.appendChild(img);
+    });
+}
+
+async function sendStickerMessage(stickerUrl) {
+    try {
+        const res = await apiCall('/messages', 'POST', {
+            receiverId: activeChatPartnerId,
+            groupId: activeChatGroupId,
+            messageType: 'image',
+            fileUrl: stickerUrl,
+            message: '🎨 Sticker'
+        });
+        messages.push(res);
+        await renderMessages();
+        socket.emit('send_message', res);
+    } catch (err) {
+        console.error('Sticker gönderilemedi:', err);
+    }
+}
+
+if (btnEmoji) {
+    btnEmoji.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiPopover.classList.toggle('hidden');
+        if (gifPopover) gifPopover.classList.add('hidden');
+        if (!emojiPopover.classList.contains('hidden')) {
+            populateEmojis();
+            populateStickers();
+        }
+    });
+}
+
+if (btnEmojiPopoverClose) {
+    btnEmojiPopoverClose.addEventListener('click', () => {
+        emojiPopover.classList.add('hidden');
+    });
+}
+
+if (tabEmojis) {
+    tabEmojis.addEventListener('click', () => {
+        tabEmojis.style.borderBottom = '2px solid var(--primary-color)';
+        tabEmojis.style.color = 'var(--text-main)';
+        tabStickers.style.borderBottom = 'none';
+        tabStickers.style.color = 'var(--text-muted)';
+        emojisGrid.classList.remove('hidden');
+        stickersGrid.classList.add('hidden');
+    });
+}
+
+if (tabStickers) {
+    tabStickers.addEventListener('click', () => {
+        tabStickers.style.borderBottom = '2px solid var(--primary-color)';
+        tabStickers.style.color = 'var(--text-main)';
+        tabEmojis.style.borderBottom = 'none';
+        tabEmojis.style.color = 'var(--text-muted)';
+        stickersGrid.classList.remove('hidden');
+        emojisGrid.classList.add('hidden');
+    });
+}
+
+// Tıklama dışı kapatma (Click-Away) dinleyicileri
+document.addEventListener('click', (e) => {
+    if (emojiPopover && !emojiPopover.contains(e.target) && e.target !== btnEmoji) {
+        emojiPopover.classList.add('hidden');
+    }
+    if (gifPopover && !gifPopover.contains(e.target) && e.target !== btnGif) {
+        gifPopover.classList.add('hidden');
+    }
+});
 
 // 4. SÜRELİ KENDİNİ SİLEN MESAJLAR
 let activeDisappearingDuration = 0;
