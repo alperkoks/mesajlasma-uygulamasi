@@ -342,6 +342,10 @@ logoutBtn.addEventListener('click', () => {
     activeChatPartner = null;
     activeChatPartnerId = null;
     
+    if (settingsModal) {
+        settingsModal.classList.add('hidden');
+    }
+    
     showScreen('auth');
 });
 
@@ -1560,6 +1564,58 @@ let callActive = false;
 let isVideoCallActive = false;
 let currentCallPartnerId = null;
 let incomingOfferSignal = null;
+let iceCandidatesQueue = [];
+
+let ringInterval = null;
+let audioCtx = null;
+
+function startRingtone() {
+    stopRingtone();
+    ringInterval = setInterval(() => {
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+            osc.frequency.linearRampToValueAtTime(480, audioCtx.currentTime + 0.1);
+            osc.frequency.linearRampToValueAtTime(440, audioCtx.currentTime + 0.2);
+            
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.2);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 1.2);
+        } catch (err) {
+            console.error('Zil sesi çalınamadı:', err);
+        }
+    }, 1500);
+}
+
+function stopRingtone() {
+    if (ringInterval) {
+        clearInterval(ringInterval);
+        ringInterval = null;
+    }
+}
+
+async function processQueuedIceCandidates() {
+    if (!peerConnection || !peerConnection.remoteDescription) return;
+    while (iceCandidatesQueue.length > 0) {
+        const candidate = iceCandidatesQueue.shift();
+        try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+            console.error('Kuyruktan ICE adayı eklenirken hata:', err);
+        }
+    }
+}
+
 
 const webrtcCallScreen = document.getElementById('webrtc-call-screen');
 const callPartnerAvatar = document.getElementById('call-partner-avatar');
@@ -1702,6 +1758,7 @@ if (btnAcceptCall) {
             initPeerConnection(currentCallPartnerId);
             
             await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOfferSignal));
+            processQueuedIceCandidates();
             
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
@@ -1765,6 +1822,7 @@ if (btnToggleVideo) {
 
 
 function endCallSession() {
+    stopRingtone();
     webrtcCallScreen.classList.add('hidden');
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
@@ -1777,6 +1835,7 @@ function endCallSession() {
     callActive = false;
     currentCallPartnerId = null;
     incomingOfferSignal = null;
+    iceCandidatesQueue = [];
     
     if (btnToggleMic) btnToggleMic.style.backgroundColor = 'rgba(255,255,255,0.15)';
     if (btnToggleVideo) btnToggleVideo.style.backgroundColor = 'rgba(255,255,255,0.15)';
@@ -2149,34 +2208,43 @@ async function initApp() {
             isVideoCallActive = isVideoCall;
             incomingOfferSignal = signalData;
             
+            // Zil sesini çal
+            startRingtone();
+            
             const callerUser = { username: fromUsername };
             showCallScreen(callerUser, isVideoCall, true);
         });
 
         socket.on('call_accepted', async ({ signalData }) => {
+            stopRingtone();
             callStatus.textContent = currentLanguage === 'tr' ? 'Görüşme' : 'Connected';
             callActive = true;
             if (peerConnection) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData));
+                processQueuedIceCandidates();
             }
         });
 
         socket.on('call_rejected', () => {
+            stopRingtone();
             alert(currentLanguage === 'tr' ? 'Arama reddedildi.' : 'Call rejected.');
             endCallSession();
         });
 
         socket.on('call_ended', () => {
+            stopRingtone();
             endCallSession();
         });
 
         socket.on('webrtc_ice_candidate', async ({ candidate }) => {
-            if (peerConnection) {
+            if (peerConnection && peerConnection.remoteDescription) {
                 try {
                     await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
                 } catch (err) {
                     console.error('ICE adayı eklenirken hata oluştu:', err);
                 }
+            } else {
+                iceCandidatesQueue.push(candidate);
             }
         });
         
