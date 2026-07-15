@@ -44,6 +44,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- AYARLAR SEKMELİ DÜZEN MANTIĞI ---
+    const initSettingsTabEvents = () => {
+        const tabButtons = document.querySelectorAll('.settings-sidebar-btn');
+        const tabContents = document.querySelectorAll('.tab-settings-content');
+        
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Aktif tab butonunu değiştir
+                tabButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // İçeriği değiştir
+                const targetTab = btn.getAttribute('data-tab');
+                tabContents.forEach(content => {
+                    if (content.id === `tab-content-${targetTab.replace('tab-', '')}`) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                });
+                
+                // Eğer Güvenlik sekmesi açıldıysa kimlik anahtarını yükle
+                if (targetTab === 'tab-security') {
+                    showSecurityKeyInSettings();
+                }
+            });
+        });
+    };
+
+    const showSecurityKeyInSettings = async () => {
+        if (!currentUser) return;
+        const encoder = new TextEncoder();
+        const data = encoder.encode(`AgChatUserPublicIdentitySeed_${currentUser.id}`);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        const formattedKey = hashHex.match(/.{1,4}/g).join('-');
+        
+        const keyTextarea = document.getElementById('settings-public-key');
+        if (keyTextarea) {
+            keyTextarea.value = `AG-DH256-${formattedKey}`;
+        }
+    };
+
+    // Sekme olaylarını başlat
+    initSettingsTabEvents();
+
     // Duvar kağıdı seçim butonlarını dinle
     document.querySelectorAll('.wp-select-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -570,6 +617,22 @@ openSettingsBtn.addEventListener('click', () => {
     
     // Duvar kağıdı aktif seçim butonunu görsel olarak işaretle
     applyWallpaper(currentWallpaper);
+
+    // Ayarlar sekmelerini varsayılana sıfırla (Profilim sekmesi)
+    document.querySelectorAll('.settings-sidebar-btn').forEach(btn => {
+        if (btn.getAttribute('data-tab') === 'tab-profile') {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+    document.querySelectorAll('.tab-settings-content').forEach(content => {
+        if (content.id === 'tab-content-profile') {
+            content.classList.remove('hidden');
+        } else {
+            content.classList.add('hidden');
+        }
+    });
 
     settingsModal.classList.remove('hidden');
 });
@@ -1780,13 +1843,27 @@ if (btnMic) {
 
 function playVoice(url, btnElement, progressElement, durationElement) {
     let audio = btnElement._audio;
+    const isSent = btnElement.closest('.message-row').classList.contains('sent');
+    const playColor = isSent ? 'white' : 'var(--primary-color)';
+    const playedColor = isSent ? '#ffffff' : 'var(--primary-color)';
+    const unplayedColor = isSent ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.15)';
+
     if (!audio) {
         audio = new Audio(url);
         btnElement._audio = audio;
         
         audio.addEventListener('timeupdate', () => {
-            const percent = (audio.currentTime / audio.duration) * 100;
-            progressElement.style.width = `${percent}%`;
+            const barCount = progressElement.children.length;
+            const playedBars = Math.floor((audio.currentTime / audio.duration) * barCount);
+            
+            for (let i = 0; i < barCount; i++) {
+                const bar = progressElement.children[i];
+                if (i < playedBars) {
+                    bar.style.backgroundColor = playedColor;
+                } else {
+                    bar.style.backgroundColor = unplayedColor;
+                }
+            }
             
             const formatTime = (secs) => {
                 if (isNaN(secs)) return '0:00';
@@ -1798,17 +1875,19 @@ function playVoice(url, btnElement, progressElement, durationElement) {
         });
         
         audio.addEventListener('ended', () => {
-            btnElement.textContent = '▶️';
-            progressElement.style.width = '0%';
+            btnElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: ${playColor};"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+            for (let i = 0; i < progressElement.children.length; i++) {
+                progressElement.children[i].style.backgroundColor = unplayedColor;
+            }
         });
     }
     
     if (audio.paused) {
         audio.play();
-        btnElement.textContent = '⏸️';
+        btnElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: ${playColor};"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
     } else {
         audio.pause();
-        btnElement.textContent = '▶️';
+        btnElement.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: ${playColor};"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
     }
 }
 
@@ -3359,13 +3438,27 @@ async function renderMessages() {
             msgContentHTML = `<a href="${msg.file_url}" download="${escapeHTML(displayText)}" style="color:inherit; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; word-break:break-all;">📁 ${escapeHTML(displayText)}</a>`;
         } else if (msg.message_type === 'voice') {
             const uniqueId = `voice_${msg.id}`;
+            const isSent = msg.sender_id === currentUser.id;
+            const playColor = isSent ? 'white' : 'var(--primary-color)';
+            
+            // Deterministik ses dalga formu çubukları oluştur
+            let waveformBars = '';
+            const barCount = 28;
+            for (let i = 0; i < barCount; i++) {
+                const height = 6 + ((msg.id * (i + 1) * 7) % 16); // heights 6px to 22px
+                const barColor = isSent ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.15)';
+                waveformBars += `<div class="waveform-bar" style="height: ${height}px; width: 2px; background-color: ${barColor}; border-radius: 1px; transition: background-color 0.1s;"></div>`;
+            }
+            
             msgContentHTML = `
-                <div class="voice-player">
-                    <button type="button" class="voice-play-btn" id="btn-play-${uniqueId}">▶️</button>
-                    <div class="voice-progress-container" id="progress-container-${uniqueId}">
-                        <div class="voice-progress-bar" id="progress-bar-${uniqueId}"></div>
+                <div class="voice-player-premium">
+                    <button type="button" class="voice-play-btn-premium" id="btn-play-${uniqueId}" style="display:flex; align-items:center; justify-content:center;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: ${playColor};"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    </button>
+                    <div class="voice-waveform-container" id="waveform-${uniqueId}">
+                        ${waveformBars}
                     </div>
-                    <span class="voice-duration" id="duration-${uniqueId}">0:00</span>
+                    <span class="voice-duration-premium" id="duration-${uniqueId}">0:00</span>
                 </div>
             `;
         } else {
@@ -3403,14 +3496,18 @@ async function renderMessages() {
                 const top4 = list.slice(0, 4);
                 
                 if (top4.length > 0) {
-                    reactionsHTML = '<div class="message-reactions-row" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; margin-bottom: 2px;">';
+                    const isSent = msg.sender_id === currentUser.id;
+                    const reactionsAlignStyle = isSent ? 'right: 12px;' : 'left: 12px;';
+                    reactionsHTML = `<div class="message-reactions-row" style="position: absolute; bottom: -12px; ${reactionsAlignStyle} display: flex; gap: 4px; z-index: 15;">`;
                     top4.forEach(item => {
                         const isMyReaction = item.users.includes(currentUser.username);
-                        const activeStyle = isMyReaction ? 'border: 1px solid var(--primary-color); background-color: var(--primary-light); color: var(--primary-color);' : 'border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main);';
+                        const activeStyle = isMyReaction 
+                            ? 'border: 1.5px solid var(--primary-color); background-color: var(--primary-light); color: var(--primary-color); box-shadow: 0 2px 5px rgba(99,102,241,0.2);' 
+                            : 'border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main); box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
                         reactionsHTML += `
-                            <span class="reaction-pill" data-emoji="${item.emoji}" data-msg-id="${msg.id}" style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.8rem; padding: 4px 6px; border-radius: 8px; cursor: pointer; user-select: none; line-height: 1; ${activeStyle}" title="${item.users.join(', ')}">
+                            <span class="reaction-pill" data-emoji="${item.emoji}" data-msg-id="${msg.id}" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; padding: 2px 6px; border-radius: 12px; cursor: pointer; user-select: none; line-height: 1; ${activeStyle} transition: all 0.15s ease;" title="${item.users.join(', ')}">
                                 <span>${item.emoji}</span>
-                                <span style="font-size: 0.6rem; font-weight: 600; margin-top: 2px;">${item.count}</span>
+                                <span style="font-size: 0.65rem; font-weight: 700;">${item.count}</span>
                             </span>
                         `;
                     });
@@ -3465,11 +3562,11 @@ async function renderMessages() {
         if (msg.message_type === 'voice') {
             const uniqueId = `voice_${msg.id}`;
             const playBtn = document.getElementById(`btn-play-${uniqueId}`);
-            const progress = document.getElementById(`progress-bar-${uniqueId}`);
+            const waveform = document.getElementById(`waveform-${uniqueId}`);
             const duration = document.getElementById(`duration-${uniqueId}`);
-            if (playBtn && progress && duration) {
+            if (playBtn && waveform && duration) {
                 playBtn.addEventListener('click', () => {
-                    playVoice(msg.file_url, playBtn, progress, duration);
+                    playVoice(msg.file_url, playBtn, waveform, duration);
                 });
             }
         }

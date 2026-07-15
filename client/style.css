@@ -1375,3 +1375,87 @@ body.dark-theme .voice-progress-container {
     transform: scale(1.02);
     transition: all 0.2s ease;
 }
+
+/* SEKMELİ AYARLAR DÜZENİ */
+.settings-sidebar-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.6rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    width: 100%;
+}
+.settings-sidebar-btn:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-main);
+}
+body.dark-theme .settings-sidebar-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+.settings-sidebar-btn.active {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+}
+
+/* TELEGRAM TARZI SES YAYINI (WAVEFORM) */
+.voice-player-premium {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 6px;
+    border-radius: 12px;
+    user-select: none;
+}
+.voice-play-btn-premium {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.2);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, transform 0.1s;
+    outline: none;
+}
+.voice-play-btn-premium:active {
+    transform: scale(0.92);
+}
+.voice-play-btn-premium:hover {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+.message-row.received .voice-play-btn-premium {
+    background-color: rgba(99, 102, 241, 0.15);
+}
+.message-row.received .voice-play-btn-premium:hover {
+    background-color: rgba(99, 102, 241, 0.25);
+}
+.voice-waveform-container {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 26px;
+    cursor: pointer;
+}
+.waveform-bar {
+    align-self: center;
+}
+.voice-duration-premium {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    min-width: 32px;
+    text-align: right;
+}
+.message-row.received .voice-duration-premium {
+    color: var(--text-muted);
+}

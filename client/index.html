@@ -330,97 +330,135 @@
 
     <!-- 3. EKRAN: PROFİL AYARLARI MODALI (Varsayılan olarak gizli) -->
     <div id="settings-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Profil Ayarları</h3>
-                <span id="close-settings" class="close-btn" title="Kapat">&times;</span>
+        <div class="modal-content" style="max-width: 680px; height: 520px; display: flex; flex-direction: column;">
+            <div class="modal-header" style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color);">
+                <h3 id="settings-modal-title" style="margin: 0; font-size: 1.2rem; font-weight: 700;">Ayarlar</h3>
+                <span id="close-settings" class="close-btn" title="Kapat" style="font-size: 1.5rem; cursor: pointer;">&times;</span>
             </div>
-            <div class="modal-body">
-                <!-- Profil Resmi Yükleme Bölümü -->
-                <div class="profile-pic-settings">
-                    <div class="avatar" id="settings-avatar-preview" style="width: 80px; height: 80px; font-size: 2rem; margin: 0 auto 1rem;">U</div>
-                    <div style="text-align: center; margin-bottom: 1.5rem;">
-                        <input type="file" id="settings-file-input" accept="image/*" class="hidden">
-                        <button type="button" id="btn-select-photo" class="btn btn-small" style="background-color: var(--primary-color); color: white;">Görsel Seç</button>
-                        <button type="button" id="btn-upload-photo" class="btn btn-small btn-accept hidden">Fotoğrafı Yükle</button>
-                    </div>
+            <div class="settings-layout" style="display: flex; flex: 1; overflow: hidden;">
+                <!-- Sol Sidebar Menü -->
+                <div class="settings-sidebar" style="width: 180px; background: rgba(0,0,0,0.02); border-right: 1px solid var(--border-color); padding: 1rem 0.5rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                    <button type="button" class="settings-sidebar-btn active" data-tab="tab-profile">👤 Profilim</button>
+                    <button type="button" class="settings-sidebar-btn" data-tab="tab-appearance">🎨 Görünüm</button>
+                    <button type="button" class="settings-sidebar-btn" data-tab="tab-notifications">🔔 Bildirim & Ses</button>
+                    <button type="button" class="settings-sidebar-btn" data-tab="tab-security">🔒 Güvenlik & E2EE</button>
                 </div>
+                
+                <!-- Sağ İçerik Alanı -->
+                <div class="settings-content-area" style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column;">
+                    <form id="settings-form" style="display: flex; flex-direction: column; height: 100%; gap: 1rem; margin: 0;">
+                        
+                        <!-- TAB: PROFİLİM -->
+                        <div id="tab-content-profile" class="tab-settings-content">
+                            <!-- Profil Resmi Yükleme Bölümü -->
+                            <div class="profile-pic-settings" style="text-align: center; margin-bottom: 1.25rem;">
+                                <div class="avatar" id="settings-avatar-preview" style="width: 80px; height: 80px; font-size: 2rem; margin: 0 auto 0.75rem; border: 3px solid rgba(255,255,255,0.2); box-shadow: var(--shadow-md);">U</div>
+                                <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.5rem;">
+                                    <input type="file" id="settings-file-input" accept="image/*" class="hidden">
+                                    <button type="button" id="btn-select-photo" class="btn btn-small" style="background-color: var(--primary-color); color: white; width: auto; padding: 0.4rem 1rem; font-size: 0.8rem;">Görsel Seç</button>
+                                    <button type="button" id="btn-upload-photo" class="btn btn-small btn-accept hidden" style="width: auto; padding: 0.4rem 1rem; font-size: 0.8rem;">Yükle</button>
+                                </div>
+                            </div>
+                            
+                            <div class="input-group" style="margin-bottom: 0.75rem;">
+                                <label for="settings-username" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Kullanıcı Adı</label>
+                                <input type="text" id="settings-username" required autocomplete="off" placeholder="Yeni kullanıcı adı" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main); outline: none;">
+                            </div>
 
-                <form id="settings-form">
-                    <div class="input-group">
-                        <label for="settings-username">Kullanıcı Adı</label>
-                        <input type="text" id="settings-username" required autocomplete="off" placeholder="Yeni kullanıcı adı">
-                    </div>
-
-                    <div class="input-group">
-                        <label for="settings-bio">Biyografi (Hakkımda)</label>
-                        <input type="text" id="settings-bio" maxlength="150" placeholder="Kendinizden bahsedin...">
-                    </div>
-
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem;">
-                        <input type="checkbox" id="settings-show-last-seen" style="width: 16px; height: 16px; cursor: pointer; margin: 0; accent-color: var(--primary-color);">
-                        <label for="settings-show-last-seen" style="margin: 0; cursor: pointer; font-size: 0.85rem; color: var(--text-main); font-weight: 500; user-select: none;">Son görülme zamanımı başkalarıyla paylaş</label>
-                    </div>
-
-                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.25rem;">
-                        <input type="checkbox" id="settings-show-online" style="width: 16px; height: 16px; cursor: pointer; margin: 0; accent-color: var(--primary-color);">
-                        <label for="settings-show-online" style="margin: 0; cursor: pointer; font-size: 0.85rem; color: var(--text-main); font-weight: 500; user-select: none;">Çevrimiçi olduğumu başkalarıyla paylaş</label>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="settings-lang">Dil / Language</label>
-                        <select id="settings-lang" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main); font-weight: 500; font-size: 0.9rem; outline: none; margin-bottom: 0.5rem; cursor: pointer; accent-color: var(--primary-color);">
-                            <option value="tr">Türkçe</option>
-                            <option value="en">English</option>
-                        </select>
-                    </div>
-
-                    <!-- Arayüz Teması Seçeneği -->
-                    <div class="input-group" style="margin-bottom: 1.25rem;">
-                        <label>Arayüz Teması / Theme</label>
-                        <button type="button" id="theme-toggle-btn" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background-color: var(--border-color); color: var(--text-main); font-weight: 600; padding: 0.6rem; cursor: pointer; border: none; border-radius: 8px;">🌙 <span>Karanlık Mod</span></button>
-                    </div>
-
-                    <!-- Sohbet Arka Planı Seçeneği -->
-                    <div class="input-group" style="margin-bottom: 1.25rem;">
-                        <label>Sohbet Arka Planı / Wallpaper</label>
-                        <div style="display: flex; gap: 0.25rem; margin-top: 0.5rem; justify-content: space-between;">
-                            <button type="button" class="btn wp-select-btn" data-wp="wp-default" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: var(--bg-light); color: var(--text-main); border-radius: 6px; flex: 1;">Klasik</button>
-                            <button type="button" class="btn wp-select-btn" data-wp="wp-neon" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border-radius: 6px; flex: 1;">Neon</button>
-                            <button type="button" class="btn wp-select-btn" data-wp="wp-sunset" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #f43f5e, #f59e0b); color: white; border-radius: 6px; flex: 1;">Gün Batımı</button>
-                            <button type="button" class="btn wp-select-btn" data-wp="wp-emerald" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #10b981, #06b6d4); color: white; border-radius: 6px; flex: 1;">Zümrüt</button>
-                            <button type="button" class="btn wp-select-btn" data-wp="wp-abstract" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #ec4899); color: white; border-radius: 6px; flex: 1;">Soyut</button>
+                            <div class="input-group">
+                                <label for="settings-bio" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Biyografi (Hakkımda)</label>
+                                <input type="text" id="settings-bio" maxlength="150" placeholder="Kendinizden bahsedin..." style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main); outline: none;">
+                            </div>
                         </div>
-                    </div>
+                        
+                        <!-- TAB: GÖRÜNÜM -->
+                        <div id="tab-content-appearance" class="tab-settings-content hidden">
+                            <!-- Dil Seçeneği -->
+                            <div class="input-group" style="margin-bottom: 0.75rem;">
+                                <label for="settings-lang" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Dil / Language</label>
+                                <select id="settings-lang" style="width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main); font-weight: 500; font-size: 0.85rem; outline: none; cursor: pointer;">
+                                    <option value="tr">Türkçe</option>
+                                    <option value="en">English</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Arayüz Teması Seçeneği -->
+                            <div class="input-group" style="margin-bottom: 0.75rem;">
+                                <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Arayüz Teması / Theme</label>
+                                <button type="button" id="theme-toggle-btn" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background-color: var(--border-color); color: var(--text-main); font-weight: 600; padding: 0.5rem; cursor: pointer; border: none; border-radius: 8px; font-size: 0.85rem;">🌙 <span>Karanlık Mod</span></button>
+                            </div>
 
-                    <!-- Bildirim ve Uygulama Yükleme Butonları -->
-                    <div id="settings-actions-container" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
-                        <button type="button" id="btn-request-notifications" class="btn btn-small hidden" style="width: 100%; background-color: #f59e0b; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 600; padding: 0.6rem; border: none; border-radius: 8px; cursor: pointer; animation: pulse 2s infinite;">🔔 Bildirimleri Etkinleştir</button>
-                        <button type="button" id="btn-install-app" class="btn btn-small hidden" style="width: 100%; background-color: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 600; padding: 0.6rem; border: none; border-radius: 8px; cursor: pointer;">📲 Uygulamayı Yükle</button>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="settings-volume">Uygulama İçi Ses Seviyesi (<span id="settings-volume-value">100%</span>)</label>
-                        <div style="display: flex; align-items: center; gap: 0.75rem;">
-                            <span>🔈</span>
-                            <input type="range" id="settings-volume" min="0" max="1" step="0.05" value="1" style="flex: 1; accent-color: var(--primary-color); height: 8px;">
-                            <span>🔊</span>
+                            <!-- Sohbet Arka Planı Seçeneği -->
+                            <div class="input-group">
+                                <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Sohbet Arka Planı / Wallpaper</label>
+                                <div style="display: flex; gap: 0.25rem; margin-top: 0.5rem; justify-content: space-between;">
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-default" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: var(--bg-light); color: var(--text-main); border-radius: 6px; flex: 1;">Klasik</button>
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-neon" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border-radius: 6px; flex: 1;">Neon</button>
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-sunset" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #f43f5e, #f59e0b); color: white; border-radius: 6px; flex: 1;">Gün Batımı</button>
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-emerald" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #10b981, #06b6d4); color: white; border-radius: 6px; flex: 1;">Zümrüt</button>
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-abstract" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #ec4899); color: white; border-radius: 6px; flex: 1;">Soyut</button>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">Değişiklikleri Kaydet</button>
+                        
+                        <!-- TAB: BİLDİRİM & SES -->
+                        <div id="tab-content-notifications" class="tab-settings-content hidden">
+                            <!-- Gizlilik Seçenekleri (Sohbet Akışı) -->
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                                <input type="checkbox" id="settings-show-last-seen" style="width: 16px; height: 16px; cursor: pointer; margin: 0; accent-color: var(--primary-color);">
+                                <label for="settings-show-last-seen" style="margin: 0; cursor: pointer; font-size: 0.85rem; color: var(--text-main); font-weight: 500; user-select: none;">Son görülme zamanımı paylaş</label>
+                            </div>
 
-                    <!-- Çıkış Yap Butonu -->
-                    <div style="border-top: 1px solid var(--border-color); margin-top: 1.5rem; padding-top: 1rem;">
-                        <button type="button" id="logout-btn" class="btn btn-action-danger" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 8px; font-weight: 600;">
-                            <svg style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;" viewBox="0 0 24 24">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                <polyline points="16 17 21 12 16 7"></polyline>
-                                <line x1="21" y1="12" x2="9" y2="12"></line>
-                            </svg>
-                            <span id="lbl-logout">Çıkış Yap</span>
-                        </button>
-                    </div>
-                </form>
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                                <input type="checkbox" id="settings-show-online" style="width: 16px; height: 16px; cursor: pointer; margin: 0; accent-color: var(--primary-color);">
+                                <label for="settings-show-online" style="margin: 0; cursor: pointer; font-size: 0.85rem; color: var(--text-main); font-weight: 500; user-select: none;">Çevrimiçi olduğumu paylaş</label>
+                            </div>
+
+                            <div class="input-group" style="margin-bottom: 0.75rem;">
+                                <label for="settings-volume" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Uygulama Ses Seviyesi (<span id="settings-volume-value">100%</span>)</label>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <span>🔈</span>
+                                    <input type="range" id="settings-volume" min="0" max="1" step="0.05" value="1" style="flex: 1; accent-color: var(--primary-color); height: 8px;">
+                                    <span>🔊</span>
+                                </div>
+                            </div>
+
+                            <!-- Bildirim ve Yükleme Butonları -->
+                            <div id="settings-actions-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem;">
+                                <button type="button" id="btn-request-notifications" class="btn btn-small hidden" style="width: 100%; background-color: #f59e0b; color: white; font-weight: 600; padding: 0.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.8rem;">🔔 Bildirimleri Etkinleştir</button>
+                                <button type="button" id="btn-install-app" class="btn btn-small hidden" style="width: 100%; background-color: var(--primary-color); color: white; font-weight: 600; padding: 0.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.8rem;">📲 Uygulamayı Yükle</button>
+                            </div>
+                        </div>
+                        
+                        <!-- TAB: GÜVENLİK & E2EE -->
+                        <div id="tab-content-security" class="tab-settings-content hidden">
+                            <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;">
+                                <h4 style="color:#059669; margin: 0 0 0.25rem 0; font-size: 0.9rem;">Uçtan Uca Şifreleme (E2EE)</h4>
+                                <p style="font-size:0.75rem; line-height:1.4; color:var(--text-muted); margin:0;">
+                                    Bu uygulama, sohbetlerinizin güvenliğini sağlamak için Diffie-Hellman anahtar değişimi ve AES-GCM şifreleme algoritmalarını kullanır. Mesajlarınız daha cihazınızdan çıkmadan şifrelenir.
+                                </p>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Ortak Kimlik Anahtarınız (Public Key)</label>
+                                <textarea id="settings-public-key" readonly style="width: 100%; height: 90px; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.03); color: var(--text-muted); font-family: monospace; font-size: 0.72rem; resize: none; outline: none; border-color: var(--border-color);"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Alt Butonlar -->
+                        <div style="margin-top: auto; display: flex; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                            <button type="submit" class="btn btn-primary" style="flex: 2; padding: 0.6rem; font-size: 0.85rem;">Değişiklikleri Kaydet</button>
+                            <button type="button" id="logout-btn" class="btn btn-action-danger" style="flex: 1; padding: 0.6rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; font-size: 0.85rem;">
+                                <svg style="width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;" viewBox="0 0 24 24">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                    <polyline points="16 17 21 12 16 7"></polyline>
+                                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                                </svg>
+                                <span id="lbl-logout">Çıkış</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
