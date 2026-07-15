@@ -1185,6 +1185,7 @@ function urlBase64ToUint8Array(base64String) {
 // 1. ÇOKLU DİL (i18n) SÖZLÜĞÜ VE YERELLEŞTİRME
 const i18n = {
     tr: {
+        document_title: "Hızlı Mesajlaşma",
         settings_title: "Profil Ayarları",
         settings_username: "Kullanıcı Adı",
         settings_bio: "Biyografi (Hakkımda)",
@@ -1193,6 +1194,15 @@ const i18n = {
         settings_lang: "Dil / Language",
         settings_volume: "Uygulama İçi Ses Seviyesi",
         settings_save: "Değişiklikleri Kaydet",
+        settings_tab_profile: "👤 Profilim",
+        settings_tab_appearance: "🎨 Görünüm",
+        settings_tab_notifications: "🔔 Bildirim & Ses",
+        settings_tab_security: "🔒 Güvenlik & E2EE",
+        banner_label: "Profil Kapağı / Banner",
+        btn_select_banner: "Özel Banner Yükle (Dosya Seç)",
+        btn_select_avatar: "Görsel Seç",
+        welcome_title: "Sohbete Başla!",
+        welcome_desc: "Mesajlaşmak için sol taraftaki menüden bir kullanıcı seçin.",
         group_create_title: "Yeni Grup Oluştur",
         group_create_name: "Grup Adı",
         group_create_friends: "Gruba Eklenecek Arkadaşlar",
@@ -1212,9 +1222,45 @@ const i18n = {
         theme_dark: "Karanlık Mod",
         theme_light: "Aydınlık Mod",
         btn_enable_notifications: "🔔 Bildirimleri Etkinleştir",
-        btn_install_app: "📲 Uygulamayı Yükle"
+        btn_install_app: "📲 Uygulamayı Yükle",
+        tab_friends: "Arkadaşlar",
+        tab_groups: "Gruplar",
+        tab_calls: "Aramalar",
+        friend_search_placeholder: "Kullanıcı adı ara...",
+        friend_search_title: "Arkadaş Ara",
+        no_friends_placeholder: "Henüz arkadaş eklemediniz.",
+        search_in_chat: "Mesajlarda Ara",
+        clear_chat: "Sohbeti Temizle",
+        unfriend: "Arkadaştan Çıkar",
+        block: "Engelle",
+        search_messages_placeholder: "Mesajlarda ara...",
+        wp_classic: "Klasik",
+        wp_neon: "Neon",
+        wp_sunset: "Gün Batımı",
+        wp_emerald: "Zümrüt",
+        wp_abstract: "Soyut",
+        banner_indigo: "İndigo",
+        banner_sunset: "Sunset",
+        banner_emerald: "Zümrüt",
+        banner_neon: "Neon",
+        security_key_label: "E2EE Kimlik Anahtarınız (Genel Anahtar)",
+        security_key_desc: "Bu sizin uçtan uca şifreleme için kullanılan benzersiz kimlik anahtarınızdır. Sohbet ortaklarınız bu anahtar vasıtasıyla sizinle şifreli haberleşir.",
+        close: "Kapat",
+        auth_welcome: "Hoş Geldiniz",
+        auth_desc: "Mesajlaşmaya başlamak için giriş yapın veya kayıt olun.",
+        login_title: "Giriş Yap",
+        login_password: "Şifre",
+        login_btn: "Giriş Yap",
+        login_forgot: "Şifremi Unuttum",
+        register_title: "Kayıt Ol",
+        register_btn: "Kayıt Ol",
+        email_label: "E-posta Adresi",
+        forgot_title: "Şifre Sıfırlama",
+        forgot_submit: "Sıfırlama Linki Gönder",
+        forgot_back_to_login: "Giriş Yap Ekranına Dön"
     },
     en: {
+        document_title: "Instant Messenger",
         settings_title: "Profile Settings",
         settings_username: "Username",
         settings_bio: "Biography (About Me)",
@@ -1223,6 +1269,15 @@ const i18n = {
         settings_lang: "Language / Dil",
         settings_volume: "In-App Audio Volume",
         settings_save: "Save Changes",
+        settings_tab_profile: "👤 Profile",
+        settings_tab_appearance: "🎨 Appearance",
+        settings_tab_notifications: "🔔 Notifications",
+        settings_tab_security: "🔒 Security & E2EE",
+        banner_label: "Profile Banner",
+        btn_select_banner: "Upload Custom Banner (Choose File)",
+        btn_select_avatar: "Choose Avatar",
+        welcome_title: "Start Chatting!",
+        welcome_desc: "Select a user from the left menu to start messaging.",
         group_create_title: "Create New Group",
         group_create_name: "Group Name",
         group_create_friends: "Friends to Add to Group",
@@ -1242,7 +1297,42 @@ const i18n = {
         theme_dark: "Dark Mode",
         theme_light: "Light Mode",
         btn_enable_notifications: "🔔 Enable Notifications",
-        btn_install_app: "📲 Install App"
+        btn_install_app: "📲 Install App",
+        tab_friends: "Friends",
+        tab_groups: "Groups",
+        tab_calls: "Calls",
+        friend_search_placeholder: "Search username...",
+        friend_search_title: "Search Friend",
+        no_friends_placeholder: "No friends added yet.",
+        search_in_chat: "Search Messages",
+        clear_chat: "Clear Chat",
+        unfriend: "Unfriend",
+        block: "Block",
+        search_messages_placeholder: "Search messages...",
+        wp_classic: "Classic",
+        wp_neon: "Neon",
+        wp_sunset: "Sunset",
+        wp_emerald: "Emerald",
+        wp_abstract: "Abstract",
+        banner_indigo: "Indigo",
+        banner_sunset: "Sunset",
+        banner_emerald: "Emerald",
+        banner_neon: "Neon",
+        security_key_label: "Your E2EE Identity Key (Public Key)",
+        security_key_desc: "This is your unique identity seed key used for end-to-end encryption. Your chat partners use this key to communicate securely with you.",
+        close: "Close",
+        auth_welcome: "Welcome",
+        auth_desc: "Sign in or sign up to start messaging.",
+        login_title: "Sign In",
+        login_password: "Password",
+        login_btn: "Sign In",
+        login_forgot: "Forgot Password",
+        register_title: "Sign Up",
+        register_btn: "Sign Up",
+        email_label: "Email Address",
+        forgot_title: "Password Reset",
+        forgot_submit: "Send Reset Link",
+        forgot_back_to_login: "Back to Login"
     }
 };
 
@@ -1250,20 +1340,32 @@ let currentLanguage = 'tr';
 
 function translatePage() {
     const langData = i18n[currentLanguage];
-    
-    const updateText = (id, key) => {
-        const el = document.getElementById(id);
-        if (el && langData[key]) el.textContent = langData[key];
-    };
+    if (!langData) return;
 
-    const settingsHeader = document.querySelector('#settings-modal h3');
+    // Document Title
+    document.title = langData.document_title;
+
+    // Settings Modal
+    const settingsHeader = document.querySelector('#settings-modal-title');
     if (settingsHeader) settingsHeader.textContent = langData.settings_title;
     
+    const closeSettings = document.getElementById('close-settings');
+    if (closeSettings) closeSettings.title = langData.close;
+
     const lblUser = document.querySelector('label[for="settings-username"]');
     if (lblUser) lblUser.textContent = langData.settings_username;
     
     const lblBio = document.querySelector('label[for="settings-bio"]');
     if (lblBio) lblBio.textContent = langData.settings_bio;
+
+    const bannerLabel = document.querySelector('#tab-content-profile .input-group:nth-child(2) label');
+    if (bannerLabel) bannerLabel.textContent = langData.banner_label;
+
+    const btnSelectBannerPhoto = document.getElementById('btn-select-banner-photo');
+    if (btnSelectBannerPhoto) btnSelectBannerPhoto.textContent = langData.btn_select_banner;
+
+    const btnSelectPhoto = document.getElementById('btn-select-photo');
+    if (btnSelectPhoto) btnSelectPhoto.textContent = langData.btn_select_avatar;
     
     const lblLastSeen = document.querySelector('label[for="settings-show-last-seen"]');
     if (lblLastSeen) lblLastSeen.textContent = langData.settings_show_last_seen;
@@ -1273,36 +1375,128 @@ function translatePage() {
     
     const lblLang = document.querySelector('label[for="settings-lang"]');
     if (lblLang) lblLang.textContent = langData.settings_lang;
+
+    const lblVolume = document.querySelector('label[for="settings-volume"]');
+    if (lblVolume) lblVolume.textContent = langData.settings_volume;
     
     const btnSave = document.querySelector('#settings-form button[type="submit"]');
-    if (btnSave) btnSave.textContent = langData.settings_save;
+    if (btnSave) {
+        if (!btnSave.disabled) {
+            btnSave.textContent = langData.settings_save;
+        }
+    }
 
+    // Settings Sidebar Buttons
+    const sidebarProfileBtn = document.querySelector('.settings-sidebar-btn[data-tab="tab-profile"]');
+    if (sidebarProfileBtn) sidebarProfileBtn.textContent = langData.settings_tab_profile;
+    const sidebarAppearanceBtn = document.querySelector('.settings-sidebar-btn[data-tab="tab-appearance"]');
+    if (sidebarAppearanceBtn) sidebarAppearanceBtn.textContent = langData.settings_tab_appearance;
+    const sidebarNotificationsBtn = document.querySelector('.settings-sidebar-btn[data-tab="tab-notifications"]');
+    if (sidebarNotificationsBtn) sidebarNotificationsBtn.textContent = langData.settings_tab_notifications;
+    const sidebarSecurityBtn = document.querySelector('.settings-sidebar-btn[data-tab="tab-security"]');
+    if (sidebarSecurityBtn) sidebarSecurityBtn.textContent = langData.settings_tab_security;
+
+    // Welcome Screen
+    const welcomeTitle = document.querySelector('#no-chat-selected h3');
+    if (welcomeTitle) welcomeTitle.textContent = langData.welcome_title;
+    const welcomeDesc = document.querySelector('#no-chat-selected p');
+    if (welcomeDesc) welcomeDesc.textContent = langData.welcome_desc;
+
+    // Sidebar navigation tabs
+    const tabFriends = document.querySelector('#tab-friends span');
+    if (tabFriends) tabFriends.textContent = langData.tab_friends;
+    const tabGroups = document.querySelector('#tab-groups span');
+    if (tabGroups) tabGroups.textContent = langData.tab_groups;
+    const tabCalls = document.querySelector('#tab-calls span');
+    if (tabCalls) tabCalls.textContent = langData.tab_calls;
+
+    // Placeholders
+    const friendsPlaceholder = document.querySelector('#users-list .placeholder');
+    if (friendsPlaceholder) friendsPlaceholder.textContent = langData.no_friends_placeholder;
+
+    const searchInput = document.getElementById('friend-search-input');
+    if (searchInput) searchInput.placeholder = langData.friend_search_placeholder;
+    const searchBtn = document.querySelector('#friend-search-form button');
+    if (searchBtn) searchBtn.title = langData.friend_search_title;
+
+    const openSettingsBtn = document.getElementById('open-settings-btn');
+    if (openSettingsBtn) openSettingsBtn.title = langData.settings_title;
+
+    // Option Dropdowns
+    const groupSettingsBtnSpan = document.querySelector('#btn-group-settings span');
+    if (groupSettingsBtnSpan) groupSettingsBtnSpan.textContent = langData.group_create_title;
+    const disappearingSpan = document.querySelector('#btn-disappearing-messages span');
+    if (disappearingSpan) disappearingSpan.textContent = langData.disappearing_messages;
+    const searchMessagesSpan = document.querySelector('#btn-toggle-search span');
+    if (searchMessagesSpan) searchMessagesSpan.textContent = langData.search_in_chat;
+    const clearChatSpan = document.querySelector('#btn-clear-chat span');
+    if (clearChatSpan) clearChatSpan.textContent = langData.clear_chat;
+    const unfriendSpan = document.querySelector('#btn-unfriend span');
+    if (unfriendSpan) unfriendSpan.textContent = langData.unfriend;
+    const blockSpan = document.querySelector('#btn-block span');
+    if (blockSpan) blockSpan.textContent = langData.block;
+
+    // Search bar
+    const chatSearchInput = document.getElementById('chat-search-input');
+    if (chatSearchInput) chatSearchInput.placeholder = langData.search_messages_placeholder;
+
+    // Group Create Modal
     const groupHeader = document.querySelector('#group-create-modal h3');
     if (groupHeader) groupHeader.textContent = langData.group_create_title;
-    
     const lblGroupName = document.querySelector('label[for="group-name-input"]');
     if (lblGroupName) lblGroupName.textContent = langData.group_create_name;
-    
     const lblChannel = document.querySelector('label[for="group-is-channel"]');
     if (lblChannel) lblChannel.textContent = langData.group_is_channel;
-    
     const btnCreateGroup = document.querySelector('#group-create-modal button[type="submit"]');
     if (btnCreateGroup) btnCreateGroup.textContent = langData.group_create_submit;
 
-    const spanDis = document.querySelector('#btn-disappearing-messages span');
-    if (spanDis) spanDis.textContent = langData.disappearing_messages;
+    // E2EE
+    const e2eeStatusText = document.getElementById('e2ee-status-text');
+    if (e2eeStatusText) {
+        e2eeStatusText.textContent = activeE2eeEnabled 
+            ? langData.e2ee_on 
+            : langData.e2ee_off;
+    }
 
     const btnCallVoice = document.getElementById('btn-call-voice');
     if (btnCallVoice) btnCallVoice.title = langData.call_voice;
-    
     const btnCallVideo = document.getElementById('btn-call-video');
     if (btnCallVideo) btnCallVideo.title = langData.call_video;
+
+    // Theme and Wallpaper Appearance titles
+    const themeLabel = document.querySelector('#tab-content-appearance .input-group:nth-child(2) label');
+    if (themeLabel) themeLabel.textContent = langData.theme_label;
+    const wallpaperLabel = document.querySelector('#tab-content-appearance .input-group:nth-child(3) label');
+    if (wallpaperLabel) wallpaperLabel.textContent = langData.wallpaper_label;
+
+    // Wallpaper Buttons
+    document.querySelectorAll('.wp-select-btn').forEach(btn => {
+        const wp = btn.getAttribute('data-wp');
+        if (wp === 'wp-default') btn.textContent = langData.wp_classic;
+        if (wp === 'wp-neon') btn.textContent = langData.wp_neon;
+        if (wp === 'wp-sunset') btn.textContent = langData.wp_sunset;
+        if (wp === 'wp-emerald') btn.textContent = langData.wp_emerald;
+        if (wp === 'wp-abstract') btn.textContent = langData.wp_abstract;
+    });
+
+    // Banner Buttons
+    document.querySelectorAll('.banner-select-btn').forEach(btn => {
+        const banner = btn.getAttribute('data-banner');
+        if (banner.includes('#4f46e5')) btn.textContent = langData.banner_indigo;
+        if (banner.includes('#f43f5e')) btn.textContent = langData.banner_sunset;
+        if (banner.includes('#10b981')) btn.textContent = langData.banner_emerald;
+        if (banner.includes('#a855f7')) btn.textContent = langData.banner_neon;
+    });
+
+    // Security Settings
+    const securityLabel = document.querySelector('label[for="settings-public-key"]');
+    if (securityLabel) securityLabel.textContent = langData.security_key_label;
+    const securityDesc = document.querySelector('#tab-content-security p');
+    if (securityDesc) securityDesc.textContent = langData.security_key_desc;
 
     // Tema Değiştirme Butonu ve Etiketi Yerelleştirme
     const themeToggleBtn = document.getElementById('theme-toggle-btn');
     if (themeToggleBtn) {
-        const themeLabel = themeToggleBtn.previousElementSibling;
-        if (themeLabel) themeLabel.textContent = langData.theme_label;
         const themeSpan = themeToggleBtn.querySelector('span');
         if (themeSpan) {
             const isDark = document.body.classList.contains('dark-theme');
@@ -1314,7 +1508,6 @@ function translatePage() {
     // Bildirim ve Yükleme Butonları Yerelleştirme
     const btnRequestNotif = document.getElementById('btn-request-notifications');
     if (btnRequestNotif) btnRequestNotif.textContent = langData.btn_enable_notifications;
-
     const btnInstApp = document.getElementById('btn-install-app');
     if (btnInstApp) btnInstApp.textContent = langData.btn_install_app;
 
@@ -1322,11 +1515,84 @@ function translatePage() {
     const lblLogout = document.getElementById('lbl-logout');
     if (lblLogout) lblLogout.textContent = langData.logout_btn;
 
-    if (messageInput) {
-        if (!messageInput.disabled) {
-            messageInput.placeholder = langData.placeholder_message;
+    // Auth screen translations
+    const welcomeHeader = document.querySelector('#auth-screen .auth-header h2');
+    if (welcomeHeader) welcomeHeader.textContent = langData.auth_welcome;
+    const welcomeParagraph = document.querySelector('#auth-screen .auth-header p');
+    if (welcomeParagraph) welcomeParagraph.textContent = langData.auth_desc;
+    
+    const loginHeader = document.querySelector('#login-form h3');
+    if (loginHeader) loginHeader.textContent = langData.login_title;
+    const loginUserLabel = document.querySelector('label[for="login-username"]');
+    if (loginUserLabel) loginUserLabel.textContent = langData.settings_username;
+    const loginPassLabel = document.querySelector('label[for="login-password"]');
+    if (loginPassLabel) loginPassLabel.textContent = langData.login_password;
+    const loginSubmitBtn = document.querySelector('#login-form button[type="submit"]');
+    if (loginSubmitBtn) loginSubmitBtn.textContent = langData.login_btn;
+    const forgotLink = document.getElementById('show-forgot');
+    if (forgotLink) forgotLink.textContent = langData.login_forgot;
+    
+    const registerLink = document.getElementById('show-register');
+    if (registerLink) {
+        const parent = registerLink.parentElement;
+        if (parent) {
+            if (currentLanguage === 'tr') {
+                parent.innerHTML = `Hesabınız yok mu? <a href="#" id="show-register">Kayıt Ol</a>`;
+            } else {
+                parent.innerHTML = `Don't have an account? <a href="#" id="show-register">Sign Up</a>`;
+            }
+            document.getElementById('show-register').addEventListener('click', (e) => {
+                e.preventDefault();
+                loginForm.classList.add('hidden');
+                registerForm.classList.remove('hidden');
+            });
         }
     }
+
+    const registerHeader = document.querySelector('#register-form h3');
+    if (registerHeader) registerHeader.textContent = langData.register_title;
+    const registerUserLabel = document.querySelector('label[for="register-username"]');
+    if (registerUserLabel) registerUserLabel.textContent = langData.settings_username;
+    const registerEmailLabel = document.querySelector('label[for="register-email"]');
+    if (registerEmailLabel) registerEmailLabel.textContent = langData.email_label;
+    const registerPassLabel = document.querySelector('label[for="register-password"]');
+    if (registerPassLabel) registerPassLabel.textContent = langData.login_password;
+    const registerSubmitBtn = document.querySelector('#register-form button[type="submit"]');
+    if (registerSubmitBtn) registerSubmitBtn.textContent = langData.register_btn;
+    
+    const loginToggleLink = document.getElementById('show-login');
+    if (loginToggleLink) {
+        const parent = loginToggleLink.parentElement;
+        if (parent) {
+            if (currentLanguage === 'tr') {
+                parent.innerHTML = `Zaten üye misiniz? <a href="#" id="show-login">Giriş Yap</a>`;
+            } else {
+                parent.innerHTML = `Already a member? <a href="#" id="show-login">Sign In</a>`;
+            }
+            document.getElementById('show-login').addEventListener('click', (e) => {
+                e.preventDefault();
+                registerForm.classList.add('hidden');
+                loginForm.classList.remove('hidden');
+            });
+        }
+    }
+
+    const forgotHeader = document.querySelector('#forgot-form h3');
+    if (forgotHeader) forgotHeader.textContent = langData.forgot_title;
+    const forgotEmailLabel = document.querySelector('label[for="forgot-email"]');
+    if (forgotEmailLabel) forgotEmailLabel.textContent = langData.email_label;
+    const forgotSubmitBtn = document.querySelector('#forgot-form button[type="submit"]');
+    if (forgotSubmitBtn) forgotSubmitBtn.textContent = langData.forgot_submit;
+    
+    const forgotBackBtn = document.getElementById('forgot-show-login');
+    if (forgotBackBtn) forgotBackBtn.textContent = langData.forgot_back_to_login;
+
+    // Input placeholder
+    if (messageInput && !messageInput.disabled) {
+        messageInput.placeholder = langData.placeholder_message;
+    }
+
+    updateMuteButtonUI();
 }
 
 // 2. KANAL YAZMA YETKİSİ KONTROLÜ
