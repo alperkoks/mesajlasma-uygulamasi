@@ -37,10 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         updateThemeBtnUI(savedTheme === 'dark');
         themeBtn.addEventListener('click', () => {
-            document.body.classList.toggle('dark-theme');
-            const isDark = document.body.classList.contains('dark-theme');
-            updateThemeBtnUI(isDark);
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            tempTheme = (tempTheme === 'dark') ? 'light' : 'dark';
+            document.body.classList.toggle('dark-theme', tempTheme === 'dark');
+            updateThemeBtnUI(tempTheme === 'dark');
         });
     }
 
@@ -95,13 +94,78 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.wp-select-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const wp = btn.getAttribute('data-wp');
-            applyWallpaper(wp);
+            tempWallpaper = wp;
+            applyTemporaryWallpaperUI(tempWallpaper);
         });
     });
 
     // Varsayılan duvar kağıdını yükle
     applyWallpaper(currentWallpaper);
 });
+
+// --- GEÇİCİ AYARLAR DRAFT DURUMU ---
+let tempTheme = localStorage.getItem('theme') || 'light';
+let tempWallpaper = localStorage.getItem('chatWallpaper') || 'wp-default';
+let tempBanner = '';
+let tempProfilePicFile = null;
+let tempBannerFile = null;
+
+function applyTemporaryWallpaperUI(wpClass) {
+    const messagesHistory = document.getElementById('messages-history');
+    if (messagesHistory) {
+        messagesHistory.classList.remove('wp-default', 'wp-neon', 'wp-sunset', 'wp-emerald', 'wp-abstract');
+        messagesHistory.classList.add(wpClass);
+    }
+    
+    // Butonlardaki çerçeveyi görsel olarak güncelle
+    document.querySelectorAll('.wp-select-btn').forEach(btn => {
+        if (btn.getAttribute('data-wp') === wpClass) {
+            btn.style.outline = '2px solid var(--primary-color)';
+            btn.style.outlineOffset = '1px';
+        } else {
+            btn.style.outline = 'none';
+        }
+    });
+}
+
+function applyTemporaryBannerUI(bannerVal) {
+    const settingsBannerPreview = document.getElementById('settings-banner-preview');
+    if (settingsBannerPreview) {
+        if (bannerVal.startsWith('linear-gradient')) {
+            settingsBannerPreview.style.background = bannerVal;
+        } else {
+            settingsBannerPreview.style.background = `url(${bannerVal}) center/cover`;
+        }
+    }
+}
+
+function discardTemporarySettings() {
+    // 1. Temayı eski kaydedilen haline geri yükle
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.body.classList.toggle('dark-theme', savedTheme === 'dark');
+    
+    // Tema buton UI'ını güncelle
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    if (themeBtn) {
+        const span = themeBtn.querySelector('span');
+        if (span) {
+            const isDark = savedTheme === 'dark';
+            span.textContent = isDark 
+                ? (currentLanguage === 'tr' ? 'Aydınlık Mod' : 'Light Mode') 
+                : (currentLanguage === 'tr' ? 'Karanlık Mod' : 'Dark Mode');
+            themeBtn.childNodes[0].textContent = isDark ? '☀️ ' : '🌙 ';
+        }
+    }
+
+    // 2. Duvar kağıdını eski kaydedilen haline geri yükle
+    const savedWallpaper = localStorage.getItem('chatWallpaper') || 'wp-default';
+    applyWallpaper(savedWallpaper);
+    
+    // 3. Geçici durumları temizle
+    tempProfilePicFile = null;
+    tempBannerFile = null;
+    tempBanner = '';
+}
 
 // EKRANLAR VE ELEMENTLER
 const authScreen = document.getElementById('auth-screen');
@@ -654,12 +718,14 @@ openSettingsBtn.addEventListener('click', () => {
 
 // Ayarlar Modalini Kapat
 closeSettings.addEventListener('click', () => {
+    discardTemporarySettings();
     settingsModal.classList.add('hidden');
 });
 
 // Modal dışına tıklandığında kapat
 window.addEventListener('click', (e) => {
     if (e.target === settingsModal) {
+        discardTemporarySettings();
         settingsModal.classList.add('hidden');
     }
 });
@@ -673,62 +739,12 @@ btnSelectPhoto.addEventListener('click', () => {
 settingsFileInput.addEventListener('change', () => {
     const file = settingsFileInput.files[0];
     if (file) {
+        tempProfilePicFile = file; // Geçici durum olarak sakla
         const reader = new FileReader();
         reader.onload = (e) => {
             settingsAvatarPreview.innerHTML = `<img src="${e.target.result}" class="avatar-img">`;
-            btnUploadPhoto.classList.remove('hidden'); // Fotoğrafı Yükle butonunu göster
         };
         reader.readAsDataURL(file);
-    }
-});
-
-// "Fotoğrafı Yükle" butonuna basıldığında görseli sunucuya yükle (Cloudinary)
-btnUploadPhoto.addEventListener('click', async () => {
-    const file = settingsFileInput.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append('profile_pic', file);
-
-    try {
-        const response = await fetch('/api/profile/upload-pic', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
-            body: formData
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.message || 'Yükleme başarısız oldu.');
-        }
-
-        alert(data.message);
-
-        // Token ve Kullanıcı bilgisini güncelle
-        token = data.token;
-        currentUser.profile_pic = data.profile_pic;
-        localStorage.setItem('token', token);
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
-        // Kendi avatarlarımızı anlık güncelle
-        if (currentUser.profile_pic) {
-            const imgHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
-            myAvatar.innerHTML = imgHTML;
-            settingsAvatarPreview.innerHTML = imgHTML;
-        }
-
-        btnUploadPhoto.classList.add('hidden');
-
-        if (socket) {
-            socket.auth.token = token;
-        }
-
-        await loadUsers();
-    } catch (err) {
-        console.error('Profil resmi yükleme hatası:', err);
-        alert(err.message || 'Profil resmi yüklenirken bir hata oluştu.');
     }
 });
 
@@ -738,82 +754,129 @@ if (btnSelectBannerPhoto && settingsBannerFileInput) {
         settingsBannerFileInput.click();
     });
 
-    settingsBannerFileInput.addEventListener('change', async () => {
+    settingsBannerFileInput.addEventListener('change', () => {
         const file = settingsBannerFileInput.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('profile_banner', file);
-
-        try {
-            const res = await fetch('/api/profile/upload-banner', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data.message || 'Kapak resmi yüklenemedi.');
-            }
-
-            alert(data.message);
-            currentUser.profile_banner = data.profile_banner;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
-            // Önizlemeyi güncelle
-            if (settingsBannerPreview) {
-                if (data.profile_banner.startsWith('linear-gradient')) {
-                    settingsBannerPreview.style.background = data.profile_banner;
-                } else {
-                    settingsBannerPreview.style.background = `url(${data.profile_banner}) center/cover`;
+        if (file) {
+            tempBannerFile = file; // Geçici durum olarak sakla
+            tempBanner = ''; // Preset seçimini temizle
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (settingsBannerPreview) {
+                    settingsBannerPreview.style.background = `url(${e.target.result}) center/cover`;
                 }
-            }
-        } catch (err) {
-            alert('Kapak resmi yüklenemedi moruk: ' + err.message);
+            };
+            reader.readAsDataURL(file);
         }
     });
 }
 
 document.querySelectorAll('.banner-select-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', () => {
         const bannerVal = btn.getAttribute('data-banner');
-        try {
-            const res = await apiCall('/profile/update-banner-preset', 'POST', { banner: bannerVal });
-            currentUser.profile_banner = res.profile_banner;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
-
-            // Önizlemeyi güncelle
-            if (settingsBannerPreview) {
-                settingsBannerPreview.style.background = res.profile_banner;
-            }
-        } catch (err) {
-            alert('Kapak şablonu uygulanamadı moruk: ' + err.message);
-        }
+        tempBanner = bannerVal; // Geçici durum olarak sakla
+        tempBannerFile = null; // Özel dosya seçimini temizle
+        applyTemporaryBannerUI(tempBanner);
     });
 });
 
-// Ayarları Kaydet (Kullanıcı Adı Güncelleme)
+// Ayarları Kaydet
 settingsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const newUsername = settingsUsername.value.trim();
+    
+    const submitBtn = settingsForm.querySelector('button[type="submit"]');
+    let originalBtnText = '';
+    if (submitBtn) {
+        originalBtnText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = currentLanguage === 'tr' ? 'Kaydediliyor...' : 'Saving...';
+    }
+
+    let hasChanges = false;
+
+    // 1. Profil Resmi Değiştiyse Yükle
+    if (tempProfilePicFile) {
+        const formData = new FormData();
+        formData.append('profile_pic', tempProfilePicFile);
+        try {
+            const response = await fetch('/api/profile/upload-pic', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const data = await response.json();
+            if (response.ok) {
+                token = data.token;
+                currentUser.profile_pic = data.profile_pic;
+                localStorage.setItem('token', token);
+                if (socket) socket.auth.token = token;
+                hasChanges = true;
+            } else {
+                throw new Error(data.message || 'Profil resmi yüklenemedi.');
+            }
+        } catch (err) {
+            console.error('Profil resmi yükleme hatası:', err);
+            alert(err.message || 'Profil resmi güncellenirken hata oldu.');
+        }
+    }
+
+    // 2. Profil Kapak Resmi (Banner) Değiştiyse Yükle/Güncelle
+    if (tempBannerFile) {
+        const formData = new FormData();
+        formData.append('profile_banner', tempBannerFile);
+        try {
+            const response = await fetch('/api/profile/upload-banner', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+            const data = await response.json();
+            if (response.ok) {
+                currentUser.profile_banner = data.profile_banner;
+                hasChanges = true;
+            } else {
+                throw new Error(data.message || 'Kapak resmi yüklenemedi.');
+            }
+        } catch (err) {
+            console.error('Kapak resmi yükleme hatası:', err);
+            alert(err.message || 'Kapak resmi güncellenirken hata oldu.');
+        }
+    } else if (tempBanner && tempBanner !== (currentUser.profile_banner || '')) {
+        try {
+            const res = await apiCall('/profile/update-banner-preset', 'POST', { banner: tempBanner });
+            currentUser.profile_banner = res.profile_banner;
+            hasChanges = true;
+        } catch (err) {
+            console.error('Kapak şablonu uygulanamadı:', err);
+        }
+    }
+
+    // 3. Tema Değiştiyse Kaydet
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    if (tempTheme !== savedTheme) {
+        localStorage.setItem('theme', tempTheme);
+        hasChanges = true;
+    }
+
+    // 4. Duvar Kağıdı Değiştiyse Kaydet
+    const savedWallpaper = localStorage.getItem('chatWallpaper') || 'wp-default';
+    if (tempWallpaper !== savedWallpaper) {
+        applyWallpaper(tempWallpaper);
+        hasChanges = true;
+    }
+
     // Ses Seviyesini Kaydet
     if (settingsVolume) {
         appVolume = parseFloat(settingsVolume.value);
         localStorage.setItem('appVolume', appVolume);
     }
 
-    let hasChanges = false;
-    
     // Biyografi Değiştiyse Kaydet
     const newBio = settingsBio ? settingsBio.value.trim() : '';
     if (settingsBio && newBio !== (currentUser.bio || '')) {
         try {
             await apiCall('/profile/update-bio', 'POST', { bio: newBio });
             currentUser.bio = newBio;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
             hasChanges = true;
         } catch (err) {
             console.error('Biyografi güncellenemedi:', err);
@@ -833,7 +896,6 @@ settingsForm.addEventListener('submit', async (e) => {
                 showOnline: newShowOnline
             });
             currentUser = res.user;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
             hasChanges = true;
         } catch (err) {
             console.error('Gizlilik ayarları güncellenemedi:', err);
@@ -847,7 +909,6 @@ settingsForm.addEventListener('submit', async (e) => {
         try {
             await apiCall('/profile/update-language', 'POST', { language: newLang });
             currentUser.language = newLang;
-            localStorage.setItem('currentUser', JSON.stringify(currentUser));
             currentLanguage = newLang;
             translatePage();
             hasChanges = true;
@@ -856,11 +917,29 @@ settingsForm.addEventListener('submit', async (e) => {
         }
     }
 
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
     if (!newUsername || newUsername === currentUser.username) {
         if (hasChanges) {
-            alert('Profil ayarlarınız başarıyla güncellendi!');
+            alert(currentLanguage === 'tr' ? 'Profil ayarlarınız başarıyla güncellendi!' : 'Profile settings updated successfully!');
+        }
+        
+        // Kendi arayüzümüzü güncelle
+        if (currentUser.profile_pic) {
+            const imgHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
+            myAvatar.innerHTML = imgHTML;
+        } else {
+            myAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
+        }
+
+        tempProfilePicFile = null;
+        tempBannerFile = null;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
         }
         settingsModal.classList.add('hidden');
+        await loadUsers();
         return;
     }
 
@@ -868,13 +947,11 @@ settingsForm.addEventListener('submit', async (e) => {
         const res = await apiCall('/profile/update-username', 'POST', { newUsername });
         alert(res.message);
         
-        // Token ve Kullanıcı bilgisini güncelle
         token = res.token;
         currentUser = res.user;
         localStorage.setItem('token', token);
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
 
-        // Kendi arayüzümüzü güncelle
         myUsernameEl.textContent = currentUser.username;
         if (currentUser.profile_pic) {
             myAvatar.innerHTML = `<img src="${currentUser.profile_pic}" alt="${currentUser.username}" class="avatar-img">`;
@@ -882,14 +959,21 @@ settingsForm.addEventListener('submit', async (e) => {
             myAvatar.textContent = currentUser.username.substring(0, 2).toUpperCase();
         }
 
-        settingsModal.classList.add('hidden');
-        
         if (socket) {
             socket.auth.token = token;
         }
     } catch (err) {
         // Hata zaten apiCall içinde alert ediliyor
     }
+
+    tempProfilePicFile = null;
+    tempBannerFile = null;
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
+    }
+    settingsModal.classList.add('hidden');
+    await loadUsers();
 });
 
 // Profil resmine tıklanınca resmi büyük aç (Lightbox)
