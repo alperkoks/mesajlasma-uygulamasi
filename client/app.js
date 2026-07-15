@@ -3319,7 +3319,7 @@ async function renderMessages() {
         } else if (msg.message_type === 'image') {
             msgContentHTML = `<img src="${msg.file_url}" alt="görsel" style="max-width:100%; max-height:240px; border-radius:8px; display:block; cursor:pointer; margin-bottom: 2px;" onclick="window.open('${msg.file_url}', '_blank')">`;
         } else if (msg.message_type === 'file') {
-            msgContentHTML = `<a href="${msg.file_url}" target="_blank" style="color:inherit; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; word-break:break-all;">📁 ${escapeHTML(displayText)}</a>`;
+            msgContentHTML = `<a href="${msg.file_url}" download="${escapeHTML(displayText)}" style="color:inherit; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; word-break:break-all;">📁 ${escapeHTML(displayText)}</a>`;
         } else if (msg.message_type === 'voice') {
             const uniqueId = `voice_${msg.id}`;
             msgContentHTML = `

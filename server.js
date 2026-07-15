@@ -892,9 +892,12 @@ app.post('/api/messages/upload', authenticateToken, upload.single('file'), async
     try {
         const isImage = req.file.mimetype.startsWith('image/');
         
+        // Multer'ın Türkçe karakter bozulmasını (latin1 -> utf8) gider
+        const originalNameUtf8 = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+        
         // Benzersiz dosya ismi oluştur (UDF, PDF vb. orijinal uzantıları koruyarak)
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        const cleanFilename = uniqueSuffix + '-' + req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const cleanFilename = uniqueSuffix + '-' + originalNameUtf8.replace(/[^a-zA-Z0-9.-]/g, '_');
         const filePath = path.join(__dirname, 'client', 'uploads', cleanFilename);
         
         // Dosyayı diske yaz
@@ -904,7 +907,7 @@ app.post('/api/messages/upload', authenticateToken, upload.single('file'), async
         res.json({
             fileUrl: fileUrl,
             messageType: isImage ? 'image' : 'file',
-            fileName: req.file.originalname
+            fileName: originalNameUtf8
         });
     } catch (error) {
         console.error('Dosya yükleme hatası:', error);
