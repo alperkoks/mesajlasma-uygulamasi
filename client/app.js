@@ -2261,6 +2261,11 @@ async function initApp() {
         initPushNotifications();
 
         showScreen('chat');
+        
+        // Geri tuşu kontrolünü başlat (Sentinel ve Main durumları)
+        history.replaceState({ screen: 'sentinel' }, '');
+        history.pushState({ screen: 'main' }, '');
+
         await loadUsers();
         await loadPendingRequests();
         await loadGroups();
@@ -3065,6 +3070,11 @@ async function selectUserChat(user) {
             chatContainer.classList.add('mobile-chat-active');
         }
 
+        // Geri tuşu kontrolü için geçmişe chat durumunu ekle
+        if (history.state && history.state.screen !== 'chat') {
+            history.pushState({ screen: 'chat' }, '');
+        }
+
         activeChatName.textContent = user.username;
         if (user.profile_pic) {
             activeChatAvatar.innerHTML = `<img src="${user.profile_pic}" alt="${user.username}" class="avatar-img">`;
@@ -3096,23 +3106,48 @@ async function selectUserChat(user) {
     }
 }
 
+function closeActiveChatUI() {
+    activeChatPartner = null;
+    activeChatPartnerId = null;
+    activeChatGroupId = null;
+    
+    const chatContainer = document.querySelector('.chat-container');
+    if (chatContainer) {
+        chatContainer.classList.remove('mobile-chat-active');
+    }
+    
+    chatActiveScreen.classList.add('hidden');
+    noChatSelectedScreen.classList.remove('hidden');
+    
+    renderUsersList();
+}
+
 // Mobilde sohbet alanından arkadaş listesine geri dönme butonu
 if (mobileBackBtn) {
     mobileBackBtn.addEventListener('click', () => {
-        activeChatPartner = null;
-        activeChatPartnerId = null;
-        
-        const chatContainer = document.querySelector('.chat-container');
-        if (chatContainer) {
-            chatContainer.classList.remove('mobile-chat-active');
-        }
-        
-        chatActiveScreen.classList.add('hidden');
-        noChatSelectedScreen.classList.remove('hidden');
-        
-        renderUsersList();
+        history.back();
     });
 }
+
+// Tarayıcı geri butonu ve popstate yönetimi
+window.addEventListener('popstate', (e) => {
+    const state = e.state;
+    if (!state) return;
+
+    if (state.screen === 'sentinel') {
+        // Ana ekrandayken geri basılırsa onay iste
+        const confirmExit = confirm(currentLanguage === 'tr' ? 'Uygulamadan çıkmak istiyor musunuz?' : 'Do you want to exit the application?');
+        if (confirmExit) {
+            history.back();
+        } else {
+            // Çıkmak istemiyorsa history durumunu 'main' olarak restore et
+            history.pushState({ screen: 'main' }, '');
+        }
+    } else if (state.screen === 'main') {
+        // Sohbet açıksa kapatıp listeye dön
+        closeActiveChatUI();
+    }
+});
 
 async function loadMessages() {
     try {
@@ -3908,6 +3943,11 @@ async function selectGroupChat(group) {
         const chatContainer = document.querySelector('.chat-container');
         if (chatContainer) {
             chatContainer.classList.add('mobile-chat-active');
+        }
+
+        // Geri tuşu kontrolü için geçmişe chat durumunu ekle
+        if (history.state && history.state.screen !== 'chat') {
+            history.pushState({ screen: 'chat' }, '');
         }
 
         // Başlık güncellemeleri
