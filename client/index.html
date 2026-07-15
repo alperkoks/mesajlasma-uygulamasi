@@ -259,32 +259,48 @@
                             </div>
 
                             <!-- Emoji & Sticker Popover'ı -->
-                            <div id="emoji-popover" class="hidden" style="position: absolute; bottom: 100%; left: 0; margin-bottom: 0.5rem; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); width: 320px; z-index: 1000; display: flex; flex-direction: column; overflow: hidden; height: 350px;">
-                                <!-- Tab Seçenekleri: Emojiler / Stickerlar -->
-                                <div style="display: flex; border-bottom: 1px solid var(--border-color); background-color: var(--bg-hover);">
-                                    <button type="button" id="tab-emojis" style="flex: 1; padding: 0.75rem; border: none; background: transparent; color: var(--text-main); font-weight: 600; cursor: pointer; border-bottom: 2px solid var(--primary-color);">Emojis</button>
-                                    <button type="button" id="tab-stickers" style="flex: 1; padding: 0.75rem; border: none; background: transparent; color: var(--text-muted); font-weight: 600; cursor: pointer;">Stickers</button>
-                                    <button type="button" id="btn-emoji-popover-close" style="padding: 0.75rem; background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted);">×</button>
-                                </div>
-                                
-                                <!-- Emojiler Izgarası -->
-                                <div id="emojis-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; padding: 0.75rem; font-size: 1.5rem; text-align: center; cursor: pointer; user-select: none;">
-                                    <!-- Javascript tarafından doldurulacak -->
-                                </div>
-                                
-                                <!-- Stickerlar Bölümü (Varsayılan olarak gizli) -->
-                                <div id="stickers-container" class="hidden" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                                    <div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: center; background-color: var(--bg-hover);">
-                                        <button type="button" id="btn-add-sticker" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; background-color: var(--primary-color); color: white; border: none; border-radius: 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
-                                            <span>➕</span> <span id="lbl-add-sticker">Çıkartma Ekle</span>
-                                        </button>
-                                        <input type="file" id="sticker-file-input" style="display: none;" accept="image/*">
-                                    </div>
-                                    <div id="stickers-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.75rem;">
-                                        <!-- Javascript tarafından doldurulacak -->
-                                    </div>
-                                </div>
-                            </div>
+                             <div id="emoji-popover" class="hidden" style="position: absolute; bottom: 100%; left: 0; margin-bottom: 0.5rem; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.15); width: 320px; z-index: 1000; display: flex; flex-direction: column; overflow: hidden; height: 350px;">
+                                 <!-- Tab Seçenekleri: Emojiler / Stickerlar -->
+                                 <div style="display: flex; border-bottom: 1px solid var(--border-color); background-color: var(--bg-hover);">
+                                     <button type="button" id="tab-emojis" style="flex: 1; padding: 0.75rem; border: none; background: transparent; color: var(--text-main); font-weight: 600; cursor: pointer; border-bottom: 2px solid var(--primary-color);">Emojis</button>
+                                     <button type="button" id="tab-stickers" style="flex: 1; padding: 0.75rem; border: none; background: transparent; color: var(--text-muted); font-weight: 600; cursor: pointer;">Stickers</button>
+                                     <button type="button" id="btn-emoji-popover-close" style="padding: 0.75rem; background: transparent; border: none; font-size: 1.25rem; cursor: pointer; color: var(--text-muted);">×</button>
+                                 </div>
+
+                                 <!-- Emoji Kategori Seçici (Sadece Emoji sekmesinde görünür) -->
+                                 <div id="emoji-categories" style="display: flex; gap: 0.2rem; padding: 0.35rem; background-color: var(--bg-hover); border-bottom: 1px solid var(--border-color); overflow-x: auto; font-size: 1.1rem; justify-content: space-around; user-select: none;">
+                                     <span class="emoji-cat-btn active" data-cat="fav" title="Favoriler" style="cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s;">⭐</span>
+                                     <span class="emoji-cat-btn" data-cat="smileys" title="İfadeler & İnsanlar" style="cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s;">😀</span>
+                                     <span class="emoji-cat-btn" data-cat="animals" title="Hayvanlar & Doğa" style="cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s;">🐱</span>
+                                     <span class="emoji-cat-btn" data-cat="food" title="Yiyecek & İçecek" style="cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s;">🍎</span>
+                                     <span class="emoji-cat-btn" data-cat="travel" title="Seyahat & Aktiviteler" style="cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s;">⚽</span>
+                                     <span class="emoji-cat-btn" data-cat="symbols" title="Semboller" style="cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s;">❤️</span>
+                                 </div>
+                                 
+                                 <!-- Emojiler Izgarası -->
+                                 <div id="emojis-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; padding: 0.75rem; font-size: 1.5rem; text-align: center; cursor: pointer; user-select: none;">
+                                     <!-- Javascript tarafından doldurulacak -->
+                                 </div>
+                                 
+                                 <!-- Stickerlar Bölümü (Varsayılan olarak gizli) -->
+                                 <div id="stickers-container" class="hidden" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                                     <div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: center; align-items: center; gap: 0.5rem; background-color: var(--bg-hover);">
+                                         <button type="button" id="btn-add-sticker" style="display: flex; align-items: center; gap: 0.2rem; padding: 0.35rem 0.6rem; background-color: var(--primary-color); color: white; border: none; border-radius: 20px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">
+                                             <span>➕</span> <span id="lbl-add-sticker">Ekle</span>
+                                         </button>
+                                         <input type="file" id="sticker-file-input" style="display: none;" accept="image/*">
+                                         
+                                         <!-- Sticker Alt Sekmesi: Tümü / Favoriler -->
+                                         <div style="display: flex; gap: 0.25rem; margin-left: auto;">
+                                             <button type="button" id="sticker-filter-all" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--primary-light); color: var(--primary-color); cursor: pointer;">Tümü</button>
+                                             <button type="button" id="sticker-filter-fav" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer;">⭐ Favori</button>
+                                         </div>
+                                     </div>
+                                     <div id="stickers-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.75rem;">
+                                         <!-- Javascript tarafından doldurulacak -->
+                                     </div>
+                                 </div>
+                             </div>
                         </form>
                     </footer>
                 </div>

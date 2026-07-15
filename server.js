@@ -705,6 +705,29 @@ app.post('/api/profile/update-privacy', authenticateToken, async (req, res) => {
     }
 });
 
+// Dil Seçeneğini Güncelleme Rotası
+app.post('/api/profile/update-language', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { language } = req.body;
+
+    if (!language) {
+        return res.status(400).json({ message: 'Dil seçeneği zorunludur.' });
+    }
+
+    try {
+        const db = getDbInstance();
+        if (isPostgres) {
+            await db.query('UPDATE users SET language = $1 WHERE id = $2', [language, userId]);
+        } else {
+            await db.run('UPDATE users SET language = ? WHERE id = ?', [language, userId]);
+        }
+        res.json({ message: 'Dil başarıyla güncellendi.' });
+    } catch (error) {
+        console.error('Dil güncelleme hatası:', error);
+        res.status(500).json({ message: 'Dil güncellenirken hata oluştu.' });
+    }
+});
+
 // 2.2 PROFİL FOTOĞRAFI YÜKLEME
 app.post('/api/profile/upload-pic', authenticateToken, upload.single('profile_pic'), async (req, res) => {
     const userId = req.user.id;

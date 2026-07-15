@@ -1180,19 +1180,35 @@ async function sendGifMessage(url) {
 }
 
 // 3.1 EMOJI & STICKER ENTEGRASYONU
-const emojiList = [
-    "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", 
-    "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", 
-    "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", 
-    "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", 
-    "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", 
-    "🥴", "🤢", "🤮", "🤧", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", 
-    "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾",
-    "👋", "🤚", "🖐️", "✋", "🖖", "👌", "🤌", "🤏", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", 
-    "🖕", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏", "✍️", 
-    "💅", "🤳", "💪", "🦾", "🦿", "🦵", "🦶", "👂", "🦻", "👃", "🧠", "🫀", "🫁", "🦷", "🦴", "👀", 
-    "👁️", "👅", "👄", "💋", "🩸"
-];
+const emojiGroups = {
+    fav: [],
+    smileys: [
+        "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", 
+        "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏",
+        "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳",
+        "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗", "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬"
+    ],
+    animals: [
+        "🐱", "🐶", "🦁", "🐵", "🦊", "🐻", "🐼", "🐨", "🐯", "🐮", "🐷", "🐸", "🐔", "🐧", "🐦", "🦆",
+        "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🪱", "🐛", "🦋", "🐌", "🐞", "🐜", "🌲", "🌳",
+        "🌴", "🌵", "🌶️", "🌷", "🌸", "🌹", "🍀", "🍁", "🍄", "🐚", "🌏", "⭐", "🌙", "⚡", "🌈", "🌊"
+    ],
+    food: [
+        "🍎", "🍌", "🍇", "🍓", "🍉", "🍒", "🍑", "🍍", "🥥", "🥝", "🍅", "🥑", "🥦", "🥕", "🌽", "🥔",
+        "🍞", "🥐", "🥖", "🥞", "🧀", "🍖", "🍗", "🥩", "🥓", "🍔", "🍟", "🍕", "🌭", "🍳", "🍲", "🍿",
+        "🍣", "🍦", "🍩", "🍪", "🎂", "🍫", "🍬", "🍭", "🍯", "🥤", "☕", "🍵", "🍺", "🍷", "🥃", "🍹"
+    ],
+    travel: [
+        "⚽", "🏀", "🏈", "⚾", "🥎", "🎾", "🏐", "🏉", "🥏", "🎱", "🪀", "🏓", "🏸", "🏒", "🎯", "🎮",
+        "✈️", "🚀", "🛸", "🚁", "🚂", "🚃", "🚌", "🚗", "🚕", "🚙", "🏍️", "🛵", "🚲", "🛴", "⚓", "⛵",
+        "🏔️", "⛰️", "🌋", "🧗", "🏕️", "🏖️", "🏜️", "🏝️", "🏟️", "🏛️", "🎉", "🎈", "🎊", "🎇", "🎆", "🏆"
+    ],
+    symbols: [
+        "💡", "🕯️", "🛠️", "⚙️", "🔑", "🔒", "🔓", "🔔", "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍",
+        "🤎", "💔", "❤️‍🔥", "❤️‍🩹", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "💥", "💦", "💨",
+        "💤", "💬", "💭", "✨", "🌟", "⭐", "⚡", "☄️", "🔥", "🔮", "🧿", "🔇", "🔔", "📣", "📢", "🎵"
+    ]
+};
 
 const stickerList = [
     "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&h=200&fit=crop", // Cute Cat
@@ -1203,22 +1219,69 @@ const stickerList = [
     "https://images.unsplash.com/photo-1555685812-4b943f1cb0eb?w=200&h=200&fit=crop"  // Rabbit
 ];
 
+let currentEmojiCategory = 'smileys';
+let currentStickerFilter = 'all';
+
 function populateEmojis() {
     if (!emojisGrid) return;
     emojisGrid.innerHTML = '';
-    emojiList.forEach(emoji => {
+    
+    // Load favorite emojis
+    let favs = [];
+    try {
+        favs = JSON.parse(localStorage.getItem('favorite_emojis')) || [];
+    } catch(e) {}
+    emojiGroups.fav = favs;
+    
+    const activeEmojis = emojiGroups[currentEmojiCategory] || [];
+    
+    if (activeEmojis.length === 0 && currentEmojiCategory === 'fav') {
+        emojisGrid.innerHTML = `<div style="grid-column: span 7; font-size: 0.8rem; color: var(--text-muted); padding: 2rem 0; text-align: center;">${currentLanguage === 'tr' ? 'Henüz favori emojiniz yok.<br><small style="font-size:0.7rem; color:var(--text-muted)">Herhangi bir emojiye sağ tıklayarak/uzun basarak ekleyebilirsiniz.</small>' : 'No favorite emojis yet.<br><small style="font-size:0.7rem; color:var(--text-muted)">Right click / long press on any emoji to add.</small>'}</div>`;
+        return;
+    }
+
+    activeEmojis.forEach(emoji => {
         const span = document.createElement('span');
         span.textContent = emoji;
         span.style.padding = '0.2rem';
         span.style.transition = 'transform 0.1s';
+        span.style.cursor = 'pointer';
+        
         span.addEventListener('mouseover', () => span.style.transform = 'scale(1.2)');
         span.addEventListener('mouseout', () => span.style.transform = 'scale(1)');
+        
+        // Single click: add to input
         span.addEventListener('click', () => {
             messageInput.value += emoji;
             messageInput.dispatchEvent(new Event('input'));
         });
+
+        // Right click: toggle favorite
+        span.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            toggleFavoriteEmoji(emoji);
+        });
+        
         emojisGrid.appendChild(span);
     });
+}
+
+function toggleFavoriteEmoji(emoji) {
+    let favs = [];
+    try {
+        favs = JSON.parse(localStorage.getItem('favorite_emojis')) || [];
+    } catch(e) {}
+    
+    const idx = favs.indexOf(emoji);
+    if (idx > -1) {
+        favs.splice(idx, 1);
+        alert(currentLanguage === 'tr' ? `"${emoji}" favorilerden çıkarıldı.` : `"${emoji}" removed from favorites.`);
+    } else {
+        favs.push(emoji);
+        alert(currentLanguage === 'tr' ? `"${emoji}" favorilere eklendi!` : `"${emoji}" added to favorites!`);
+    }
+    localStorage.setItem('favorite_emojis', JSON.stringify(favs));
+    populateEmojis();
 }
 
 function populateStickers() {
@@ -1234,23 +1297,69 @@ function populateStickers() {
     
     const allStickers = [...stickerList, ...localCustoms];
     
-    allStickers.forEach(url => {
-        const img = document.createElement('img');
-        img.src = url;
-        img.style.width = '100%';
-        img.style.height = '75px';
-        img.style.objectFit = 'contain';
-        img.style.borderRadius = '8px';
-        img.style.cursor = 'pointer';
-        img.style.transition = 'transform 0.15s';
+    let favStickers = [];
+    try {
+        favStickers = JSON.parse(localStorage.getItem('favorite_stickers')) || [];
+    } catch(e) {}
+    
+    const displayStickers = currentStickerFilter === 'fav' ? favStickers : allStickers;
+    
+    if (displayStickers.length === 0 && currentStickerFilter === 'fav') {
+        stickersGrid.innerHTML = `<div style="grid-column: span 3; font-size: 0.8rem; color: var(--text-muted); padding: 2rem 0; text-align: center;">${currentLanguage === 'tr' ? 'Henüz favori çıkartmanız yok.<br><small style="font-size:0.7rem; color:var(--text-muted)">Herhangi bir çıkartmaya sağ tıklayarak ekleyebilirsiniz.</small>' : 'No favorite stickers yet.<br><small style="font-size:0.7rem; color:var(--text-muted)">Right click on any sticker to add.</small>'}</div>`;
+        return;
+    }
+
+    displayStickers.forEach(url => {
+        const div = document.createElement('div');
+        div.style.position = 'relative';
+        div.style.width = '100%';
+        div.style.height = '75px';
+        div.style.cursor = 'pointer';
+        
+        const isFav = favStickers.includes(url);
+        const starHTML = isFav ? `<span style="position: absolute; top: 2px; right: 2px; font-size: 0.8rem; z-index: 5;">⭐</span>` : '';
+        
+        div.innerHTML = `
+            ${starHTML}
+            <img src="${url}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px; transition: transform 0.15s;">
+        `;
+        
+        const img = div.querySelector('img');
         img.addEventListener('mouseover', () => img.style.transform = 'scale(1.05)');
         img.addEventListener('mouseout', () => img.style.transform = 'scale(1)');
+        
+        // Single click: Send sticker
         img.addEventListener('click', async () => {
             emojiPopover.classList.add('hidden');
             await sendStickerMessage(url);
         });
-        stickersGrid.appendChild(img);
+
+        // Right click: Toggle favorite
+        div.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            toggleFavoriteSticker(url);
+        });
+        
+        stickersGrid.appendChild(div);
     });
+}
+
+function toggleFavoriteSticker(url) {
+    let favs = [];
+    try {
+        favs = JSON.parse(localStorage.getItem('favorite_stickers')) || [];
+    } catch(e) {}
+    
+    const idx = favs.indexOf(url);
+    if (idx > -1) {
+        favs.splice(idx, 1);
+        alert(currentLanguage === 'tr' ? 'Çıkartma favorilerden çıkarıldı.' : 'Sticker removed from favorites.');
+    } else {
+        favs.push(url);
+        alert(currentLanguage === 'tr' ? 'Çıkartma favorilere eklendi!' : 'Sticker added to favorites!');
+    }
+    localStorage.setItem('favorite_stickers', JSON.stringify(favs));
+    populateStickers();
 }
 
 async function sendStickerMessage(stickerUrl) {
@@ -1288,6 +1397,17 @@ if (btnEmojiPopoverClose) {
     });
 }
 
+// Emoji Kategori Tıklama Dinleyicileri
+document.querySelectorAll('.emoji-cat-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.emoji-cat-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentEmojiCategory = btn.getAttribute('data-cat');
+        populateEmojis();
+    });
+});
+
 if (tabEmojis) {
     tabEmojis.addEventListener('click', () => {
         tabEmojis.style.borderBottom = '2px solid var(--primary-color)';
@@ -1295,6 +1415,7 @@ if (tabEmojis) {
         tabStickers.style.borderBottom = 'none';
         tabStickers.style.color = 'var(--text-muted)';
         emojisGrid.classList.remove('hidden');
+        document.getElementById('emoji-categories').classList.remove('hidden');
         stickersContainer.classList.add('hidden');
     });
 }
@@ -1307,6 +1428,39 @@ if (tabStickers) {
         tabEmojis.style.color = 'var(--text-muted)';
         stickersContainer.classList.remove('hidden');
         emojisGrid.classList.add('hidden');
+        document.getElementById('emoji-categories').classList.add('hidden');
+    });
+}
+
+// Sticker Alt Filtre Tıklama Dinleyicileri
+const stickerFilterAll = document.getElementById('sticker-filter-all');
+const stickerFilterFav = document.getElementById('sticker-filter-fav');
+
+if (stickerFilterAll) {
+    stickerFilterAll.addEventListener('click', (e) => {
+        e.stopPropagation();
+        stickerFilterAll.style.backgroundColor = 'var(--primary-light)';
+        stickerFilterAll.style.color = 'var(--primary-color)';
+        if (stickerFilterFav) {
+            stickerFilterFav.style.backgroundColor = 'var(--bg-white)';
+            stickerFilterFav.style.color = 'var(--text-muted)';
+        }
+        currentStickerFilter = 'all';
+        populateStickers();
+    });
+}
+
+if (stickerFilterFav) {
+    stickerFilterFav.addEventListener('click', (e) => {
+        e.stopPropagation();
+        stickerFilterFav.style.backgroundColor = 'var(--primary-light)';
+        stickerFilterFav.style.color = 'var(--primary-color)';
+        if (stickerFilterAll) {
+            stickerFilterAll.style.backgroundColor = 'var(--bg-white)';
+            stickerFilterAll.style.color = 'var(--text-muted)';
+        }
+        currentStickerFilter = 'fav';
+        populateStickers();
     });
 }
 
@@ -4226,15 +4380,7 @@ if (activeChatName) {
         }
     });
 }
-if (activeChatAvatar) {
-    activeChatAvatar.style.cursor = 'pointer';
-    activeChatAvatar.addEventListener('click', () => {
-        if (activeChatPartnerId) {
-            const user = users.find(u => u.id === activeChatPartnerId);
-            if (user) showUserProfile(user);
-        }
-    });
-}
+// Profil detaylarına isimden de erişilebilir
 
 function formatLastSeen(isoString) {
     if (!isoString) return 'yakınlarda';
