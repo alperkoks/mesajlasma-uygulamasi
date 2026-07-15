@@ -928,6 +928,74 @@ app.post('/api/profile/upload-banner', authenticateToken, upload.single('profile
     }
 });
 
+// BAĞLANTI ÖNİZLEME (LINK PREVIEW) ENDPOINT'I
+const linkPreviewCache = new Map();
+app.get('/api/link-preview', authenticateToken, async (req, res) => {
+    const targetUrl = req.query.url;
+    if (!targetUrl) {
+        return res.status(400).json({ message: 'URL parametresi gerekli.' });
+    }
+
+    if (linkPreviewCache.has(targetUrl)) {
+        return res.json(linkPreviewCache.get(targetUrl));
+    }
+
+    try {
+        const response = await fetch(targetUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+            },
+            signal: AbortSignal.timeout(4000)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const html = await response.text();
+
+        const getMeta = (regex) => {
+            const match = html.match(regex);
+            return match ? match[1].trim() : null;
+        };
+
+        // Gelişmiş regex taramaları
+        let title = getMeta(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
+                    getMeta(/<meta\s+name=["']title["']\s+content=["'](.*?)["']/i) ||
+                    (html.match(/<title>(.*?)<\/title>/i) ? html.match(/<title>(.*?)<\/title>/i)[1].trim() : null);
+
+        let description = getMeta(/<meta\s+property=["']og:description["']\s+content=["'](.*?)["']/i) ||
+                          getMeta(/<meta\s+name=["']description["']\s+content=["'](.*?)["']/i);
+
+        let image = getMeta(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
+        let siteName = getMeta(/<meta\s+property=["']og:site_name["']\s+content=["'](.*?)["']/i);
+
+        const decodeHtml = (str) => {
+            if (!str) return str;
+            return str
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#039;/g, "'");
+        };
+
+        const result = {
+            url: targetUrl,
+            title: decodeHtml(title) || targetUrl,
+            description: decodeHtml(description) || '',
+            image: image || '',
+            siteName: decodeHtml(siteName) || new URL(targetUrl).hostname
+        };
+
+        linkPreviewCache.set(targetUrl, result);
+        res.json(result);
+    } catch (error) {
+        console.error('Link preview çekme hatası:', error.message);
+        res.status(500).json({ message: 'Önizleme oluşturulamadı.' });
+    }
+});
+
 // 2.3 SOHBET İÇİ DOSYA/RESİM YÜKLEME
 app.post('/api/messages/upload', authenticateToken, upload.single('file'), async (req, res) => {
     if (!req.file) {

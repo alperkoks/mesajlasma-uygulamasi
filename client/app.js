@@ -1595,6 +1595,60 @@ function translatePage() {
     updateMuteButtonUI();
 }
 
+// 1.1 BAĞLANTI (LINK) TIKLANABİLİR YAPMA VE ZENGİN ÖNİZLEME (LINK PREVIEW) YORDAMLARI
+function autolinkText(text) {
+    const urlPattern = /(https?:\/\/[^\s<]+)/g;
+    return text.replace(urlPattern, (url) => {
+        const cleanUrl = url.replace(/&amp;/g, '&')
+                           .replace(/&lt;/g, '<')
+                           .replace(/&gt;/g, '>')
+                           .replace(/&quot;/g, '"');
+        return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--primary-color); text-decoration: underline; word-break: break-all;">${url}</a>`;
+    });
+}
+
+async function fetchAndRenderLinkPreview(url, msgId) {
+    const container = document.getElementById(`link-preview-${msgId}`);
+    if (!container) return;
+
+    try {
+        const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (!data.title && !data.description && !data.image) return;
+
+        let imgHTML = '';
+        if (data.image) {
+            imgHTML = `<img src="${data.image}" style="width: 100%; max-height: 140px; object-fit: cover; border-radius: 8px; margin-top: 0.5rem;" alt="preview" onclick="window.open('${escapeHTML(data.url)}', '_blank')">`;
+        }
+
+        const siteNameHTML = data.siteName ? `<div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px;">${escapeHTML(data.siteName)}</div>` : '';
+        const titleHTML = `<div style="font-size: 0.85rem; font-weight: 700; color: var(--text-main); margin-bottom: 3px; line-height: 1.3;"><a href="${escapeHTML(data.url)}" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none; border-bottom: 1px dashed var(--primary-color);">${escapeHTML(data.title)}</a></div>`;
+        const descHTML = data.description ? `<div style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${escapeHTML(data.description)}</div>` : '';
+
+        container.style.marginTop = '0.5rem';
+        container.style.padding = '0.6rem 0.8rem';
+        container.style.borderLeft = '3px solid var(--primary-color)';
+        container.style.backgroundColor = 'rgba(0,0,0,0.03)';
+        container.style.borderRadius = '0 8px 8px 0';
+        container.style.textAlign = 'left';
+        container.style.maxWidth = '320px';
+        container.style.boxShadow = 'var(--shadow-sm)';
+        
+        container.innerHTML = `
+            ${siteNameHTML}
+            ${titleHTML}
+            ${descHTML}
+            ${imgHTML}
+        `;
+    } catch (err) {
+        console.error('Bağlantı önizleme yükleme hatası:', err);
+    }
+}
+
 // 2. KANAL YAZMA YETKİSİ KONTROLÜ
 function checkChannelPostPermission() {
     if (activeChatGroupId) {
@@ -3902,7 +3956,14 @@ async function renderMessages() {
                 </div>
             `;
         } else {
-            msgContentHTML = escapeHTML(displayText);
+            const escaped = escapeHTML(displayText);
+            msgContentHTML = autolinkText(escaped);
+            
+            // Eğer bağlantı varsa zengin önizleme konteyneri ekle
+            const urlMatch = displayText.match(/https?:\/\/[^\s<]+/);
+            if (urlMatch) {
+                msgContentHTML += `<div class="link-preview-card-container" id="link-preview-${msg.id}"></div>`;
+            }
         }
 
         // Emoji Tepkileri (Reactions) HTML İnşası
@@ -3995,6 +4056,14 @@ async function renderMessages() {
             </div>
         `;
         messagesHistory.appendChild(row);
+
+        // Eğer mesaj düz metinse ve bağlantı içeriyorsa zengin önizlemeyi tetikle
+        if (msg.message_type !== 'deleted' && msg.message_type !== 'sticker' && msg.message_type !== 'image' && msg.message_type !== 'file' && msg.message_type !== 'voice') {
+            const urlMatch = displayText.match(/https?:\/\/[^\s<]+/);
+            if (urlMatch) {
+                fetchAndRenderLinkPreview(urlMatch[0], msg.id);
+            }
+        }
 
         // Sesli mesaj olay bağlama
         if (msg.message_type === 'voice') {
