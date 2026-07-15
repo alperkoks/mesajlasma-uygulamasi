@@ -156,6 +156,7 @@ async function initDatabase() {
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT NULL`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_encrypted INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reactions TEXT DEFAULT '{}'`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_forwarded INTEGER DEFAULT 0`);
 
             console.log('PostgreSQL Tabloları kontrol edildi/oluşturuldu.');
         } finally {
@@ -265,6 +266,9 @@ async function initDatabase() {
         }
         if (!columnsMsg.includes('reactions')) {
             await dbSqlite.exec("ALTER TABLE messages ADD COLUMN reactions TEXT DEFAULT '{}'");
+        }
+        if (!columnsMsg.includes('is_forwarded')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_forwarded INTEGER DEFAULT 0");
         }
 
         await dbSqlite.exec(`
@@ -527,19 +531,19 @@ const dbQueries = {
     },
 
     // Yeni mesaj kaydetme (Grup, dosya tipleri, alıntılama, süreli mesaj ve şifreleme desteğiyle)
-    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null, parentMessageId = null, expiresAt = null, isEncrypted = 0) {
+    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null, parentMessageId = null, expiresAt = null, isEncrypted = 0, isForwarded = 0) {
         if (isPostgres) {
             const finalReceiverId = groupId ? null : receiverId;
             const res = await dbPostgresPool.query(
-                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted, is_forwarded) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted, isForwarded]
             );
             return res.rows[0];
         } else {
             const finalReceiverId = groupId ? 0 : receiverId;
             const result = await dbSqlite.run(
-                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted, is_forwarded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted, isForwarded]
             );
             return await dbSqlite.get('SELECT * FROM messages WHERE id = ?', [result.lastID]);
         }

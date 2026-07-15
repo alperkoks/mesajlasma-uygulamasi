@@ -1107,13 +1107,37 @@ if (btnGifPopoverClose) {
     });
 }
 
+const fallbackGifs = [
+    { tags: ["love", "heart", "cute", "kiss", "hug", "love you", "aşk", "sevgi"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaG1tMmNrb2s3cmx2Zm16OG5ubGkxejJ6dnAwa2FkMmdqenpjbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/13CoXDiaCcC2EA/giphy.gif" },
+    { tags: ["love", "cat", "cute", "hug", "love you", "aşk", "sevgi", "sarılma"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWp3dWlzbzh5ZmVhcHF1ODl4Y2w0ZzI1azV4cjEweXlrcXk1dWptMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/WYEWdb9F6n13W/giphy.gif" },
+    { tags: ["love", "dog", "cute", "kiss", "puppy", "sevgi", "aşk", "köpek"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYnQ1M3c5eTdtOHp1N2lqbGNjZHpqdjdpc24ydjF6aHZibGFvOHd4MSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/MDJ9IbhswvCfkGL7Go/giphy.gif" },
+    { tags: ["happy", "dance", "celebrate", "excited", "yes", "mutlu", "dans"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcnF5aDFpcTFocHNuaDFtcmM5M29ubDZqbjNqbm8yMzd1aDk5aWlmNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/qscdhKw2oJGqiIJ1Kb/giphy.gif" },
+    { tags: ["dance", "cute", "happy", "party", "excited", "dans", "parti"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ3Nnb3A4Zm1xNTZ1bTZrdWZ1Yjh6ZTBpbmZ1NnpvYzJwbTRuNGM4biZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l2QDODC4jE8am08aA/giphy.gif" },
+    { tags: ["laugh", "funny", "lol", "hahaha", "smile", "komik", "gülme"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTBwdzUwbGZpY3ptOHJmYTVoMmR4dnpxaWVjZ2Y0NnFldXJzZWh6dyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/1d7F9xyq6j7C1wbIW1/giphy.gif" },
+    { tags: ["sad", "cry", "tears", "alone", "crying", "üzgün", "ağlama"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNXplZXRqazh6cTYwdjE5MTZrb3kybnk2NDk5d3NqZ3Yyb255cmZubyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/kegwX875t4j5bT263M/giphy.gif" },
+    { tags: ["angry", "mad", "no", "fight", "rage", "kızgın", "öfke"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWVmYXZoYmpyOHhveTVrc2c0dTRudmpyNW02NDc5cDF5YTA4cmk2YyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3ndAvMC5LFPNMCzq7m/giphy.gif" },
+    { tags: ["shocked", "omg", "wow", "surprised", "şok", "şaşkın"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMGxpeDVsZHphYmszODRkNm41Nm43N2V5ZmN2azZtczkwZWhpcXl6OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/HHz0E2p3H8P4HhS7Ww/giphy.gif" },
+    { tags: ["thumbsup", "ok", "yes", "nice", "good", "evet", "tamam", "onay"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWp3dWlzbzh5ZmVhcHF1ODl4Y2w0ZzI1azV4cjEweXlrcXk1dWptMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/WYEWdb9F6n13W/giphy.gif" },
+    { tags: ["hello", "wave", "hi", "welcome", "selam", "merhaba"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExaDVsYzRjOWEwb2s4NmJ4b3I4NnR5bndmbm9ueHNueDhvMWxyejA4NyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3ornk57KwDXfghaG4M/giphy.gif" },
+    { tags: ["bye", "goodbye", "leave", "hoşçakal", "baybay"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdW1pMG83ejM5c3NreDhvdXN5Zmx5ZW85dnRreHRyeDRvMXR5eDVzMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/26u4b45b8KlgAB7iM/giphy.gif" },
+    { tags: ["cool", "deal with it", "sunglasses", "havalı", "karizma"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbXFidnhjOHcydnQxcmx2Zm16OG5ubGkxejJ6dnAwa2FkMmdqenpjbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l3q2t2KAyvxy9xBe0/giphy.gif" },
+    { tags: ["sleep", "tired", "bed", "goodnight", "uyku", "yorgun", "iyi geceler"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExczMyejhicTN0dnQxcmx2Zm16OG5ubGkxejJ6dnAwa2FkMmdqenpjbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l0MYu38R0PPhIXeXY/giphy.gif" },
+    { tags: ["wait", "what", "thinking", "confused", "ne", "bekle", "düşünceli"], url: "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWxueGlicTN0dnQxcmx2Zm16OG5ubGkxejJ6dnAwa2FkMmdqenpjbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3o7TKSj06tqUQn27tS/giphy.gif" }
+];
+
 async function loadTrendingGifs() {
     try {
         const response = await fetch('/api/gifs/trending');
+        if (!response.ok) throw new Error('Trending API error');
         const gifs = await response.json();
-        renderGifs(gifs);
+        if (gifs && gifs.length > 0) {
+            renderGifs(gifs);
+        } else {
+            renderGifs(fallbackGifs.map(g => ({ preview: g.url, url: g.url })));
+        }
     } catch (err) {
-        console.error('Trend GIFler yüklenemedi:', err);
+        console.error('Trend GIFler yüklenemedi, yedekler yükleniyor:', err);
+        renderGifs(fallbackGifs.map(g => ({ preview: g.url, url: g.url })));
     }
 }
 
@@ -1129,10 +1153,18 @@ if (gifSearchInput) {
             }
             try {
                 const response = await fetch(`/api/gifs/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('Search API error');
                 const gifs = await response.json();
-                renderGifs(gifs);
+                if (gifs && gifs.length > 0) {
+                    renderGifs(gifs);
+                } else {
+                    const filtered = fallbackGifs.filter(g => g.tags.some(t => t.includes(query.toLowerCase())));
+                    renderGifs(filtered.map(g => ({ preview: g.url, url: g.url })));
+                }
             } catch (err) {
-                console.error('GIF arama hatası:', err);
+                console.error('GIF arama hatası, yerel yedeklerde aranıyor:', err);
+                const filtered = fallbackGifs.filter(g => g.tags.some(t => t.includes(query.toLowerCase())));
+                renderGifs(filtered.map(g => ({ preview: g.url, url: g.url })));
             }
         }, 500);
     });
@@ -1141,8 +1173,8 @@ if (gifSearchInput) {
 function renderGifs(gifs) {
     if (!gifResultsGrid) return;
     gifResultsGrid.innerHTML = '';
-    if (gifs.length === 0) {
-        gifResultsGrid.innerHTML = '<div style="grid-column: span 2; text-align: center; color: var(--text-muted); font-size: 0.85rem;">GIF bulunamadı.</div>';
+    if (!gifs || gifs.length === 0) {
+        gifResultsGrid.innerHTML = `<div style="grid-column: span 2; text-align: center; color: var(--text-muted); font-size: 0.85rem;">${currentLanguage === 'tr' ? 'GIF bulunamadı.' : 'No GIFs found.'}</div>`;
         return;
     }
     gifs.forEach(gif => {
@@ -2404,11 +2436,11 @@ async function initApp() {
 
         // MESAJ DÜZENLENDİĞİNDE çalışan olay
         socket.on('message_edited', (data) => {
-            const isGroupMatch = activeChatGroupId && data.groupId === activeChatGroupId;
-            const isUserMatch = !activeChatGroupId && activeChatPartnerId && (data.receiverId === activeChatPartnerId || data.receiverId === currentUser.id);
+            const isGroupMatch = activeChatGroupId && Number(data.groupId) === Number(activeChatGroupId);
+            const isUserMatch = !activeChatGroupId && activeChatPartnerId && (Number(data.receiverId) === Number(activeChatPartnerId) || Number(data.receiverId) === Number(currentUser.id));
 
             if (isGroupMatch || isUserMatch) {
-                const msg = messages.find(m => m.id === data.messageId);
+                const msg = messages.find(m => Number(m.id) === Number(data.messageId));
                 if (msg) {
                     msg.message = data.message;
                     msg.is_edited = 1;
@@ -2419,18 +2451,18 @@ async function initApp() {
 
         // MESAJ SİLİNDİĞİNDE çalışan olay
         socket.on('message_deleted', (data) => {
-            const isGroupMatch = activeChatGroupId && data.groupId === activeChatGroupId;
-            const isUserMatch = !activeChatGroupId && activeChatPartnerId && (data.receiverId === activeChatPartnerId || data.receiverId === currentUser.id);
+            const isGroupMatch = activeChatGroupId && Number(data.groupId) === Number(activeChatGroupId);
+            const isUserMatch = !activeChatGroupId && activeChatPartnerId && (Number(data.receiverId) === Number(activeChatPartnerId) || Number(data.receiverId) === Number(currentUser.id));
 
             if (isGroupMatch || isUserMatch) {
-                messages = messages.filter(m => m.id !== data.messageId);
+                messages = messages.filter(m => Number(m.id) !== Number(data.messageId));
                 renderMessages();
             }
         });
 
         // MESAJ EMOJİ REAKSİYONU GÜNCELLENDİĞİNDE çalışan olay
         socket.on('message_reaction_updated', (data) => {
-            const msg = messages.find(m => m.id === data.messageId);
+            const msg = messages.find(m => Number(m.id) === Number(data.messageId));
             if (msg) {
                 msg.reactions = data.reactions;
                 renderMessages();
@@ -2956,22 +2988,49 @@ async function renderMessages() {
         if (reactionsObj && typeof reactionsObj === 'object') {
             const keys = Object.keys(reactionsObj);
             if (keys.length > 0) {
-                reactionsHTML = '<div class="message-reactions-row" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; margin-bottom: 2px;">';
+                let list = [];
                 keys.forEach(emo => {
                     const usersWhoReacted = reactionsObj[emo] || [];
                     if (usersWhoReacted.length > 0) {
-                        const isMyReaction = usersWhoReacted.includes(currentUser.username);
-                        const activeStyle = isMyReaction ? 'border: 1px solid var(--primary-color); background-color: var(--primary-light); color: var(--primary-color);' : 'border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main);';
-                        reactionsHTML += `
-                            <span class="reaction-pill" data-emoji="${emo}" data-msg-id="${msg.id}" style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.75rem; padding: 2px 6px; border-radius: 12px; cursor: pointer; user-select: none; ${activeStyle}" title="${usersWhoReacted.join(', ')}">
-                                <span>${emo}</span>
-                                <span style="font-size: 0.65rem; font-weight: 600;">${usersWhoReacted.length}</span>
-                            </span>
-                        `;
+                        list.push({
+                            emoji: emo,
+                            users: usersWhoReacted,
+                            count: usersWhoReacted.length
+                        });
                     }
                 });
-                reactionsHTML += '</div>';
+                
+                // Sayılarına göre azalan sırada sırala (en çok tıklanan en solda)
+                list.sort((a, b) => b.count - a.count);
+                
+                // En fazla 4 adet emojiyi göster
+                const top4 = list.slice(0, 4);
+                
+                if (top4.length > 0) {
+                    reactionsHTML = '<div class="message-reactions-row" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; margin-bottom: 2px;">';
+                    top4.forEach(item => {
+                        const isMyReaction = item.users.includes(currentUser.username);
+                        const activeStyle = isMyReaction ? 'border: 1px solid var(--primary-color); background-color: var(--primary-light); color: var(--primary-color);' : 'border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main);';
+                        reactionsHTML += `
+                            <span class="reaction-pill" data-emoji="${item.emoji}" data-msg-id="${msg.id}" style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.8rem; padding: 4px 6px; border-radius: 8px; cursor: pointer; user-select: none; line-height: 1; ${activeStyle}" title="${item.users.join(', ')}">
+                                <span>${item.emoji}</span>
+                                <span style="font-size: 0.6rem; font-weight: 600; margin-top: 2px;">${item.count}</span>
+                            </span>
+                        `;
+                    });
+                    reactionsHTML += '</div>';
+                }
             }
+        }
+
+        // İletildi (Forwarded) İşareti
+        let forwardedHTML = '';
+        if (msg.is_forwarded === 1) {
+            forwardedHTML = `
+                <div class="message-forwarded-badge" style="font-size: 0.65rem; color: var(--text-muted); font-style: italic; margin-bottom: 3px; display: flex; align-items: center; gap: 3px; opacity: 0.75; user-select: none;">
+                    ↪️ ${currentLanguage === 'tr' ? 'İletildi' : 'Forwarded'}
+                </div>
+            `;
         }
 
         let senderNameHTML = '';
@@ -2987,7 +3046,8 @@ async function renderMessages() {
 
         row.innerHTML = `
             <div class="${bubbleClass}" data-msg-id="${msg.id}" data-sender-id="${msg.sender_id}">
-                <span class="ctx-trigger-arrow" style="position: absolute; top: 4px; right: 6px; display: none; cursor: pointer; font-size: 0.7rem; color: var(--text-muted); user-select: none; z-index: 10;" title="Menü">▼</span>
+                <span class="ctx-trigger-arrow" title="Menü">▼</span>
+                ${forwardedHTML}
                 ${replyQuoteHTML}
                 ${senderNameHTML}
                 <div class="message-text">${msgContentHTML}</div>
@@ -3987,9 +4047,23 @@ async function loadGroupMembers(group) {
 // --- BİLDİRİM/SAĞ TIK VE CONTEXT MENU MANTIKLARI ---
 let activeContextMessage = null; // Menünün açıldığı mesaj nesnesi
 
+function hideContextMenu() {
+    if (chatContextMenu) {
+        chatContextMenu.classList.add('hidden');
+    }
+    document.querySelectorAll('.message-bubble').forEach(b => b.classList.remove('active-context'));
+}
+
 function showContextMenu(x, y, msg) {
     if (!chatContextMenu) return;
     activeContextMessage = msg;
+
+    // Aktif mesaj vurgusunu ekle
+    document.querySelectorAll('.message-bubble').forEach(b => b.classList.remove('active-context'));
+    const currentBubble = messagesHistory.querySelector(`.message-bubble[data-msg-id="${msg.id}"]`);
+    if (currentBubble) {
+        currentBubble.classList.add('active-context');
+    }
 
     // Menünün butonlarını yetkiye göre aç/kapa
     const isMyMessage = msg.sender_id === currentUser.id;
@@ -4024,7 +4098,7 @@ function showContextMenu(x, y, msg) {
                 targetUserId: activeChatPartnerId,
                 groupId: activeChatGroupId
             });
-            chatContextMenu.classList.add('hidden');
+            hideContextMenu();
         });
     });
 
@@ -4068,7 +4142,7 @@ if (ctxBtnReply) {
         messageInput.placeholder = 'Yanıtınızı yazın...';
         messageInput.focus();
         
-        chatContextMenu.classList.add('hidden');
+        hideContextMenu();
     });
 }
 
@@ -4078,7 +4152,7 @@ if (ctxBtnEdit) {
         // Sadece text mesajları düzenlenebilir
         if (activeContextMessage.message_type && activeContextMessage.message_type !== 'text') {
             alert('Yalnızca metin mesajları düzenlenebilir.');
-            chatContextMenu.classList.add('hidden');
+            hideContextMenu();
             return;
         }
 
@@ -4092,7 +4166,7 @@ if (ctxBtnEdit) {
         replyingMessageId = null;
         replyPreviewContainer.classList.add('hidden');
 
-        chatContextMenu.classList.add('hidden');
+        hideContextMenu();
     });
 }
 
@@ -4100,7 +4174,7 @@ if (ctxBtnDelete) {
     ctxBtnDelete.addEventListener('click', async () => {
         if (!activeContextMessage) return;
         if (!confirm('Bu mesajı silmek istediğinize emin misiniz?')) {
-            chatContextMenu.classList.add('hidden');
+            hideContextMenu();
             return;
         }
 
@@ -4114,7 +4188,7 @@ if (ctxBtnDelete) {
             alert('Mesaj silinemedi: ' + err.message);
         }
 
-        chatContextMenu.classList.add('hidden');
+        hideContextMenu();
     });
 }
 
@@ -4122,7 +4196,7 @@ if (ctxBtnDelete) {
 if (ctxBtnForward) {
     ctxBtnForward.addEventListener('click', () => {
         if (!activeContextMessage) return;
-        chatContextMenu.classList.add('hidden');
+        hideContextMenu();
         if (forwardModal) {
             forwardModal.classList.remove('hidden');
             renderForwardTargets();
@@ -4219,7 +4293,8 @@ async function forwardMessageTo(msg, targetUserId, targetGroupId) {
             messageType: msg.message_type || 'text',
             fileUrl: msg.file_url || null,
             message: msg.decrypted_message || msg.message,
-            isEncrypted: 0
+            isEncrypted: 0,
+            isForwarded: 1
         });
         
         const isCurrentPrivate = !activeChatGroupId && targetUserId && activeChatPartnerId === targetUserId;
@@ -4241,7 +4316,7 @@ document.addEventListener('click', (e) => {
     if (chatContextMenu && !chatContextMenu.classList.contains('hidden')) {
         // Eğer tıklanan yer context menü elemanı değilse kapat
         if (!chatContextMenu.contains(e.target)) {
-            chatContextMenu.classList.add('hidden');
+            hideContextMenu();
         }
     }
 });

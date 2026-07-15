@@ -1468,7 +1468,7 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
 app.post('/api/messages', authenticateToken, async (req, res) => {
     const senderId = req.user.id;
     const receiverId = req.body.receiverId ? parseInt(req.body.receiverId) : null;
-    const { message, groupId, messageType, fileUrl, parentMessageId, durationSeconds, isEncrypted } = req.body;
+    const { message, groupId, messageType, fileUrl, parentMessageId, durationSeconds, isEncrypted, isForwarded } = req.body;
 
     if (!groupId && !receiverId) {
         return res.status(400).json({ message: 'Alıcı ID veya Grup ID zorunludur.' });
@@ -1525,6 +1525,8 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
         }
         const isEncryptedVal = isEncrypted ? 1 : 0;
 
+        const isForwardedVal = isForwarded ? 1 : 0;
+
         // Mesajı veritabanına kaydet
         const savedMessage = await dbQueries.saveMessage(
             senderId, 
@@ -1535,7 +1537,8 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
             fileUrl || null,
             parentMessageId || null,
             expiresAt,
-            isEncryptedVal
+            isEncryptedVal,
+            isForwardedVal
         );
         
         // --- GERÇEK ZAMANLI SOKET İLETİMİ ---
