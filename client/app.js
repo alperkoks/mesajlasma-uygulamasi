@@ -235,6 +235,11 @@ const settingsFileInput = document.getElementById('settings-file-input');
 const btnSelectPhoto = document.getElementById('btn-select-photo');
 const btnUploadPhoto = document.getElementById('btn-upload-photo');
 
+// BANNER (KAPAK RESMİ) ELEMENTLERİ
+const settingsBannerPreview = document.getElementById('settings-banner-preview');
+const settingsBannerFileInput = document.getElementById('settings-banner-file-input');
+const btnSelectBannerPhoto = document.getElementById('btn-select-banner-photo');
+
 // LIGHTBOX (BÜYÜK RESİM ÖNİZLEME) ELEMENTLERİ
 const lightboxModal = document.getElementById('lightbox-modal');
 const lightboxImg = document.getElementById('lightbox-img');
@@ -618,6 +623,16 @@ openSettingsBtn.addEventListener('click', () => {
     // Duvar kağıdı aktif seçim butonunu görsel olarak işaretle
     applyWallpaper(currentWallpaper);
 
+    // Kendi profil kapak resmi (banner) önizlemesini yükle
+    if (settingsBannerPreview) {
+        const bannerVal = currentUser.profile_banner || 'linear-gradient(135deg, #4f46e5, #06b6d4)';
+        if (bannerVal.startsWith('linear-gradient')) {
+            settingsBannerPreview.style.background = bannerVal;
+        } else {
+            settingsBannerPreview.style.background = `url(${bannerVal}) center/cover`;
+        }
+    }
+
     // Ayarlar sekmelerini varsayılana sıfırla (Profilim sekmesi)
     document.querySelectorAll('.settings-sidebar-btn').forEach(btn => {
         if (btn.getAttribute('data-tab') === 'tab-profile') {
@@ -715,6 +730,69 @@ btnUploadPhoto.addEventListener('click', async () => {
         console.error('Profil resmi yükleme hatası:', err);
         alert(err.message || 'Profil resmi yüklenirken bir hata oluştu.');
     }
+});
+
+// PROFİL KAPAK RESMİ (BANNER) İNTERAKTİF İŞLEMLERİ
+if (btnSelectBannerPhoto && settingsBannerFileInput) {
+    btnSelectBannerPhoto.addEventListener('click', () => {
+        settingsBannerFileInput.click();
+    });
+
+    settingsBannerFileInput.addEventListener('change', async () => {
+        const file = settingsBannerFileInput.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('profile_banner', file);
+
+        try {
+            const res = await fetch('/api/profile/upload-banner', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.message || 'Kapak resmi yüklenemedi.');
+            }
+
+            alert(data.message);
+            currentUser.profile_banner = data.profile_banner;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+            // Önizlemeyi güncelle
+            if (settingsBannerPreview) {
+                if (data.profile_banner.startsWith('linear-gradient')) {
+                    settingsBannerPreview.style.background = data.profile_banner;
+                } else {
+                    settingsBannerPreview.style.background = `url(${data.profile_banner}) center/cover`;
+                }
+            }
+        } catch (err) {
+            alert('Kapak resmi yüklenemedi moruk: ' + err.message);
+        }
+    });
+}
+
+document.querySelectorAll('.banner-select-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+        const bannerVal = btn.getAttribute('data-banner');
+        try {
+            const res = await apiCall('/profile/update-banner-preset', 'POST', { banner: bannerVal });
+            currentUser.profile_banner = res.profile_banner;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+
+            // Önizlemeyi güncelle
+            if (settingsBannerPreview) {
+                settingsBannerPreview.style.background = res.profile_banner;
+            }
+        } catch (err) {
+            alert('Kapak şablonu uygulanamadı moruk: ' + err.message);
+        }
+    });
 });
 
 // Ayarları Kaydet (Kullanıcı Adı Güncelleme)
@@ -4952,6 +5030,16 @@ function showUserProfile(user) {
     } else {
         profileModalAvatar.innerHTML = initial;
         profileModalAvatar.style.cursor = 'default';
+    }
+
+    const profileModalBanner = document.getElementById('profile-modal-banner');
+    if (profileModalBanner) {
+        const bannerVal = user.profile_banner || 'linear-gradient(135deg, #4f46e5, #06b6d4)';
+        if (bannerVal.startsWith('linear-gradient')) {
+            profileModalBanner.style.background = bannerVal;
+        } else {
+            profileModalBanner.style.background = `url(${bannerVal}) center/cover`;
+        }
     }
 
     userProfileModal.classList.remove('hidden');

@@ -883,6 +883,51 @@ app.post('/api/profile/upload-pic', authenticateToken, upload.single('profile_pi
     }
 });
 
+// PROFİL KAPAK RESMİ (BANNER) GÜNCELLEME VE YÜKLEME
+app.post('/api/profile/update-banner-preset', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { banner } = req.body;
+
+    if (!banner) {
+        return res.status(400).json({ message: 'Lütfen geçerli bir kapak şablonu belirtin.' });
+    }
+
+    try {
+        await dbQueries.updateUserProfileBanner(userId, banner);
+        io.emit('profile_banner_changed', { userId, profileBanner: banner });
+        res.json({ message: 'Kapak resminiz başarıyla güncellendi!', profile_banner: banner });
+    } catch (error) {
+        console.error('Kapak resmi preset güncelleme hatası:', error);
+        res.status(500).json({ message: 'Kapak resmi güncellenirken hata oluştu.' });
+    }
+});
+
+app.post('/api/profile/upload-banner', authenticateToken, upload.single('profile_banner'), async (req, res) => {
+    const userId = req.user.id;
+
+    if (!req.file) {
+        return res.status(400).json({ message: 'Lütfen geçerli bir görsel dosyası seçin.' });
+    }
+
+    try {
+        let imageUrl = '';
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+            const uploadResult = await uploadStream(req.file.buffer);
+            imageUrl = uploadResult.secure_url;
+        } else {
+            console.log('📷 [BANNER SİMÜLASYONU] Cloudinary ayarları eksik, yerel test resmi kullanılıyor.');
+            imageUrl = 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=600&h=200';
+        }
+
+        await dbQueries.updateUserProfileBanner(userId, imageUrl);
+        io.emit('profile_banner_changed', { userId, profileBanner: imageUrl });
+        res.json({ message: 'Kapak resminiz başarıyla güncellendi!', profile_banner: imageUrl });
+    } catch (error) {
+        console.error('Kapak resmi yükleme hatası:', error);
+        res.status(500).json({ message: 'Kapak resmi yüklenirken hata oluştu.' });
+    }
+});
+
 // 2.3 SOHBET İÇİ DOSYA/RESİM YÜKLEME
 app.post('/api/messages/upload', authenticateToken, upload.single('file'), async (req, res) => {
     if (!req.file) {
@@ -927,6 +972,7 @@ app.get('/api/users', authenticateToken, async (req, res) => {
                 id: friend.id,
                 username: friend.username,
                 profile_pic: friend.profile_pic,
+                profile_banner: friend.profile_banner,
                 bio: friend.bio || '',
                 last_seen: friend.show_last_seen !== 0 ? (friend.last_seen || null) : null,
                 unread_count: parseInt(friend.unread_count || 0),

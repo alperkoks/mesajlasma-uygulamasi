@@ -145,6 +145,7 @@ async function initDatabase() {
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS show_last_seen INTEGER DEFAULT 1`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS show_online INTEGER DEFAULT 1`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_banner TEXT`);
             await client.query(`ALTER TABLE groups ADD COLUMN IF NOT EXISTS profile_pic TEXT`);
             await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS is_admin INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'tr'`);
@@ -235,6 +236,9 @@ async function initDatabase() {
         }
         if (!columns.includes('language')) {
             await dbSqlite.exec("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'tr'");
+        }
+        if (!columns.includes('profile_banner')) {
+            await dbSqlite.exec("ALTER TABLE users ADD COLUMN profile_banner TEXT");
         }
 
         await dbSqlite.exec(`
@@ -657,6 +661,7 @@ const dbQueries = {
                     users.id, 
                     users.username, 
                     users.profile_pic,
+                    users.profile_banner,
                     users.bio,
                     users.last_seen,
                     users.show_last_seen,
@@ -1101,6 +1106,15 @@ const dbQueries = {
         }
     },
 
+    // Kullanıcı kapak resmini (banner) güncelle
+    async updateUserProfileBanner(userId, bannerUrl) {
+        if (isPostgres) {
+            await dbPostgresPool.query('UPDATE users SET profile_banner = $1 WHERE id = $2', [bannerUrl, userId]);
+        } else {
+            await dbSqlite.run('UPDATE users SET profile_banner = ? WHERE id = ?', [bannerUrl, userId]);
+        }
+    },
+
     // ID'ye göre tek mesaj getir
     async getMessageById(messageId) {
         if (isPostgres) {
@@ -1186,10 +1200,10 @@ const dbQueries = {
     // ID'ye göre kullanıcı bilgilerini getir
     async getUserById(userId) {
         if (isPostgres) {
-            const res = await dbPostgresPool.query('SELECT id, username, profile_pic, bio, last_seen, show_last_seen, show_online, language, email FROM users WHERE id = $1', [userId]);
+            const res = await dbPostgresPool.query('SELECT id, username, profile_pic, profile_banner, bio, last_seen, show_last_seen, show_online, language, email FROM users WHERE id = $1', [userId]);
             return res.rows[0];
         } else {
-            return await dbSqlite.get('SELECT id, username, profile_pic, bio, last_seen, show_last_seen, show_online, language, email FROM users WHERE id = ?', [userId]);
+            return await dbSqlite.get('SELECT id, username, profile_pic, profile_banner, bio, last_seen, show_last_seen, show_online, language, email FROM users WHERE id = ?', [userId]);
         }
     },
 
