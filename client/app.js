@@ -2154,12 +2154,53 @@ if (btnToggleMic) {
 }
 
 if (btnToggleVideo) {
-    btnToggleVideo.addEventListener('click', () => {
+    btnToggleVideo.addEventListener('click', async () => {
         if (localStream) {
             const videoTrack = localStream.getVideoTracks()[0];
             if (videoTrack) {
+                // Eğer zaten video track varsa kapat/aç yap
                 videoTrack.enabled = !videoTrack.enabled;
                 btnToggleVideo.style.backgroundColor = videoTrack.enabled ? 'rgba(255,255,255,0.15)' : '#ef4444';
+            } else {
+                // Sesli arama esnasında kamerayı ilk defa açmak istiyorsa (Video call upgrade)
+                try {
+                    const videoStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: currentFacingMode },
+                        audio: false
+                    });
+                    const newVideoTrack = videoStream.getVideoTracks()[0];
+                    localStream.addTrack(newVideoTrack);
+                    
+                    // Görsel arayüz elemanlarını görüntülü moda geçir
+                    isVideoCallActive = true;
+                    callVideosContainer.classList.remove('hidden');
+                    if (btnSwitchCamera) btnSwitchCamera.style.display = 'flex';
+                    if (localVideo) {
+                        localVideo.srcObject = null;
+                        localVideo.srcObject = localStream;
+                    }
+                    
+                    // WebRTC PeerConnection'a yeni track'i ekle
+                    if (peerConnection) {
+                        peerConnection.addTrack(newVideoTrack, localStream);
+                        // Re-negotiate tetikle
+                        const offer = await peerConnection.createOffer();
+                        await peerConnection.setLocalDescription(offer);
+                        socket.emit('call_user', {
+                            targetUserId: currentCallPartnerId,
+                            signalData: offer,
+                            isVideoCall: true
+                        });
+                    }
+                    
+                    // Karşı tarafa kamerayı açma komutunu (upgrade) soketle bildir
+                    socket.emit('upgrade_to_video', { targetUserId: currentCallPartnerId });
+                    btnToggleVideo.style.backgroundColor = 'rgba(255,255,255,0.15)';
+                    console.log('📹 Arama başarıyla görüntülü aramaya yükseltildi.');
+                } catch (err) {
+                    console.error('Kamera açma/yükseltme hatası:', err);
+                    alert(currentLanguage === 'tr' ? 'Kamera açılamadı.' : 'Could not open camera.');
+                }
             }
         }
     });
@@ -2605,6 +2646,7 @@ async function initApp() {
                 msg.message_type = data.message_type;
                 msg.file_url = data.file_url;
                 msg.reactions = data.reactions;
+                msg.decrypted_message = null; // Eski şifresi çözülmüş önbelleği temizle
                 renderMessages();
             }
         });
@@ -2649,6 +2691,41 @@ async function initApp() {
         socket.on('call_ended', () => {
             stopRingtone();
             endCallSession();
+        });
+
+        socket.on('upgrade_to_video', async () => {
+            isVideoCallActive = true;
+            callVideosContainer.classList.remove('hidden');
+            if (btnSwitchCamera) btnSwitchCamera.style.display = 'flex';
+            
+            // Eğer yerel video track'imiz yoksa bizim kameramızı da açıp akışa dahil et
+            if (localStream && localStream.getVideoTracks().length === 0) {
+                try {
+                    const videoStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: currentFacingMode },
+                        audio: false
+                    });
+                    const newVideoTrack = videoStream.getVideoTracks()[0];
+                    localStream.addTrack(newVideoTrack);
+                    if (localVideo) {
+                        localVideo.srcObject = null;
+                        localVideo.srcObject = localStream;
+                    }
+                    if (peerConnection) {
+                        peerConnection.addTrack(newVideoTrack, localStream);
+                        // Bağlantıyı tazelemek için re-negotiate tetiklenebilir
+                        const offer = await peerConnection.createOffer();
+                        await peerConnection.setLocalDescription(offer);
+                        socket.emit('call_user', {
+                            targetUserId: currentCallPartnerId,
+                            signalData: offer,
+                            isVideoCall: true
+                        });
+                    }
+                } catch (e) {
+                    console.error('Kamera otomatik açma hatası:', e);
+                }
+            }
         });
 
         socket.on('webrtc_ice_candidate', async ({ candidate }) => {

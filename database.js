@@ -1154,12 +1154,12 @@ const dbQueries = {
     async deleteMessageForEveryone(messageId, senderId) {
         if (isPostgres) {
             await dbPostgresPool.query(
-                "UPDATE messages SET message = '🚫 Bu mesaj silindi', message_type = 'deleted', file_url = NULL, reactions = '{}' WHERE id = $1 AND sender_id = $2",
+                "UPDATE messages SET message = '🚫 Bu mesaj silindi', message_type = 'deleted', file_url = NULL, reactions = '{}', is_encrypted = 0 WHERE id = $1 AND sender_id = $2",
                 [messageId, senderId]
             );
         } else {
             await dbSqlite.run(
-                "UPDATE messages SET message = '🚫 Bu mesaj silindi', message_type = 'deleted', file_url = NULL, reactions = '{}' WHERE id = ? AND sender_id = ?",
+                "UPDATE messages SET message = '🚫 Bu mesaj silindi', message_type = 'deleted', file_url = NULL, reactions = '{}', is_encrypted = 0 WHERE id = ? AND sender_id = ?",
                 [messageId, senderId]
             );
         }

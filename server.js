@@ -9,8 +9,13 @@ const { Server } = require('socket.io'); // Socket.IO kütüphanesini dahil etti
 const { initDatabase, dbQueries, getDbInstance } = require('./database');
 let isPostgres = false;
 const webpush = require('web-push');
+const fs = require('fs');
 
 const app = express();
+const uploadsDir = path.join(__dirname, 'client', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
 const server = http.createServer(app);
 const io = new Server(server); // Soket sunucusunu başlattık
 
@@ -429,6 +434,15 @@ io.on('connection', (socket) => {
                 io.to(socketId).emit('webrtc_ice_candidate', {
                     candidate: candidate
                 });
+            });
+        }
+    });
+
+    socket.on('upgrade_to_video', ({ targetUserId }) => {
+        const targetSockets = userSockets.get(Number(targetUserId));
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(socketId => {
+                io.to(socketId).emit('upgrade_to_video');
             });
         }
     });
@@ -876,34 +890,16 @@ app.post('/api/messages/upload', authenticateToken, upload.single('file'), async
     }
 
     try {
-        let fileUrl = '';
         const isImage = req.file.mimetype.startsWith('image/');
-
-        // Eğer Cloudinary ayarları girilmişse resmi veya dosyayı yükle
-        if (process.env.CLOUDINARY_CLOUD_NAME) {
-            const uploadResult = await new Promise((resolve, reject) => {
-                const stream = cloudinary.uploader.upload_stream(
-                    { folder: 'chat_files', resource_type: 'auto' },
-                    (error, result) => {
-                        if (result) {
-                            resolve(result);
-                        } else {
-                            reject(error);
-                        }
-                    }
-                );
-                stream.end(req.file.buffer);
-            });
-            fileUrl = uploadResult.secure_url;
-        } else {
-            // Eğer Cloudinary kurulu değilse simüle et
-            console.log('📷 [SOHBET DOSYA SİMÜLASYONU] Cloudinary ayarları eksik, test linki üretiliyor.');
-            if (isImage) {
-                fileUrl = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
-            } else {
-                fileUrl = 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf';
-            }
-        }
+        
+        // Benzersiz dosya ismi oluştur (UDF, PDF vb. orijinal uzantıları koruyarak)
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const cleanFilename = uniqueSuffix + '-' + req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = path.join(__dirname, 'client', 'uploads', cleanFilename);
+        
+        // Dosyayı diske yaz
+        fs.writeFileSync(filePath, req.file.buffer);
+        const fileUrl = `/uploads/${cleanFilename}`;
 
         res.json({
             fileUrl: fileUrl,
@@ -1790,7 +1786,7 @@ app.post('/api/messages/:messageId/delete', authenticateToken, async (req, res) 
             } else {
                 const targets = [msgObj.sender_id, msgObj.receiver_id];
                 targets.forEach(tId => {
-                    const sockets = userSockets.get(tId);
+                    const sockets = userSockets.get(Number(tId));
                     if (sockets) {
                         sockets.forEach(sId => {
                             io.to(sId).emit('message_deleted_for_everyone', updatedMsg);
