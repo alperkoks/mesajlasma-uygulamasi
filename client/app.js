@@ -22,11 +22,24 @@ if (savedTheme === 'dark') {
 document.addEventListener('DOMContentLoaded', () => {
     const themeBtn = document.getElementById('theme-toggle-btn');
     if (themeBtn) {
-        themeBtn.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        const updateThemeBtnUI = (isDark) => {
+            const span = themeBtn.querySelector('span');
+            if (span) {
+                span.textContent = isDark 
+                    ? (currentLanguage === 'tr' ? 'Aydınlık Mod' : 'Light Mode') 
+                    : (currentLanguage === 'tr' ? 'Karanlık Mod' : 'Dark Mode');
+                // update first text node containing emoji
+                themeBtn.childNodes[0].textContent = isDark ? '☀️ ' : '🌙 ';
+            } else {
+                themeBtn.textContent = isDark ? '☀️' : '🌙';
+            }
+        };
+        
+        updateThemeBtnUI(savedTheme === 'dark');
         themeBtn.addEventListener('click', () => {
             document.body.classList.toggle('dark-theme');
             const isDark = document.body.classList.contains('dark-theme');
-            themeBtn.textContent = isDark ? '☀️' : '🌙';
+            updateThemeBtnUI(isDark);
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
         });
     }
@@ -886,7 +899,13 @@ const i18n = {
         typing: "yazıyor...",
         channel_only_admin: "Bu kanalda sadece yöneticiler mesaj gönderebilir.",
         placeholder_message: "Mesajınızı yazın...",
-        voice_message: "Sesli Mesaj"
+        voice_message: "Sesli Mesaj",
+        logout_btn: "🚪 Çıkış Yap",
+        theme_label: "Arayüz Teması / Theme",
+        theme_dark: "Karanlık Mod",
+        theme_light: "Aydınlık Mod",
+        btn_enable_notifications: "🔔 Bildirimleri Etkinleştir",
+        btn_install_app: "📲 Uygulamayı Yükle"
     },
     en: {
         settings_title: "Profile Settings",
@@ -910,7 +929,13 @@ const i18n = {
         typing: "typing...",
         channel_only_admin: "Only admins can post in this channel.",
         placeholder_message: "Type a message...",
-        voice_message: "Voice Message"
+        voice_message: "Voice Message",
+        logout_btn: "🚪 Logout",
+        theme_label: "Interface Theme / Arayüz Teması",
+        theme_dark: "Dark Mode",
+        theme_light: "Light Mode",
+        btn_enable_notifications: "🔔 Enable Notifications",
+        btn_install_app: "📲 Install App"
     }
 };
 
@@ -965,6 +990,30 @@ function translatePage() {
     
     const btnCallVideo = document.getElementById('btn-call-video');
     if (btnCallVideo) btnCallVideo.title = langData.call_video;
+
+    // Tema Değiştirme Butonu ve Etiketi Yerelleştirme
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    if (themeToggleBtn) {
+        const themeLabel = themeToggleBtn.previousElementSibling;
+        if (themeLabel) themeLabel.textContent = langData.theme_label;
+        const themeSpan = themeToggleBtn.querySelector('span');
+        if (themeSpan) {
+            const isDark = document.body.classList.contains('dark-theme');
+            themeSpan.textContent = isDark ? langData.theme_light : langData.theme_dark;
+            themeToggleBtn.childNodes[0].textContent = isDark ? '☀️ ' : '🌙 ';
+        }
+    }
+
+    // Bildirim ve Yükleme Butonları Yerelleştirme
+    const btnRequestNotif = document.getElementById('btn-request-notifications');
+    if (btnRequestNotif) btnRequestNotif.textContent = langData.btn_enable_notifications;
+
+    const btnInstApp = document.getElementById('btn-install-app');
+    if (btnInstApp) btnInstApp.textContent = langData.btn_install_app;
+
+    // Çıkış Yap Butonu Yerelleştirme
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.textContent = langData.logout_btn;
 
     if (messageInput) {
         if (!messageInput.disabled) {
