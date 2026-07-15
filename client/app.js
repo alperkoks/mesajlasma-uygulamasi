@@ -1133,10 +1133,6 @@ if (btnDisappearingMessages) {
     });
 }
 
-socket.on('message_deleted', ({ messageId }) => {
-    messages = messages.filter(m => m.id !== messageId);
-    renderMessages();
-});
 
 // 5. SES KAYDETME (MediaRecorder) VE CUSTOM SESLİ OYNATICI
 const btnMic = document.getElementById('btn-mic');
@@ -1565,41 +1561,6 @@ if (btnToggleVideo) {
     });
 }
 
-socket.on('call_incoming', ({ fromUserId, fromUsername, signalData, isVideoCall }) => {
-    currentCallPartnerId = fromUserId;
-    isVideoCallActive = isVideoCall;
-    incomingOfferSignal = signalData;
-    
-    const callerUser = { username: fromUsername };
-    showCallScreen(callerUser, isVideoCall, true);
-});
-
-socket.on('call_accepted', async ({ signalData }) => {
-    callStatus.textContent = currentLanguage === 'tr' ? 'Görüşme' : 'Connected';
-    callActive = true;
-    if (peerConnection) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData));
-    }
-});
-
-socket.on('call_rejected', () => {
-    alert(currentLanguage === 'tr' ? 'Arama reddedildi.' : 'Call rejected.');
-    endCallSession();
-});
-
-socket.on('call_ended', () => {
-    endCallSession();
-});
-
-socket.on('webrtc_ice_candidate', async ({ candidate }) => {
-    if (peerConnection) {
-        try {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch (err) {
-            console.error('ICE adayı eklenirken hata oluştu:', err);
-        }
-    }
-});
 
 function endCallSession() {
     webrtcCallScreen.classList.add('hidden');
@@ -1977,6 +1938,43 @@ async function initApp() {
             if (isGroupMatch || isUserMatch) {
                 messages = messages.filter(m => m.id !== data.messageId);
                 renderMessages();
+            }
+        });
+
+        // --- WEBRTC ARAMA SİNYALLEŞME SOKET OLAYLARI ---
+        socket.on('call_incoming', ({ fromUserId, fromUsername, signalData, isVideoCall }) => {
+            currentCallPartnerId = fromUserId;
+            isVideoCallActive = isVideoCall;
+            incomingOfferSignal = signalData;
+            
+            const callerUser = { username: fromUsername };
+            showCallScreen(callerUser, isVideoCall, true);
+        });
+
+        socket.on('call_accepted', async ({ signalData }) => {
+            callStatus.textContent = currentLanguage === 'tr' ? 'Görüşme' : 'Connected';
+            callActive = true;
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData));
+            }
+        });
+
+        socket.on('call_rejected', () => {
+            alert(currentLanguage === 'tr' ? 'Arama reddedildi.' : 'Call rejected.');
+            endCallSession();
+        });
+
+        socket.on('call_ended', () => {
+            endCallSession();
+        });
+
+        socket.on('webrtc_ice_candidate', async ({ candidate }) => {
+            if (peerConnection) {
+                try {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (err) {
+                    console.error('ICE adayı eklenirken hata oluştu:', err);
+                }
             }
         });
         
