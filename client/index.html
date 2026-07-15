@@ -290,10 +290,14 @@
                                          </button>
                                          <input type="file" id="sticker-file-input" style="display: none;" accept="image/*">
                                          
-                                         <!-- Sticker Alt Sekmesi: Tümü / Favoriler -->
-                                         <div style="display: flex; gap: 0.25rem; margin-left: auto;">
-                                             <button type="button" id="sticker-filter-all" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--primary-light); color: var(--primary-color); cursor: pointer;">Tümü</button>
-                                             <button type="button" id="sticker-filter-fav" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer;">⭐ Favori</button>
+                                         <!-- Sticker Alt Sekmesi: Kategori Filtreleri -->
+                                         <div class="sticker-filters-row" style="display: flex; gap: 0.35rem; margin-left: auto; overflow-x: auto; white-space: nowrap; max-width: 70%; padding: 4px 0; scrollbar-width: none;">
+                                             <button type="button" id="sticker-filter-all" class="sticker-filter-pill active" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--primary-light); color: var(--primary-color); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">Tümü</button>
+                                             <button type="button" id="sticker-filter-happy" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">😊 Mutlu</button>
+                                             <button type="button" id="sticker-filter-sad" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">😢 Üzgün</button>
+                                             <button type="button" id="sticker-filter-playful" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">🤪 Eğlenceli</button>
+                                             <button type="button" id="sticker-filter-angry" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">😡 Kızgın</button>
+                                             <button type="button" id="sticker-filter-fav" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">⭐ Favori</button>
                                          </div>
                                      </div>
                                      <div id="stickers-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.75rem;">
@@ -380,7 +384,14 @@
 
                     <!-- Çıkış Yap Butonu -->
                     <div style="border-top: 1px solid var(--border-color); margin-top: 1.5rem; padding-top: 1rem;">
-                        <button type="button" id="logout-btn" class="btn btn-action-danger" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 8px;">🚪 Çıkış Yap</button>
+                        <button type="button" id="logout-btn" class="btn btn-action-danger" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 8px; font-weight: 600;">
+                            <svg style="width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;" viewBox="0 0 24 24">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            <span id="lbl-logout">Çıkış Yap</span>
+                        </button>
                     </div>
                 </form>
             </div>

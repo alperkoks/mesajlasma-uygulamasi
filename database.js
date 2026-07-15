@@ -1185,5 +1185,6 @@ const dbQueries = {
 module.exports = {
     initDatabase,
     dbQueries,
-    getDbInstance: () => (isPostgres ? dbPostgresPool : dbSqlite)
+    getDbInstance: () => (isPostgres ? dbPostgresPool : dbSqlite),
+    get isPostgres() { return isPostgres; }
 };

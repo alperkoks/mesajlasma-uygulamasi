@@ -927,7 +927,7 @@ const i18n = {
         channel_only_admin: "Bu kanalda sadece yöneticiler mesaj gönderebilir.",
         placeholder_message: "Mesajınızı yazın...",
         voice_message: "Sesli Mesaj",
-        logout_btn: "🚪 Çıkış Yap",
+        logout_btn: "Çıkış Yap",
         theme_label: "Arayüz Teması / Theme",
         theme_dark: "Karanlık Mod",
         theme_light: "Aydınlık Mod",
@@ -957,7 +957,7 @@ const i18n = {
         channel_only_admin: "Only admins can post in this channel.",
         placeholder_message: "Type a message...",
         voice_message: "Voice Message",
-        logout_btn: "🚪 Logout",
+        logout_btn: "Logout",
         theme_label: "Interface Theme / Arayüz Teması",
         theme_dark: "Dark Mode",
         theme_light: "Light Mode",
@@ -1039,8 +1039,8 @@ function translatePage() {
     if (btnInstApp) btnInstApp.textContent = langData.btn_install_app;
 
     // Çıkış Yap Butonu Yerelleştirme
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) logoutBtn.textContent = langData.logout_btn;
+    const lblLogout = document.getElementById('lbl-logout');
+    if (lblLogout) lblLogout.textContent = langData.logout_btn;
 
     if (messageInput) {
         if (!messageInput.disabled) {
@@ -1242,14 +1242,55 @@ const emojiGroups = {
     ]
 };
 
-const stickerList = [
-    "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&h=200&fit=crop", // Cute Cat
-    "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=200&h=200&fit=crop", // Cute Dog
-    "https://images.unsplash.com/photo-1507808973436-a4ed7b5e87c9?w=200&h=200&fit=crop", // Duck
-    "https://images.unsplash.com/photo-1474511320723-9a56873867b5?w=200&h=200&fit=crop", // Fox
-    "https://images.unsplash.com/photo-1540573133828-c130179948a9?w=200&h=200&fit=crop", // Monkey
-    "https://images.unsplash.com/photo-1555685812-4b943f1cb0eb?w=200&h=200&fit=crop"  // Rabbit
-];
+const stickerCategories = {
+    happy: [
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f600.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f601.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f602.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f604.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f609.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f60a.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f60d.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f618.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f929.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f970.svg"
+    ],
+    sad: [
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f614.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f61e.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f622.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f625.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f62d.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f630.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f62b.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f97a.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f494.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f327.svg"
+    ],
+    playful: [
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f61c.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f61d.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f61b.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f92a.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f92f.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f973.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f974.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f60e.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f917.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f47b.svg"
+    ],
+    angry: [
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f620.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f621.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f92c.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f624.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f47f.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f4a9.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f480.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f47a.svg",
+        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f525.svg"
+    ]
+};
 
 let currentEmojiCategory = 'smileys';
 let currentStickerFilter = 'all';
@@ -1327,17 +1368,37 @@ function populateStickers() {
         localCustoms = [];
     }
     
-    const allStickers = [...stickerList, ...localCustoms];
-    
     let favStickers = [];
     try {
         favStickers = JSON.parse(localStorage.getItem('favorite_stickers')) || [];
     } catch(e) {}
     
-    const displayStickers = currentStickerFilter === 'fav' ? favStickers : allStickers;
+    let displayStickers = [];
+    if (currentStickerFilter === 'all') {
+        displayStickers = [
+            ...stickerCategories.happy,
+            ...stickerCategories.sad,
+            ...stickerCategories.playful,
+            ...stickerCategories.angry,
+            ...localCustoms
+        ];
+    } else if (currentStickerFilter === 'happy') {
+        displayStickers = [...stickerCategories.happy];
+    } else if (currentStickerFilter === 'sad') {
+        displayStickers = [...stickerCategories.sad];
+    } else if (currentStickerFilter === 'playful') {
+        displayStickers = [...stickerCategories.playful];
+    } else if (currentStickerFilter === 'angry') {
+        displayStickers = [...stickerCategories.angry];
+    } else if (currentStickerFilter === 'fav') {
+        displayStickers = favStickers;
+    }
     
-    if (displayStickers.length === 0 && currentStickerFilter === 'fav') {
-        stickersGrid.innerHTML = `<div style="grid-column: span 3; font-size: 0.8rem; color: var(--text-muted); padding: 2rem 0; text-align: center;">${currentLanguage === 'tr' ? 'Henüz favori çıkartmanız yok.<br><small style="font-size:0.7rem; color:var(--text-muted)">Herhangi bir çıkartmaya sağ tıklayarak ekleyebilirsiniz.</small>' : 'No favorite stickers yet.<br><small style="font-size:0.7rem; color:var(--text-muted)">Right click on any sticker to add.</small>'}</div>`;
+    if (displayStickers.length === 0) {
+        const noText = currentStickerFilter === 'fav' 
+            ? (currentLanguage === 'tr' ? 'Henüz favori çıkartmanız yok.' : 'No favorite stickers yet.')
+            : (currentLanguage === 'tr' ? 'Bu kategoride çıkartma yok.' : 'No stickers in this category.');
+        stickersGrid.innerHTML = `<div style="grid-column: span 3; font-size: 0.8rem; color: var(--text-muted); padding: 2rem 0; text-align: center;">${noText}</div>`;
         return;
     }
 
@@ -1349,10 +1410,15 @@ function populateStickers() {
         div.style.cursor = 'pointer';
         
         const isFav = favStickers.includes(url);
-        const starHTML = isFav ? `<span style="position: absolute; top: 2px; right: 2px; font-size: 0.8rem; z-index: 5;">⭐</span>` : '';
+        const favIcon = isFav ? '⭐' : '☆';
+        const starButtonHTML = `
+            <button class="fav-sticker-btn" style="position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.85); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; border: none; cursor: pointer; transition: all 0.2s ease; z-index: 5; box-shadow: 0 2px 4px rgba(0,0,0,0.15); line-height: 1; padding: 0;" title="${currentLanguage === 'tr' ? 'Favorilere Ekle' : 'Add to Favorites'}">
+                ${favIcon}
+            </button>
+        `;
         
         div.innerHTML = `
-            ${starHTML}
+            ${starButtonHTML}
             <img src="${url}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px; transition: transform 0.15s;">
         `;
         
@@ -1366,9 +1432,10 @@ function populateStickers() {
             await sendStickerMessage(url);
         });
 
-        // Right click: Toggle favorite
-        div.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
+        // Click Star Button: Toggle favorite
+        const favBtn = div.querySelector('.fav-sticker-btn');
+        favBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             toggleFavoriteSticker(url);
         });
         
@@ -1465,36 +1532,43 @@ if (tabStickers) {
 }
 
 // Sticker Alt Filtre Tıklama Dinleyicileri
-const stickerFilterAll = document.getElementById('sticker-filter-all');
-const stickerFilterFav = document.getElementById('sticker-filter-fav');
+const stickerFilters = [
+    { id: 'sticker-filter-all', value: 'all' },
+    { id: 'sticker-filter-happy', value: 'happy' },
+    { id: 'sticker-filter-sad', value: 'sad' },
+    { id: 'sticker-filter-playful', value: 'playful' },
+    { id: 'sticker-filter-angry', value: 'angry' },
+    { id: 'sticker-filter-fav', value: 'fav' }
+];
 
-if (stickerFilterAll) {
-    stickerFilterAll.addEventListener('click', (e) => {
-        e.stopPropagation();
-        stickerFilterAll.style.backgroundColor = 'var(--primary-light)';
-        stickerFilterAll.style.color = 'var(--primary-color)';
-        if (stickerFilterFav) {
-            stickerFilterFav.style.backgroundColor = 'var(--bg-white)';
-            stickerFilterFav.style.color = 'var(--text-muted)';
-        }
-        currentStickerFilter = 'all';
-        populateStickers();
-    });
-}
-
-if (stickerFilterFav) {
-    stickerFilterFav.addEventListener('click', (e) => {
-        e.stopPropagation();
-        stickerFilterFav.style.backgroundColor = 'var(--primary-light)';
-        stickerFilterFav.style.color = 'var(--primary-color)';
-        if (stickerFilterAll) {
-            stickerFilterAll.style.backgroundColor = 'var(--bg-white)';
-            stickerFilterAll.style.color = 'var(--text-muted)';
-        }
-        currentStickerFilter = 'fav';
-        populateStickers();
-    });
-}
+stickerFilters.forEach(filter => {
+    const el = document.getElementById(filter.id);
+    if (el) {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // Tüm sekmeleri inaktif yap
+            stickerFilters.forEach(f => {
+                const btn = document.getElementById(f.id);
+                if (btn) {
+                    btn.classList.remove('active');
+                    btn.style.backgroundColor = 'var(--bg-white)';
+                    btn.style.color = 'var(--text-muted)';
+                    btn.style.borderColor = 'var(--border-color)';
+                }
+            });
+            
+            // Tıklanan sekmeyi aktif yap
+            el.classList.add('active');
+            el.style.backgroundColor = 'var(--primary-light)';
+            el.style.color = 'var(--primary-color)';
+            el.style.borderColor = 'var(--primary-color)';
+            
+            currentStickerFilter = filter.value;
+            populateStickers();
+        });
+    }
+});
 
 // Çıkartma Yükleme (Add Sticker) Olay Dinleyicileri
 if (btnAddSticker && stickerFileInput) {

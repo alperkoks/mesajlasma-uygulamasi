@@ -6,7 +6,7 @@ const http = require('http');
 const https = require('https');
 const path = require('path');
 const { Server } = require('socket.io'); // Socket.IO kütüphanesini dahil ettik
-const { initDatabase, dbQueries } = require('./database');
+const { initDatabase, dbQueries, getDbInstance, isPostgres } = require('./database');
 const webpush = require('web-push');
 
 const app = express();
@@ -1804,13 +1804,13 @@ function httpsGetJson(url) {
 // 7.1 GIPHY GIF PROXY ROTASI (Herkese açık ücretsiz beta anahtarı kullanır)
 app.get('/api/gifs/trending', async (req, res) => {
     try {
-        const url = `https://api.giphy.com/v1/gifs/trending?api_key=dc6zaTOxFJmzC&limit=15`;
+        const url = `https://api.giphy.com/v1/gifs/trending?api_key=5A1s40N4Uq2mS6tP&limit=15`;
         const data = await httpsGetJson(url);
         const gifs = (data.data || []).map(item => ({
             id: item.id,
             title: item.title || "",
-            url: item.images.fixed_height.url,
-            preview: item.images.fixed_height_small.url
+            url: `https://i.giphy.com/${item.id}.gif`,
+            preview: `https://i.giphy.com/${item.id}.gif`
         }));
         res.json(gifs);
     } catch (error) {
@@ -1822,13 +1822,13 @@ app.get('/api/gifs/trending', async (req, res) => {
 app.get('/api/gifs/search', async (req, res) => {
     const q = req.query.q || '';
     try {
-        const url = `https://api.giphy.com/v1/gifs/search?q=${encodeURIComponent(q)}&api_key=dc6zaTOxFJmzC&limit=15`;
+        const url = `https://api.giphy.com/v1/gifs/search?q=${encodeURIComponent(q)}&api_key=5A1s40N4Uq2mS6tP&limit=15`;
         const data = await httpsGetJson(url);
         const gifs = (data.data || []).map(item => ({
             id: item.id,
             title: item.title || "",
-            url: item.images.fixed_height.url,
-            preview: item.images.fixed_height_small.url
+            url: `https://i.giphy.com/${item.id}.gif`,
+            preview: `https://i.giphy.com/${item.id}.gif`
         }));
         res.json(gifs);
     } catch (error) {
