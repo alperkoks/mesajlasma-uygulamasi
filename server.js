@@ -6,7 +6,8 @@ const http = require('http');
 const https = require('https');
 const path = require('path');
 const { Server } = require('socket.io'); // Socket.IO kütüphanesini dahil ettik
-const { initDatabase, dbQueries, getDbInstance, isPostgres } = require('./database');
+const { initDatabase, dbQueries, getDbInstance } = require('./database');
+let isPostgres = false;
 const webpush = require('web-push');
 
 const app = express();
@@ -197,6 +198,7 @@ app.get('/', (req, res) => {
 const onlineUsers = new Set();
 // Hangi kullanıcının (ID) hangi sokette (Socket ID) olduğunu tutan harita
 const userSockets = new Map();
+const activeCalls = new Map(); // Aktif aramaları takip etmek için harita
 
 // --- GÜVENLİK DUVARI (JWT TOKEN DOĞRULAMA) ---
 function authenticateToken(req, res, next) {
@@ -285,17 +287,46 @@ io.on('connection', (socket) => {
 
     // --- WEBRTC SESLİ VE GÖRÜNTÜLÜ ARAMA SİNYALLEŞMESİ ---
     socket.on('call_user', ({ targetUserId, signalData, isVideoCall }) => {
-        const targetSockets = userSockets.get(Number(targetUserId));
+        const callerId = userId;
+        const receiverId = Number(targetUserId);
+        const isVideoVal = isVideoCall ? 1 : 0;
+
+        // Arama kaydını missed (kaçırıldı) varsayılanıyla kaydet
+        dbQueries.saveCallLog(callerId, receiverId, isVideoVal, 'missed', 0).then(log => {
+            activeCalls.set(callerId, {
+                callLogId: log.id,
+                callerId,
+                receiverId,
+                isVideo: isVideoVal,
+                startTime: null
+            });
+        }).catch(err => console.error('Arama kaydı oluşturma hatası:', err));
+
+        // Karşı tarafa anlık soket olayını gönder
+        const targetSockets = userSockets.get(receiverId);
         if (targetSockets && targetSockets.size > 0) {
             targetSockets.forEach(socketId => {
                 io.to(socketId).emit('call_incoming', {
-                    fromUserId: userId,
+                    fromUserId: callerId,
                     fromUsername: socket.user.username,
                     signalData: signalData,
                     isVideoCall: isVideoCall
                 });
             });
         }
+
+        // Çevrimdışı veya arka plandaki alıcıya Web Push bildirimi fırlat
+        sendPushNotification(receiverId, {
+            title: isVideoCall ? '📹 Görüntülü Arama' : '📞 Sesli Arama',
+            body: `${socket.user.username} sizi arıyor...`,
+            icon: socket.user.profile_pic || '/img/logo.png',
+            data: {
+                type: 'call',
+                fromUserId: callerId,
+                fromUsername: socket.user.username,
+                isVideoCall: isVideoCall
+            }
+        });
     });
 
     socket.on('accept_call', ({ targetUserId, signalData }) => {
@@ -306,6 +337,24 @@ io.on('connection', (socket) => {
                     signalData: signalData
                 });
             });
+        }
+
+        // Arama kaydını 'accepted' durumuna çek ve başlangıç zamanını kaydet
+        let foundCall = null;
+        for (const [cId, call] of activeCalls.entries()) {
+            if (call.receiverId === userId && !call.startTime) {
+                foundCall = call;
+                break;
+            }
+        }
+        if (foundCall) {
+            foundCall.startTime = Date.now();
+            const db = getDbInstance();
+            if (isPostgres) {
+                db.query("UPDATE call_logs SET status = 'accepted' WHERE id = $1", [foundCall.callLogId]).catch(e => console.error(e));
+            } else {
+                db.run("UPDATE call_logs SET status = 'accepted' WHERE id = ?", [foundCall.callLogId]).catch(e => console.error(e));
+            }
         }
     });
 
@@ -318,6 +367,26 @@ io.on('connection', (socket) => {
                 });
             });
         }
+
+        // Arama kaydını 'rejected' yap
+        let foundCallKey = null;
+        let foundCall = null;
+        for (const [cId, call] of activeCalls.entries()) {
+            if (call.receiverId === userId && !call.startTime) {
+                foundCallKey = cId;
+                foundCall = call;
+                break;
+            }
+        }
+        if (foundCall) {
+            const db = getDbInstance();
+            if (isPostgres) {
+                db.query("UPDATE call_logs SET status = 'rejected' WHERE id = $1", [foundCall.callLogId]).catch(e => console.error(e));
+            } else {
+                db.run("UPDATE call_logs SET status = 'rejected' WHERE id = ?", [foundCall.callLogId]).catch(e => console.error(e));
+            }
+            activeCalls.delete(foundCallKey);
+        }
     });
 
     socket.on('end_call', ({ targetUserId }) => {
@@ -326,6 +395,30 @@ io.on('connection', (socket) => {
             targetSockets.forEach(socketId => {
                 io.to(socketId).emit('call_ended');
             });
+        }
+
+        // Arama süresini hesapla ve kaydet
+        let foundCallKey = null;
+        let foundCall = null;
+        for (const [cId, call] of activeCalls.entries()) {
+            if (call.callerId === userId || call.receiverId === userId) {
+                foundCallKey = cId;
+                foundCall = call;
+                break;
+            }
+        }
+        if (foundCall) {
+            let duration = 0;
+            if (foundCall.startTime) {
+                duration = Math.floor((Date.now() - foundCall.startTime) / 1000);
+            }
+            const db = getDbInstance();
+            if (isPostgres) {
+                db.query("UPDATE call_logs SET duration = $1 WHERE id = $2", [duration, foundCall.callLogId]).catch(e => console.error(e));
+            } else {
+                db.run("UPDATE call_logs SET duration = ? WHERE id = ?", [duration, foundCall.callLogId]).catch(e => console.error(e));
+            }
+            activeCalls.delete(foundCallKey);
         }
     });
 
@@ -1662,42 +1755,65 @@ app.post('/api/messages/:messageId/edit', authenticateToken, async (req, res) =>
 
 // 5.0.2 MESAJ SİL (DELETE)
 app.post('/api/messages/:messageId/delete', authenticateToken, async (req, res) => {
-    const senderId = req.user.id;
+    const userId = req.user.id;
     const messageId = parseInt(req.params.messageId);
+    const { deleteType } = req.body; // 'me' veya 'everyone'
 
     try {
         const msgObj = await dbQueries.getMessageById(messageId);
         if (!msgObj) {
             return res.status(404).json({ message: 'Mesaj bulunamadı.' });
         }
-        if (msgObj.sender_id !== senderId) {
-            return res.status(403).json({ message: 'Bu işlem için yetkiniz yok.' });
-        }
 
-        await dbQueries.deleteMessageById(messageId, senderId);
+        if (deleteType === 'everyone') {
+            // Herkesten silmek için mesajı gönderenin olması gerekir
+            if (msgObj.sender_id !== userId) {
+                return res.status(403).json({ message: 'Bu işlem için yetkiniz yok. Mesajı sadece gönderen herkesten silebilir.' });
+            }
 
-        const deletedInfo = {
-            messageId,
-            groupId: msgObj.group_id || null,
-            receiverId: msgObj.receiver_id || null
-        };
+            await dbQueries.deleteMessageForEveryone(messageId, userId);
 
-        // --- SOKET İLE ANLIK SİL (Ekranlardan kaldırılması için) ---
-        if (msgObj.group_id) {
-            io.to(`group_${msgObj.group_id}`).emit('message_deleted', deletedInfo);
+            const updatedMsg = {
+                id: messageId,
+                message: '🚫 Bu mesaj silindi',
+                message_type: 'deleted',
+                file_url: null,
+                reactions: '{}',
+                group_id: msgObj.group_id || null,
+                receiver_id: msgObj.receiver_id || null,
+                sender_id: msgObj.sender_id
+            };
+
+            // Soket ile herkesten sil güncellemesini yayınla
+            if (msgObj.group_id) {
+                io.to(`group_${msgObj.group_id}`).emit('message_deleted_for_everyone', updatedMsg);
+            } else {
+                const targets = [msgObj.sender_id, msgObj.receiver_id];
+                targets.forEach(tId => {
+                    const sockets = userSockets.get(tId);
+                    if (sockets) {
+                        sockets.forEach(sId => {
+                            io.to(sId).emit('message_deleted_for_everyone', updatedMsg);
+                        });
+                    }
+                });
+            }
+
+            return res.json({ message: 'Mesaj herkesten silindi.', deleteType: 'everyone', updatedMsg });
         } else {
-            const targets = [msgObj.sender_id, msgObj.receiver_id];
-            targets.forEach(tId => {
-                const sockets = userSockets.get(tId);
-                if (sockets) {
-                    sockets.forEach(sId => {
-                        io.to(sId).emit('message_deleted', deletedInfo);
-                    });
-                }
-            });
-        }
+            // Benden sil
+            await dbQueries.deleteMessageForMe(messageId, userId);
 
-        res.json({ message: 'Mesaj başarıyla silindi.', deletedInfo });
+            // Sadece kendi soketlerime bildir
+            const sockets = userSockets.get(userId);
+            if (sockets) {
+                sockets.forEach(sId => {
+                    io.to(sId).emit('message_deleted_for_me', { messageId });
+                });
+            }
+
+            return res.json({ message: 'Mesaj benden silindi.', deleteType: 'me', messageId });
+        }
     } catch (error) {
         console.error('Mesaj silme hatası:', error);
         res.status(500).json({ message: 'Mesaj silinirken sunucu hatası oluştu.' });
@@ -1729,6 +1845,18 @@ app.delete('/api/messages/clear', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Sohbet temizleme hatası:', error);
         res.status(500).json({ message: 'Sohbet temizlenirken hata oluştu.' });
+    }
+});
+
+// 5.2 ARAMA GEÇMİŞİNİ GETİR
+app.get('/api/calls/history', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const history = await dbQueries.getCallHistory(userId);
+        res.json(history);
+    } catch (error) {
+        console.error('Arama geçmişi getirme hatası:', error);
+        res.status(500).json({ message: 'Arama geçmişi alınırken hata oluştu.' });
     }
 });
 
@@ -1868,6 +1996,7 @@ async function sendPushNotification(recipientId, payload) {
 async function startServer() {
     try {
         await initDatabase();
+        isPostgres = require('./database').isPostgres;
 
         // Web Push VAPID Anahtarlarını Yapılandır/Yükle
         let vapidPublicKey = await dbQueries.getSetting('vapid_public_key');

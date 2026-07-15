@@ -113,13 +113,16 @@
                 
                 <!-- Sekme Seçenekleri -->
                 <div class="sidebar-tabs" style="display: flex; gap: 0.25rem; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-color);">
-                    <button id="tab-friends" class="btn active" style="flex: 1; padding: 0.4rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background-color: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                    <button id="tab-friends" class="btn active" style="flex: 1; padding: 0.4rem; font-size: 0.82rem; font-weight: 600; border-radius: 6px; background-color: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
                         <span>Arkadaşlar</span>
                         <span id="badge-friends-dot" class="hidden" style="width: 8px; height: 8px; background-color: #EF4444; border-radius: 50%; display: inline-block;"></span>
                     </button>
-                    <button id="tab-groups" class="btn" style="flex: 1; padding: 0.4rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main); display: flex; align-items: center; justify-content: center; gap: 0.35rem;">
+                    <button id="tab-groups" class="btn" style="flex: 1; padding: 0.4rem; font-size: 0.82rem; font-weight: 600; border-radius: 6px; background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main); display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
                         <span>Gruplar</span>
                         <span id="badge-groups-dot" class="hidden" style="width: 8px; height: 8px; background-color: #EF4444; border-radius: 50%; display: inline-block;"></span>
+                    </button>
+                    <button id="tab-calls" class="btn" style="flex: 1; padding: 0.4rem; font-size: 0.82rem; font-weight: 600; border-radius: 6px; background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main); display: flex; align-items: center; justify-content: center; gap: 0.2rem;">
+                        <span>Aramalar</span>
                     </button>
                 </div>
 
@@ -142,6 +145,18 @@
                         </div>
                         <ul id="groups-list" class="users-list" style="flex: 1; overflow-y: auto;">
                             <li class="user-item placeholder">Henüz bir gruba dahil değilsiniz.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Aramalar Sekmesi İçeriği -->
+                <div id="calls-tab-content" class="tab-content hidden" style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
+                    <div class="users-section" style="flex: 1; display: flex; flex-direction: column;">
+                        <div style="padding: 0.75rem 1rem 0.25rem 1rem;">
+                            <h4 style="margin: 0;">Son Aramalar</h4>
+                        </div>
+                        <ul id="calls-list" class="users-list" style="flex: 1; overflow-y: auto;">
+                            <li class="user-item placeholder">Arama geçmişi temiz.</li>
                         </ul>
                     </div>
                 </div>
@@ -219,7 +234,7 @@
                         </div>
 
                         <form id="message-form" style="position: relative;">
-                            <input type="file" id="file-input" style="display:none;" accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                            <input type="file" id="file-input" style="display:none;" accept="image/*,application/pdf,.pdf,.udf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
                             
                             <!-- Eklenti, GIF ve Emoji Butonları (Solda) -->
                             <div style="display: flex; gap: 0.15rem;">
@@ -235,7 +250,7 @@
                             </div>
 
                             <!-- Geniş Metin Giriş Alanı -->
-                            <input type="text" id="message-input" autocomplete="off" placeholder="Mesajınızı yazın...">
+                            <textarea id="message-input" autocomplete="off" placeholder="Mesajınızı yazın..." rows="1"></textarea>
 
                             <!-- Ses ve Gönder Butonları (Sağda - Akıllı Geçiş) -->
                             <div style="display: flex; align-items: center;">
@@ -516,6 +531,7 @@
             <span class="ctx-reaction-emoji" data-emoji="🙏" style="font-size: 1.25rem; cursor: pointer; transition: transform 0.1s; display: inline-block;">🙏</span>
         </div>
         
+        <button type="button" id="ctx-btn-copy" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">📋</span> Mesajı Kopyala</button>
         <button type="button" id="ctx-btn-reply" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">↩️</span> Yanıtla</button>
         <button type="button" id="ctx-btn-forward" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">➡️</span> İlet</button>
         <button type="button" id="ctx-btn-edit" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">✏️</span> Düzenle</button>
@@ -572,16 +588,31 @@
             <video id="local-video" autoplay muted playsinline style="position: absolute; top: 10px; right: 10px; width: 100px; aspect-ratio: 3/4; border-radius: 8px; object-fit: cover; border: 2px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10;"></video>
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; max-width: 320px;">
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; max-width: 340px;">
+            <!-- Gelen Arama Kontrolleri -->
             <div id="incoming-call-buttons" class="hidden" style="display: flex; justify-content: space-around; width: 100%;">
-                <button type="button" id="btn-accept-call" class="btn" style="width: 64px; height: 64px; border-radius: 50%; background-color: #10b981; border: none; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(16,185,129,0.4); color: white;">📞</button>
-                <button type="button" id="btn-reject-call" class="btn" style="width: 64px; height: 64px; border-radius: 50%; background-color: #ef4444; border: none; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(239,68,68,0.4); color: white;">🛑</button>
+                <button type="button" id="btn-accept-call" class="btn" style="width: 60px; height: 60px; border-radius: 50%; background-color: #10b981; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(16,185,129,0.4); color: white;" title="Cevapla">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </button>
+                <button type="button" id="btn-reject-call" class="btn" style="width: 60px; height: 60px; border-radius: 50%; background-color: #ef4444; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(239,68,68,0.4); color: white;" title="Reddet">
+                    <svg style="transform: rotate(135deg);" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </button>
             </div>
 
-            <div id="active-call-buttons" style="display: flex; justify-content: space-around; align-items: center; width: 100%;">
-                <button type="button" id="btn-toggle-mic" class="btn-icon" style="width: 50px; height: 50px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; font-size: 1.25rem; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;">🎙️</button>
-                <button type="button" id="btn-end-call" class="btn" style="width: 64px; height: 64px; border-radius: 50%; background-color: #ef4444; border: none; font-size: 1.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(239,68,68,0.4); color: white;">🛑</button>
-                <button type="button" id="btn-toggle-video" class="btn-icon" style="width: 50px; height: 50px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; font-size: 1.25rem; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;">📷</button>
+            <!-- Aktif Arama Kontrolleri -->
+            <div id="active-call-buttons" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <button type="button" id="btn-toggle-mic" class="btn-icon" style="width: 48px; height: 48px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;" title="Mikrofonu Kapat/Aç">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                </button>
+                <button type="button" id="btn-toggle-video" class="btn-icon" style="width: 48px; height: 48px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;" title="Kamerayı Kapat/Aç">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+                </button>
+                <button type="button" id="btn-switch-camera" class="btn-icon" style="width: 48px; height: 48px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; cursor: pointer; color: white; display: none; align-items: center; justify-content: center;" title="Kamerayı Değiştir (Ön/Arka)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                </button>
+                <button type="button" id="btn-end-call" class="btn" style="width: 60px; height: 60px; border-radius: 50%; background-color: #ef4444; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(239,68,68,0.4); color: white;" title="Aramayı Sonlandır">
+                    <svg style="transform: rotate(135deg);" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </button>
             </div>
         </div>
     </div>

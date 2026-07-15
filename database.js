@@ -158,6 +158,18 @@ async function initDatabase() {
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reactions TEXT DEFAULT '{}'`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_forwarded INTEGER DEFAULT 0`);
 
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS call_logs (
+                    id SERIAL PRIMARY KEY,
+                    caller_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    is_video INTEGER DEFAULT 0,
+                    status VARCHAR(20) DEFAULT 'missed',
+                    duration INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
             console.log('PostgreSQL Tabloları kontrol edildi/oluşturuldu.');
         } finally {
             client.release();
@@ -354,6 +366,20 @@ async function initDatabase() {
                 target_id INTEGER,
                 target_type TEXT,
                 PRIMARY KEY (user_id, target_id, target_type)
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS call_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                caller_id INTEGER,
+                receiver_id INTEGER,
+                is_video INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'missed',
+                duration INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(caller_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(receiver_id) REFERENCES users(id) ON DELETE CASCADE
             )
         `);
 
@@ -1109,6 +1135,36 @@ const dbQueries = {
         }
     },
 
+    // Mesajı benden sil (Sadece benim ekranımdan gizler)
+    async deleteMessageForMe(messageId, userId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'INSERT INTO deleted_messages (message_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+                [messageId, userId]
+            );
+        } else {
+            await dbSqlite.run(
+                'INSERT OR IGNORE INTO deleted_messages (message_id, user_id) VALUES (?, ?)',
+                [messageId, userId]
+            );
+        }
+    },
+
+    // Mesajı herkesten sil (İçeriği silindi yapar)
+    async deleteMessageForEveryone(messageId, senderId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                "UPDATE messages SET message = '🚫 Bu mesaj silindi', message_type = 'deleted', file_url = NULL, reactions = '{}' WHERE id = $1 AND sender_id = $2",
+                [messageId, senderId]
+            );
+        } else {
+            await dbSqlite.run(
+                "UPDATE messages SET message = '🚫 Bu mesaj silindi', message_type = 'deleted', file_url = NULL, reactions = '{}' WHERE id = ? AND sender_id = ?",
+                [messageId, senderId]
+            );
+        }
+    },
+
     // Kullanıcı son görülme gizlilik ayarını güncelle
     async updateShowLastSeen(userId, val) {
         if (isPostgres) {
@@ -1177,6 +1233,56 @@ const dbQueries = {
             return await dbSqlite.get(
                 'SELECT is_admin, custom_title, can_send_messages, can_send_media, can_add_users FROM group_members WHERE group_id = ? AND user_id = ?',
                 [groupId, userId]
+            );
+        }
+    },
+
+    // Yeni arama kaydı kaydet
+    async saveCallLog(callerId, receiverId, isVideo, status, duration = 0) {
+        const isVideoVal = isVideo ? 1 : 0;
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                `INSERT INTO call_logs (caller_id, receiver_id, is_video, status, duration) 
+                 VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+                [callerId, receiverId, isVideoVal, status, duration]
+            );
+            return res.rows[0];
+        } else {
+            const result = await dbSqlite.run(
+                `INSERT INTO call_logs (caller_id, receiver_id, is_video, status, duration) 
+                 VALUES (?, ?, ?, ?, ?)`,
+                [callerId, receiverId, isVideoVal, status, duration]
+            );
+            return await dbSqlite.get('SELECT * FROM call_logs WHERE id = ?', [result.lastID]);
+        }
+    },
+
+    // Arama geçmişini getir
+    async getCallHistory(userId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                `SELECT c.*, 
+                        u1.username as caller_name, u1.profile_pic as caller_pic,
+                        u2.username as receiver_name, u2.profile_pic as receiver_pic
+                 FROM call_logs c
+                 JOIN users u1 ON c.caller_id = u1.id
+                 JOIN users u2 ON c.receiver_id = u2.id
+                 WHERE c.caller_id = $1 OR c.receiver_id = $1
+                 ORDER BY c.created_at DESC LIMIT 50`,
+                [userId]
+            );
+            return res.rows;
+        } else {
+            return await dbSqlite.all(
+                `SELECT c.*, 
+                        u1.username as caller_name, u1.profile_pic as caller_pic,
+                        u2.username as receiver_name, u2.profile_pic as receiver_pic
+                 FROM call_logs c
+                 JOIN users u1 ON c.caller_id = u1.id
+                 JOIN users u2 ON c.receiver_id = u2.id
+                 WHERE c.caller_id = ? OR c.receiver_id = ?
+                 ORDER BY c.created_at DESC LIMIT 50`,
+                [userId, userId]
             );
         }
     }

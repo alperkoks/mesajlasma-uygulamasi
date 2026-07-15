@@ -89,6 +89,8 @@ const stickersGrid = document.getElementById('stickers-grid');
 
 function clearMessageInput() {
     messageInput.value = '';
+    messageInput.style.height = '40px';
+    messageInput.style.overflowY = 'hidden';
     if (btnMic) btnMic.classList.remove('hidden');
     if (btnSend) btnSend.classList.add('hidden');
 }
@@ -108,6 +110,9 @@ const badgeFriendsDot = document.getElementById('badge-friends-dot');
 const badgeGroupsDot = document.getElementById('badge-groups-dot');
 const friendsTabContent = document.getElementById('friends-tab-content');
 const groupsTabContent = document.getElementById('groups-tab-content');
+const tabCalls = document.getElementById('tab-calls');
+const callsTabContent = document.getElementById('calls-tab-content');
+const callsList = document.getElementById('calls-list');
 const groupsList = document.getElementById('groups-list');
 const btnCreateGroupOpen = document.getElementById('btn-create-group-open');
 const groupCreateModal = document.getElementById('group-create-modal');
@@ -170,6 +175,7 @@ const replyPreviewSender = document.getElementById('reply-preview-sender');
 const replyPreviewText = document.getElementById('reply-preview-text');
 const btnReplyPreviewClose = document.getElementById('btn-reply-preview-close');
 const chatContextMenu = document.getElementById('chat-context-menu');
+const ctxBtnCopy = document.getElementById('ctx-btn-copy');
 const ctxBtnReply = document.getElementById('ctx-btn-reply');
 const ctxBtnForward = document.getElementById('ctx-btn-forward');
 const ctxBtnEdit = document.getElementById('ctx-btn-edit');
@@ -1842,11 +1848,11 @@ async function encryptText(text) {
     }
 }
 
-async function decryptText(encryptedText, senderId) {
+async function decryptText(encryptedText, senderId, receiverId) {
     if (!encryptedText || !encryptedText.startsWith('__E2EE__:')) return encryptedText;
     try {
-        const partnerId = senderId;
         const userId = currentUser.id;
+        const partnerId = senderId === userId ? (receiverId || activeChatPartnerId) : senderId;
         const minId = Math.min(userId, partnerId);
         const maxId = Math.max(userId, partnerId);
         const secretSeed = `AgChatSeed_${minId}_${maxId}`;
@@ -1907,6 +1913,9 @@ function startRingtone() {
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.connect(gain);
@@ -1965,6 +1974,8 @@ const btnRejectCall = document.getElementById('btn-reject-call');
 const btnEndCall = document.getElementById('btn-end-call');
 const btnToggleMic = document.getElementById('btn-toggle-mic');
 const btnToggleVideo = document.getElementById('btn-toggle-video');
+const btnSwitchCamera = document.getElementById('btn-switch-camera');
+let currentFacingMode = 'user'; // 'user' veya 'environment'
 
 const rtcConfig = {
     iceServers: [
@@ -2028,8 +2039,10 @@ function showCallScreen(partnerUser, isVideo, isIncoming) {
     
     if (isVideo) {
         callVideosContainer.classList.remove('hidden');
+        if (btnSwitchCamera) btnSwitchCamera.style.display = 'flex';
     } else {
         callVideosContainer.classList.add('hidden');
+        if (btnSwitchCamera) btnSwitchCamera.style.display = 'none';
     }
     
     if (isIncoming) {
@@ -2152,6 +2165,53 @@ if (btnToggleVideo) {
     });
 }
 
+if (btnSwitchCamera) {
+    btnSwitchCamera.addEventListener('click', async () => {
+        if (!localStream) return;
+        
+        try {
+            // Kamera yönünü değiştir
+            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+            
+            // Mevcut video yayını varsa durdur ve temizle
+            const oldVideoTrack = localStream.getVideoTracks()[0];
+            if (oldVideoTrack) {
+                oldVideoTrack.stop();
+                localStream.removeTrack(oldVideoTrack);
+            }
+            
+            // Yeni yönlendirmeyle kamera akışını al
+            const newStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: currentFacingMode },
+                audio: false
+            });
+            
+            const newVideoTrack = newStream.getVideoTracks()[0];
+            localStream.addTrack(newVideoTrack);
+            
+            // Yerel video elementini güncelle
+            if (localVideo) {
+                localVideo.srcObject = null;
+                localVideo.srcObject = localStream;
+            }
+            
+            // WebRTC bağlantısında video track'ini değiştir (karşı tarafa yansısın)
+            if (peerConnection) {
+                const senders = peerConnection.getSenders();
+                const videoSender = senders.find(sender => sender.track && sender.track.kind === 'video');
+                if (videoSender) {
+                    await videoSender.replaceTrack(newVideoTrack);
+                }
+            }
+            
+            console.log('📷 Kamera başarıyla değiştirildi:', currentFacingMode);
+        } catch (err) {
+            console.error('Kamera değiştirme hatası:', err);
+            alert(currentLanguage === 'tr' ? 'Kamera değiştirilemedi.' : 'Could not switch camera.');
+        }
+    });
+}
+
 
 function endCallSession() {
     stopRingtone();
@@ -2171,6 +2231,9 @@ function endCallSession() {
     
     if (btnToggleMic) btnToggleMic.style.backgroundColor = 'rgba(255,255,255,0.15)';
     if (btnToggleVideo) btnToggleVideo.style.backgroundColor = 'rgba(255,255,255,0.15)';
+    
+    // Arama geçmişini güncelle
+    loadCallHistory();
 }
 
 // --- UYGULAMAYI BAŞLATMA VE VERİ ÇEKME ---
@@ -2523,13 +2586,20 @@ async function initApp() {
             }
         });
 
-        // MESAJ SİLİNDİĞİNDE çalışan olay
-        socket.on('message_deleted', (data) => {
-            const isGroupMatch = activeChatGroupId && Number(data.groupId) === Number(activeChatGroupId);
-            const isUserMatch = !activeChatGroupId && activeChatPartnerId && (Number(data.receiverId) === Number(activeChatPartnerId) || Number(data.receiverId) === Number(currentUser.id));
+        // MESAJ BENDEN SİLİNDİĞİNDE çalışan olay
+        socket.on('message_deleted_for_me', (data) => {
+            messages = messages.filter(m => Number(m.id) !== Number(data.messageId));
+            renderMessages();
+        });
 
-            if (isGroupMatch || isUserMatch) {
-                messages = messages.filter(m => Number(m.id) !== Number(data.messageId));
+        // MESAJ HERKESTEN SİLİNDİĞİNDE çalışan olay
+        socket.on('message_deleted_for_everyone', (data) => {
+            const msg = messages.find(m => Number(m.id) === Number(data.id));
+            if (msg) {
+                msg.message = data.message;
+                msg.message_type = data.message_type;
+                msg.file_url = data.file_url;
+                msg.reactions = data.reactions;
                 renderMessages();
             }
         });
@@ -2686,6 +2756,102 @@ function renderUsersList() {
         usersList.appendChild(li);
     });
     updateTabBadges();
+}
+
+async function loadCallHistory() {
+    if (!callsList) return;
+    try {
+        const history = await apiCall('/calls/history');
+        renderCallHistory(history);
+    } catch (err) {
+        console.error('Arama geçmişi yüklenemedi:', err);
+    }
+}
+
+function renderCallHistory(calls) {
+    callsList.innerHTML = '';
+    if (!calls || calls.length === 0) {
+        callsList.innerHTML = `<li class="user-item placeholder">${currentLanguage === 'tr' ? 'Arama geçmişi temiz.' : 'No calls history.'}</li>`;
+        return;
+    }
+    
+    calls.forEach(call => {
+        const isOutgoing = call.caller_id === currentUser.id;
+        const otherName = isOutgoing ? call.receiver_name : call.caller_name;
+        const otherPic = isOutgoing ? call.receiver_pic : call.caller_pic;
+        
+        let statusIcon = '↙️';
+        let statusText = currentLanguage === 'tr' ? 'Cevapsız Arama' : 'Missed Call';
+        let statusColor = '#EF4444'; // Red
+        
+        if (call.status === 'accepted') {
+            statusIcon = isOutgoing ? '↗️' : '↙️';
+            statusText = isOutgoing ? (currentLanguage === 'tr' ? 'Giden Arama' : 'Outgoing Call') : (currentLanguage === 'tr' ? 'Gelen Arama' : 'Incoming Call');
+            statusColor = '#10B981'; // Green
+        } else if (call.status === 'rejected') {
+            statusIcon = '🚫';
+            statusText = currentLanguage === 'tr' ? 'Reddedildi' : 'Rejected';
+            statusColor = '#6B7280'; // Gray
+        } else if (call.status === 'cancelled') {
+            statusIcon = '⚠️';
+            statusText = currentLanguage === 'tr' ? 'İptal Edildi' : 'Cancelled';
+            statusColor = '#F59E0B'; // Amber
+        }
+        
+        const durationText = call.duration > 0 
+            ? (call.duration >= 60 
+                ? `${Math.floor(call.duration / 60)} dk ${call.duration % 60} sn` 
+                : `${call.duration} sn`)
+            : '';
+
+        const li = document.createElement('li');
+        li.className = 'user-item';
+        li.style.cursor = 'default';
+        
+        const initial = otherName ? otherName.substring(0, 2).toUpperCase() : 'U';
+        const avatarHTML = otherPic 
+            ? `<img src="${otherPic}" alt="${otherName}" class="avatar-img">`
+            : initial;
+            
+        li.innerHTML = `
+            <div class="avatar">${avatarHTML}</div>
+            <div class="user-item-info">
+                <div class="user-item-header">
+                    <span class="name" style="font-weight:600;">${otherName || 'Kullanıcı'}</span>
+                    <span class="last-msg-time" style="font-size:0.75rem;">${formatMessageTime(call.created_at)}</span>
+                </div>
+                <span class="last-msg" style="display:flex; align-items:center; gap:4px; font-size:0.8rem; color:var(--text-muted);">
+                    <span style="color:${statusColor}; font-weight:bold;">${statusIcon}</span>
+                    ${statusText} ${durationText ? `(${durationText})` : ''}
+                </span>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.25rem; margin-left:auto;">
+                <button class="btn-action-round call-back-btn" data-type="voice" data-partner-name="${otherName}" data-partner-id="${isOutgoing ? call.receiver_id : call.caller_id}" title="${currentLanguage === 'tr' ? 'Sesli Ara' : 'Voice Call'}" style="width:32px; height:32px; font-size:0.9rem; background:var(--primary-light); color:var(--primary-color); display:flex; align-items:center; justify-content:center; border:none; border-radius:50%; cursor:pointer;">
+                    📞
+                </button>
+                <button class="btn-action-round call-back-btn" data-type="video" data-partner-name="${otherName}" data-partner-id="${isOutgoing ? call.receiver_id : call.caller_id}" title="${currentLanguage === 'tr' ? 'Görüntülü Ara' : 'Video Call'}" style="width:32px; height:32px; font-size:0.9rem; background:var(--primary-light); color:var(--primary-color); display:flex; align-items:center; justify-content:center; border:none; border-radius:50%; cursor:pointer;">
+                    📹
+                </button>
+            </div>
+        `;
+        
+        // Button actions
+        li.querySelectorAll('.call-back-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const pId = Number(btn.getAttribute('data-partner-id'));
+                const type = btn.getAttribute('data-type');
+                
+                // Set active partner so calling works!
+                activeChatPartnerId = pId;
+                activeChatPartner = btn.getAttribute('data-partner-name');
+                
+                startWebRtcCall(type === 'video');
+            });
+        });
+        
+        callsList.appendChild(li);
+    });
 }
 
 // --- ARKADAŞLIK SİSTEMİ FONKSİYONLARI ---
@@ -2967,7 +3133,7 @@ async function renderMessages() {
     // Tüm şifreli mesajları arka planda çöz
     for (const msg of messages) {
         if (msg.is_encrypted === 1 && !msg.decrypted_message) {
-            msg.decrypted_message = await decryptText(msg.message, msg.sender_id);
+            msg.decrypted_message = await decryptText(msg.message, msg.sender_id, msg.receiver_id);
         }
     }
 
@@ -3015,7 +3181,12 @@ async function renderMessages() {
             const parentMsg = messages.find(m => m.id === msg.parent_message_id);
             if (parentMsg) {
                 const parentSenderName = parentMsg.sender_id === currentUser.id ? 'Siz' : (parentMsg.sender_name || activeChatPartner || 'Arkadaş');
-                const parentPreviewText = parentMsg.message_type === 'image' ? '📷 Görsel' : (parentMsg.message_type === 'file' ? '📁 Dosya' : parentMsg.message);
+                const parentTextRaw = parentMsg.decrypted_message || parentMsg.message;
+                let parentPreviewText = parentMsg.message_type === 'image' ? '📷 Görsel' : (parentMsg.message_type === 'file' ? '📁 Dosya' : parentTextRaw);
+                
+                if (parentPreviewText && parentPreviewText.length > 60) {
+                    parentPreviewText = parentPreviewText.substring(0, 60) + '...';
+                }
                 
                 replyQuoteHTML = `
                     <div class="reply-quote-box" data-parent-id="${parentMsg.id}" style="background-color: rgba(0,0,0,0.06); border-left: 3px solid var(--primary-color); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-bottom: 0.35rem; cursor: pointer; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none;">
@@ -3029,7 +3200,9 @@ async function renderMessages() {
         let msgContentHTML = '';
         const displayText = msg.decrypted_message || msg.message;
         
-        if (msg.message_type === 'sticker' || msg.message === '🎨 Sticker') {
+        if (msg.message_type === 'deleted') {
+            msgContentHTML = `<span style="color:var(--text-muted); font-style:italic; opacity:0.75; display:inline-flex; align-items:center; gap:0.25rem;">🚫 ${escapeHTML(displayText)}</span>`;
+        } else if (msg.message_type === 'sticker' || msg.message === '🎨 Sticker') {
             msgContentHTML = `<img src="${msg.file_url}" alt="sticker" style="width:110px; height:110px; object-fit:contain; display:block; border:none; background:transparent; box-shadow:none;">`;
         } else if (msg.message_type === 'image') {
             msgContentHTML = `<img src="${msg.file_url}" alt="görsel" style="max-width:100%; max-height:240px; border-radius:8px; display:block; cursor:pointer; margin-bottom: 2px;" onclick="window.open('${msg.file_url}', '_blank')">`;
@@ -3118,9 +3291,12 @@ async function renderMessages() {
         const isSticker = msg.message_type === 'sticker' || msg.message === '🎨 Sticker';
         const bubbleClass = isSticker ? 'message-bubble sticker-bubble' : 'message-bubble';
 
+        const isDeleted = msg.message_type === 'deleted';
+        const arrowStyle = isDeleted ? 'display: none !important;' : '';
+
         row.innerHTML = `
             <div class="${bubbleClass}" data-msg-id="${msg.id}" data-sender-id="${msg.sender_id}">
-                <span class="ctx-trigger-arrow" title="Menü">▼</span>
+                <span class="ctx-trigger-arrow" style="${arrowStyle}" title="Menü">▼</span>
                 ${forwardedHTML}
                 ${replyQuoteHTML}
                 ${senderNameHTML}
@@ -3154,6 +3330,7 @@ async function renderMessages() {
         if (bubbleEl) {
             // 1. Sağ tık olayı (Context Menu - Masaüstü)
             bubbleEl.addEventListener('contextmenu', (e) => {
+                if (isDeleted) return;
                 e.preventDefault();
                 showContextMenu(e.clientX, e.clientY, msg);
             });
@@ -3161,6 +3338,7 @@ async function renderMessages() {
             // 2. Mobil için uzun basım (Long Press)
             let pressTimer;
             bubbleEl.addEventListener('touchstart', (e) => {
+                if (isDeleted) return;
                 pressTimer = window.setTimeout(() => {
                     e.preventDefault();
                     const touch = e.touches[0] || e.changedTouches[0];
@@ -3318,7 +3496,29 @@ let typingTimeout;
 let isCurrentlyTyping = false;
 
 if (messageInput) {
+    messageInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            if (e.shiftKey) {
+                // Shift + Enter: Yeni satır ekle
+            } else {
+                // Sadece Enter: Formu gönder
+                e.preventDefault();
+                messageForm.dispatchEvent(new Event('submit'));
+            }
+        }
+    });
+
     messageInput.addEventListener('input', () => {
+        // Textarea otomatik yükseklik ayarlama
+        messageInput.style.height = '40px';
+        const scrollHeight = messageInput.scrollHeight;
+        if (scrollHeight > 40) {
+            messageInput.style.height = Math.min(scrollHeight, 120) + 'px';
+            messageInput.style.overflowY = scrollHeight > 120 ? 'auto' : 'hidden';
+        } else {
+            messageInput.style.overflowY = 'hidden';
+        }
+
         // Akıllı buton geçişi (Mic / Send)
         const text = messageInput.value.trim();
         if (text) {
@@ -3447,7 +3647,7 @@ function escapeHTML(str) {
 // --- GRUP SOHBETLERİ UI VE İŞLEVSELLİK MANTIĞI ---
 
 // Sekme Geçişleri (Arkadaşlar / Gruplar)
-if (tabFriends && tabGroups) {
+if (tabFriends && tabGroups && tabCalls) {
     tabFriends.addEventListener('click', () => {
         tabFriends.classList.add('active');
         tabFriends.style.backgroundColor = 'var(--primary-color)';
@@ -3458,8 +3658,15 @@ if (tabFriends && tabGroups) {
         tabGroups.style.color = 'var(--text-main)';
         tabGroups.style.border = '1px solid var(--border-color)';
 
+        tabCalls.classList.remove('active');
+        tabCalls.style.backgroundColor = 'transparent';
+        tabCalls.style.color = 'var(--text-main)';
+        tabCalls.style.border = '1px solid var(--border-color)';
+
         friendsTabContent.classList.remove('hidden');
         groupsTabContent.classList.add('hidden');
+        callsTabContent.classList.add('hidden');
+        renderUsersList();
         updateTabBadges();
     });
 
@@ -3473,11 +3680,39 @@ if (tabFriends && tabGroups) {
         tabFriends.style.color = 'var(--text-main)';
         tabFriends.style.border = '1px solid var(--border-color)';
 
+        tabCalls.classList.remove('active');
+        tabCalls.style.backgroundColor = 'transparent';
+        tabCalls.style.color = 'var(--text-main)';
+        tabCalls.style.border = '1px solid var(--border-color)';
+
         groupsTabContent.classList.remove('hidden');
         friendsTabContent.classList.add('hidden');
+        callsTabContent.classList.add('hidden');
 
         await loadGroups();
         updateTabBadges();
+    });
+
+    tabCalls.addEventListener('click', async () => {
+        tabCalls.classList.add('active');
+        tabCalls.style.backgroundColor = 'var(--primary-color)';
+        tabCalls.style.color = 'white';
+
+        tabFriends.classList.remove('active');
+        tabFriends.style.backgroundColor = 'transparent';
+        tabFriends.style.color = 'var(--text-main)';
+        tabFriends.style.border = '1px solid var(--border-color)';
+
+        tabGroups.classList.remove('active');
+        tabGroups.style.backgroundColor = 'transparent';
+        tabGroups.style.color = 'var(--text-main)';
+        tabGroups.style.border = '1px solid var(--border-color)';
+
+        callsTabContent.classList.remove('hidden');
+        friendsTabContent.classList.add('hidden');
+        groupsTabContent.classList.add('hidden');
+
+        await loadCallHistory();
     });
 }
 
@@ -4151,11 +4386,11 @@ function showContextMenu(x, y, msg) {
         } else {
             ctxBtnEdit.style.display = 'none';
         }
-        ctxBtnDelete.style.display = 'block';
     } else {
         ctxBtnEdit.style.display = 'none';
-        ctxBtnDelete.style.display = 'none';
     }
+    // Silme seçeneği (Herkesten veya Benden sil) her iki taraf için de görünür olsun
+    ctxBtnDelete.style.display = 'block';
 
     // Emoji tepki butonlarını bağlama
     const reactionElements = chatContextMenu.querySelectorAll('.ctx-reaction-emoji');
@@ -4220,6 +4455,20 @@ if (ctxBtnReply) {
     });
 }
 
+if (ctxBtnCopy) {
+    ctxBtnCopy.addEventListener('click', async () => {
+        if (!activeContextMessage) return;
+        const textToCopy = activeContextMessage.decrypted_message || activeContextMessage.message;
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            alert(currentLanguage === 'tr' ? 'Mesaj panoya kopyalandı!' : 'Message copied to clipboard!');
+        } catch (err) {
+            console.error('Kopyalama hatası:', err);
+        }
+        hideContextMenu();
+    });
+}
+
 if (ctxBtnEdit) {
     ctxBtnEdit.addEventListener('click', () => {
         if (!activeContextMessage) return;
@@ -4247,17 +4496,41 @@ if (ctxBtnEdit) {
 if (ctxBtnDelete) {
     ctxBtnDelete.addEventListener('click', async () => {
         if (!activeContextMessage) return;
-        if (!confirm('Bu mesajı silmek istediğinize emin misiniz?')) {
-            hideContextMenu();
-            return;
+        
+        const isMyMsg = activeContextMessage.sender_id === currentUser.id;
+        let deleteType = 'me';
+        
+        if (isMyMsg) {
+            const promptText = currentLanguage === 'tr'
+                ? "Lütfen silme türünü seçin:\n1 - Herkesten Sil\n2 - Benden Sil"
+                : "Select delete type:\n1 - Delete for Everyone\n2 - Delete for Me";
+            const choice = prompt(promptText, "1");
+            if (choice === "1") {
+                deleteType = 'everyone';
+            } else if (choice === "2") {
+                deleteType = 'me';
+            } else {
+                hideContextMenu();
+                return;
+            }
+        } else {
+            const confirmText = currentLanguage === 'tr'
+                ? "Bu mesajı sadece kendinizden silmek istediğinize emin misiniz?"
+                : "Are you sure you want to delete this message for yourself?";
+            if (!confirm(confirmText)) {
+                hideContextMenu();
+                return;
+            }
+            deleteType = 'me';
         }
 
         try {
-            await apiCall(`/messages/${activeContextMessage.id}/delete`, 'POST');
+            await apiCall(`/messages/${activeContextMessage.id}/delete`, 'POST', { deleteType });
             
-            // Yerel listeyi güncelle
-            messages = messages.filter(m => m.id !== activeContextMessage.id);
-            renderMessages();
+            if (deleteType === 'me') {
+                messages = messages.filter(m => Number(m.id) !== Number(activeContextMessage.id));
+                renderMessages();
+            }
         } catch (err) {
             alert('Mesaj silinemedi: ' + err.message);
         }
