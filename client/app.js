@@ -3680,8 +3680,8 @@ if (btnAttach && fileInput) {
 
         // Arayüz yükleme görsel geri bildirimi
         btnAttach.disabled = true;
-        const originalText = btnAttach.textContent;
-        btnAttach.textContent = '⏳';
+        const originalHTML = btnAttach.innerHTML;
+        btnAttach.innerHTML = '⏳';
 
         const formData = new FormData();
         formData.append('file', file);
@@ -3738,7 +3738,7 @@ if (btnAttach && fileInput) {
             alert('Dosya gönderilemedi moruk: ' + err.message);
         } finally {
             btnAttach.disabled = false;
-            btnAttach.textContent = originalText;
+            btnAttach.innerHTML = originalHTML;
             fileInput.value = '';
         }
     });
