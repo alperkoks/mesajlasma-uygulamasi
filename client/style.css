@@ -1261,3 +1261,18 @@ body.dark-theme .voice-progress-container {
 #call-partner-avatar {
     animation: pulse 2s infinite;
 }
+
+/* Çıkartma Mesaj Balonu Stilleri */
+.sticker-bubble {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+}
+.sticker-bubble .message-text {
+    background: transparent !important;
+    padding: 0 !important;
+}
+.sticker-bubble .message-time {
+    color: var(--text-muted) !important;
+}

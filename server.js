@@ -340,6 +340,76 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- MESAJ EMOJİ TEPKİLERİ (REACTIONS) OLAYI ---
+    socket.on('message_reaction', async ({ messageId, emoji, targetUserId, groupId }) => {
+        try {
+            const db = getDbInstance();
+            let msgRow;
+            if (isPostgres) {
+                const res = await db.query('SELECT * FROM messages WHERE id = $1', [messageId]);
+                msgRow = res.rows[0];
+            } else {
+                msgRow = await db.get('SELECT * FROM messages WHERE id = ?', [messageId]);
+            }
+            if (!msgRow) return;
+
+            let reactions = {};
+            try {
+                reactions = typeof msgRow.reactions === 'string' ? JSON.parse(msgRow.reactions) : (msgRow.reactions || {});
+            } catch (e) {
+                reactions = {};
+            }
+            if (typeof reactions !== 'object' || reactions === null) {
+                reactions = {};
+            }
+
+            const username = socket.user.username;
+            let userHadThisReaction = false;
+            Object.keys(reactions).forEach(emo => {
+                if (reactions[emo] && Array.isArray(reactions[emo])) {
+                    const idx = reactions[emo].indexOf(username);
+                    if (idx > -1) {
+                        reactions[emo].splice(idx, 1);
+                        if (emo === emoji) {
+                            userHadThisReaction = true;
+                        }
+                    }
+                    if (reactions[emo].length === 0) {
+                        delete reactions[emo];
+                    }
+                }
+            });
+
+            if (!userHadThisReaction) {
+                if (!reactions[emoji]) reactions[emoji] = [];
+                reactions[emoji].push(username);
+            }
+
+            const reactionsStr = JSON.stringify(reactions);
+            if (isPostgres) {
+                await db.query('UPDATE messages SET reactions = $1 WHERE id = $2', [reactionsStr, messageId]);
+            } else {
+                await db.run('UPDATE messages SET reactions = ? WHERE id = ?', [reactionsStr, messageId]);
+            }
+
+            const broadcastPayload = { messageId, reactions };
+            if (groupId) {
+                io.to(`group_${groupId}`).emit('message_reaction_updated', broadcastPayload);
+            } else if (targetUserId) {
+                const targetSockets = userSockets.get(Number(targetUserId));
+                if (targetSockets) {
+                    targetSockets.forEach(sid => io.to(sid).emit('message_reaction_updated', broadcastPayload));
+                }
+                const senderSockets = userSockets.get(Number(userId));
+                if (senderSockets) {
+                    senderSockets.forEach(sid => io.to(sid).emit('message_reaction_updated', broadcastPayload));
+                }
+            }
+        } catch (err) {
+            console.error('Reaksiyon güncelleme hatası:', err);
+        }
+    });
+
     // Bağlantı koptuğunda (Sayfa kapatıldığında veya çıkış yapıldığında)
     socket.on('disconnect', () => {
         const sockets = userSockets.get(userId);
@@ -1705,21 +1775,17 @@ function httpsGetJson(url) {
     });
 }
 
-// 7.1 TENOR GIF PROXY ROTASI (Tenor v2 API kullanır)
+// 7.1 GIPHY GIF PROXY ROTASI (Herkese açık ücretsiz beta anahtarı kullanır)
 app.get('/api/gifs/trending', async (req, res) => {
     try {
-        const apiKey = process.env.TENOR_API_KEY || "LIVDSRZULELA";
-        const url = `https://tenor.googleapis.com/v2/featured?key=${apiKey}&limit=15`;
+        const url = `https://api.giphy.com/v1/gifs/trending?api_key=dc6zaTOxFJmzC&limit=15`;
         const data = await httpsGetJson(url);
-        const gifs = (data.results || []).map(item => {
-            const media = item.media_formats || {};
-            return {
-                id: item.id,
-                title: item.title || "",
-                url: (media.gif && media.gif.url) || "",
-                preview: (media.tinygif && media.tinygif.url) || (media.gif && media.gif.url) || ""
-            };
-        });
+        const gifs = (data.data || []).map(item => ({
+            id: item.id,
+            title: item.title || "",
+            url: item.images.fixed_height.url,
+            preview: item.images.fixed_height_small.url
+        }));
         res.json(gifs);
     } catch (error) {
         console.error('GIF trending hatası:', error);
@@ -1730,18 +1796,14 @@ app.get('/api/gifs/trending', async (req, res) => {
 app.get('/api/gifs/search', async (req, res) => {
     const q = req.query.q || '';
     try {
-        const apiKey = process.env.TENOR_API_KEY || "LIVDSRZULELA";
-        const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${apiKey}&limit=15`;
+        const url = `https://api.giphy.com/v1/gifs/search?q=${encodeURIComponent(q)}&api_key=dc6zaTOxFJmzC&limit=15`;
         const data = await httpsGetJson(url);
-        const gifs = (data.results || []).map(item => {
-            const media = item.media_formats || {};
-            return {
-                id: item.id,
-                title: item.title || "",
-                url: (media.gif && media.gif.url) || "",
-                preview: (media.tinygif && media.tinygif.url) || (media.gif && media.gif.url) || ""
-            };
-        });
+        const gifs = (data.data || []).map(item => ({
+            id: item.id,
+            title: item.title || "",
+            url: item.images.fixed_height.url,
+            preview: item.images.fixed_height_small.url
+        }));
         res.json(gifs);
     } catch (error) {
         console.error('GIF arama hatası:', error);

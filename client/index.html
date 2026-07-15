@@ -272,9 +272,17 @@
                                     <!-- Javascript tarafından doldurulacak -->
                                 </div>
                                 
-                                <!-- Stickerlar Izgarası (Varsayılan olarak gizli) -->
-                                <div id="stickers-grid" class="hidden" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.75rem;">
-                                    <!-- Javascript tarafından doldurulacak -->
+                                <!-- Stickerlar Bölümü (Varsayılan olarak gizli) -->
+                                <div id="stickers-container" class="hidden" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                                    <div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: center; background-color: var(--bg-hover);">
+                                        <button type="button" id="btn-add-sticker" style="display: flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; background-color: var(--primary-color); color: white; border: none; border-radius: 20px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;">
+                                            <span>➕</span> <span id="lbl-add-sticker">Çıkartma Ekle</span>
+                                        </button>
+                                        <input type="file" id="sticker-file-input" style="display: none;" accept="image/*">
+                                    </div>
+                                    <div id="stickers-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.75rem;">
+                                        <!-- Javascript tarafından doldurulacak -->
+                                    </div>
                                 </div>
                             </div>
                         </form>
@@ -371,6 +379,21 @@
         </div>
     </div>
 
+    <!-- 4.1 EKRAN: MESAJ İLETME MODALI (FORWARD) -->
+    <div id="forward-modal" class="modal hidden" style="z-index: 10500;">
+        <div class="modal-content" style="max-width: 400px; max-height: 80vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h3 id="lbl-forward-title">Mesajı İlet</h3>
+                <span id="close-forward-modal" class="close-btn">&times;</span>
+            </div>
+            <div class="modal-body" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem;">
+                <div id="forward-targets-list" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <!-- Javascript tarafından doldurulacak (aktif arkadaş ve gruplar) -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 5. EKRAN: GRUP OLUŞTURMA MODALI (Varsayılan olarak gizli) -->
     <div id="group-create-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 420px;">
@@ -454,9 +477,20 @@
         </div>
     </div>
 
-    <!-- 6. EKRAN: GENEL SOHBET CONTEXT MENU (Düzenle, Sil, Yanıtla popover'ı) -->
-    <div id="chat-context-menu" class="hidden" style="position: absolute; z-index: 10000; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 140px; overflow: hidden; display: flex; flex-direction: column;">
+    <!-- 6. EKRAN: GENEL SOHBET CONTEXT MENU (Emoji tepkileri, Yanıtla, İlet, Düzenle, Sil) -->
+    <div id="chat-context-menu" class="hidden" style="position: absolute; z-index: 10000; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-lg); width: 200px; overflow: hidden; display: flex; flex-direction: column;">
+        <!-- Hızlı Emoji Tepkileri Satırı -->
+        <div style="display: flex; justify-content: space-around; padding: 0.5rem; border-bottom: 1px solid var(--border-color); background-color: var(--bg-hover);">
+            <span class="ctx-reaction-emoji" data-emoji="👍" style="font-size: 1.25rem; cursor: pointer; transition: transform 0.1s; display: inline-block;">👍</span>
+            <span class="ctx-reaction-emoji" data-emoji="❤️" style="font-size: 1.25rem; cursor: pointer; transition: transform 0.1s; display: inline-block;">❤️</span>
+            <span class="ctx-reaction-emoji" data-emoji="😂" style="font-size: 1.25rem; cursor: pointer; transition: transform 0.1s; display: inline-block;">😂</span>
+            <span class="ctx-reaction-emoji" data-emoji="😮" style="font-size: 1.25rem; cursor: pointer; transition: transform 0.1s; display: inline-block;">😮</span>
+            <span class="ctx-reaction-emoji" data-emoji="😢" style="font-size: 1.25rem; cursor: pointer; transition: transform 0.1s; display: inline-block;">😢</span>
+            <span class="ctx-reaction-emoji" data-emoji="🙏" style="font-size: 1.25rem; cursor: pointer; transition: transform 0.1s; display: inline-block;">🙏</span>
+        </div>
+        
         <button type="button" id="ctx-btn-reply" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">↩️</span> Yanıtla</button>
+        <button type="button" id="ctx-btn-forward" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">➡️</span> İlet</button>
         <button type="button" id="ctx-btn-edit" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">✏️</span> Düzenle</button>
         <button type="button" id="ctx-btn-delete" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: #ff4d4d; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;"><span style="font-size: 1rem;">🗑️</span> Sil</button>
     </div>

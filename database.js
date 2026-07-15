@@ -155,6 +155,7 @@ async function initDatabase() {
             await client.query(`ALTER TABLE group_members ADD COLUMN IF NOT EXISTS can_add_users INTEGER DEFAULT 1`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP DEFAULT NULL`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_encrypted INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reactions TEXT DEFAULT '{}'`);
 
             console.log('PostgreSQL Tabloları kontrol edildi/oluşturuldu.');
         } finally {
@@ -261,6 +262,9 @@ async function initDatabase() {
         }
         if (!columnsMsg.includes('is_encrypted')) {
             await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_encrypted INTEGER DEFAULT 0");
+        }
+        if (!columnsMsg.includes('reactions')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN reactions TEXT DEFAULT '{}'");
         }
 
         await dbSqlite.exec(`

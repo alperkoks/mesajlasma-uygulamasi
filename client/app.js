@@ -171,8 +171,15 @@ const replyPreviewText = document.getElementById('reply-preview-text');
 const btnReplyPreviewClose = document.getElementById('btn-reply-preview-close');
 const chatContextMenu = document.getElementById('chat-context-menu');
 const ctxBtnReply = document.getElementById('ctx-btn-reply');
+const ctxBtnForward = document.getElementById('ctx-btn-forward');
 const ctxBtnEdit = document.getElementById('ctx-btn-edit');
 const ctxBtnDelete = document.getElementById('ctx-btn-delete');
+const forwardModal = document.getElementById('forward-modal');
+const closeForwardModal = document.getElementById('close-forward-modal');
+const forwardTargetsList = document.getElementById('forward-targets-list');
+const btnAddSticker = document.getElementById('btn-add-sticker');
+const stickerFileInput = document.getElementById('sticker-file-input');
+const stickersContainer = document.getElementById('stickers-container');
 
 // BAŞKA KULLANICI PROFİL MODAL ELEMENTLERİ
 const userProfileModal = document.getElementById('user-profile-modal');
@@ -328,7 +335,8 @@ loginForm.addEventListener('submit', async (e) => {
 });
 
 // Çıkış Butonuna Basıldığında Soket Bağlantısını da Kopar
-logoutBtn.addEventListener('click', () => {
+logoutBtn.addEventListener('click', (e) => {
+    if (e) e.preventDefault();
     // Soketi güvenli bir şekilde kapat
     if (socket) {
         socket.disconnect();
@@ -1187,15 +1195,12 @@ const emojiList = [
 ];
 
 const stickerList = [
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExM3d0djhhdHFzN3g2cmx2Zm16OG5ubGkxejJ6dnAwa2FkMmdqenpjbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/13CoXDiaCcC2EA/giphy.gif",
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExYnQ1M3c5eTdtOHp1N2lqbGNjZHpqdjdpc24ydjF6aHZibGFvOHd4MSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/MDJ9IbhswvCfkGL7Go/giphy.gif",
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExdTBwdzUwbGZpY3ptOHJmYTVoMmR4dnpxaWVjZ2Y0NnFldXJzZWh6dyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/1d7F9xyq6j7C1wbIW1/giphy.gif",
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExdWp3dWlzbzh5ZmVhcHF1ODl4Y2w0ZzI1azV4cjEweXlrcXk1dWptMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/WYEWdb9F6n13W/giphy.gif",
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExcnF5aDFpcTFocHNuaDFtcmM5M29ubDZqbjNqbm8yMzd1aDk5aWlmNyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/qscdhKw2oJGqiIJ1Kb/giphy.gif",
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExMGxpeDVsZHphYmszODRkNm41Nm43N2V5ZmN2azZtczkwZWhpcXl6OSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/HHz0E2p3H8P4HhS7Ww/giphy.gif",
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWVmYXZoYmpyOHhveTVrc2c0dTRudmpyNW02NDc5cDF5YTA4cmk2YyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/3ndAvMC5LFPNMCzq7m/giphy.gif",
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExZ3Nnb3A4Zm1xNTZ1bTZrdWZ1Yjh6ZTBpbmZ1NnpvYzJwbTRuNGM4biZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/l2QDODC4jE8am08aA/giphy.gif",
-    "https://i.giphy.com/media/v1.Y2lkPTc5MGI3NjExNXplZXRqazh6cTYwdjE5MTZrb3kybnk2NDk5d3NqZ3Yyb255cmZubyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9cw/kegwX875t4j5bT263M/giphy.gif"
+    "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=200&h=200&fit=crop", // Cute Cat
+    "https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=200&h=200&fit=crop", // Cute Dog
+    "https://images.unsplash.com/photo-1507808973436-a4ed7b5e87c9?w=200&h=200&fit=crop", // Duck
+    "https://images.unsplash.com/photo-1474511320723-9a56873867b5?w=200&h=200&fit=crop", // Fox
+    "https://images.unsplash.com/photo-1540573133828-c130179948a9?w=200&h=200&fit=crop", // Monkey
+    "https://images.unsplash.com/photo-1555685812-4b943f1cb0eb?w=200&h=200&fit=crop"  // Rabbit
 ];
 
 function populateEmojis() {
@@ -1219,10 +1224,22 @@ function populateEmojis() {
 function populateStickers() {
     if (!stickersGrid) return;
     stickersGrid.innerHTML = '';
-    stickerList.forEach(url => {
+    
+    let localCustoms = [];
+    try {
+        localCustoms = JSON.parse(localStorage.getItem('custom_stickers')) || [];
+    } catch(e) {
+        localCustoms = [];
+    }
+    
+    const allStickers = [...stickerList, ...localCustoms];
+    
+    allStickers.forEach(url => {
         const img = document.createElement('img');
         img.src = url;
         img.style.width = '100%';
+        img.style.height = '75px';
+        img.style.objectFit = 'contain';
         img.style.borderRadius = '8px';
         img.style.cursor = 'pointer';
         img.style.transition = 'transform 0.15s';
@@ -1241,7 +1258,7 @@ async function sendStickerMessage(stickerUrl) {
         const res = await apiCall('/messages', 'POST', {
             receiverId: activeChatPartnerId,
             groupId: activeChatGroupId,
-            messageType: 'image',
+            messageType: 'sticker',
             fileUrl: stickerUrl,
             message: '🎨 Sticker'
         });
@@ -1278,7 +1295,7 @@ if (tabEmojis) {
         tabStickers.style.borderBottom = 'none';
         tabStickers.style.color = 'var(--text-muted)';
         emojisGrid.classList.remove('hidden');
-        stickersGrid.classList.add('hidden');
+        stickersContainer.classList.add('hidden');
     });
 }
 
@@ -1288,8 +1305,62 @@ if (tabStickers) {
         tabStickers.style.color = 'var(--text-main)';
         tabEmojis.style.borderBottom = 'none';
         tabEmojis.style.color = 'var(--text-muted)';
-        stickersGrid.classList.remove('hidden');
+        stickersContainer.classList.remove('hidden');
         emojisGrid.classList.add('hidden');
+    });
+}
+
+// Çıkartma Yükleme (Add Sticker) Olay Dinleyicileri
+if (btnAddSticker && stickerFileInput) {
+    btnAddSticker.addEventListener('click', (e) => {
+        e.stopPropagation();
+        stickerFileInput.click();
+    });
+
+    stickerFileInput.addEventListener('change', async () => {
+        const file = stickerFileInput.files[0];
+        if (!file) return;
+        
+        const originalText = btnAddSticker.querySelector('#lbl-add-sticker').textContent;
+        btnAddSticker.querySelector('#lbl-add-sticker').textContent = 'Yükleniyor...';
+        btnAddSticker.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch('/api/messages/upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!res.ok) {
+                throw new Error('Upload failed');
+            }
+
+            const data = await res.json();
+            if (data.fileUrl) {
+                let localCustoms = [];
+                try {
+                    localCustoms = JSON.parse(localStorage.getItem('custom_stickers')) || [];
+                } catch(e) {
+                    localCustoms = [];
+                }
+                localCustoms.push(data.fileUrl);
+                localStorage.setItem('custom_stickers', JSON.stringify(localCustoms));
+                populateStickers();
+            }
+        } catch (err) {
+            console.error('Çıkartma yüklenemedi:', err);
+            alert('Çıkartma yüklenemedi.');
+        } finally {
+            btnAddSticker.querySelector('#lbl-add-sticker').textContent = originalText;
+            btnAddSticker.disabled = false;
+            stickerFileInput.value = '';
+        }
     });
 }
 
@@ -1740,6 +1811,7 @@ function initPeerConnection(partnerId) {
 
 if (btnAcceptCall) {
     btnAcceptCall.addEventListener('click', async () => {
+        stopRingtone();
         if (!currentCallPartnerId || !incomingOfferSignal) return;
         incomingCallButtons.classList.add('hidden');
         activeCallButtons.classList.remove('hidden');
@@ -2202,7 +2274,15 @@ async function initApp() {
             }
         });
 
-        // --- WEBRTC ARAMA SİNYALLEŞME SOKET OLAYLARI ---
+        // MESAJ EMOJİ REAKSİYONU GÜNCELLENDİĞİNDE çalışan olay
+        socket.on('message_reaction_updated', (data) => {
+            const msg = messages.find(m => m.id === data.messageId);
+            if (msg) {
+                msg.reactions = data.reactions;
+                renderMessages();
+            }
+        });
+        
         socket.on('call_incoming', ({ fromUserId, fromUsername, signalData, isVideoCall }) => {
             currentCallPartnerId = fromUserId;
             isVideoCallActive = isVideoCall;
@@ -2689,7 +2769,9 @@ async function renderMessages() {
         let msgContentHTML = '';
         const displayText = msg.decrypted_message || msg.message;
         
-        if (msg.message_type === 'image') {
+        if (msg.message_type === 'sticker' || msg.message === '🎨 Sticker') {
+            msgContentHTML = `<img src="${msg.file_url}" alt="sticker" style="width:110px; height:110px; object-fit:contain; display:block; border:none; background:transparent; box-shadow:none;">`;
+        } else if (msg.message_type === 'image') {
             msgContentHTML = `<img src="${msg.file_url}" alt="görsel" style="max-width:100%; max-height:240px; border-radius:8px; display:block; cursor:pointer; margin-bottom: 2px;" onclick="window.open('${msg.file_url}', '_blank')">`;
         } else if (msg.message_type === 'file') {
             msgContentHTML = `<a href="${msg.file_url}" target="_blank" style="color:inherit; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; word-break:break-all;">📁 ${escapeHTML(displayText)}</a>`;
@@ -2708,6 +2790,36 @@ async function renderMessages() {
             msgContentHTML = escapeHTML(displayText);
         }
 
+        // Emoji Tepkileri (Reactions) HTML İnşası
+        let reactionsHTML = '';
+        let reactionsObj = {};
+        if (msg.reactions) {
+            try {
+                reactionsObj = typeof msg.reactions === 'string' ? JSON.parse(msg.reactions) : msg.reactions;
+            } catch (e) {}
+        }
+        
+        if (reactionsObj && typeof reactionsObj === 'object') {
+            const keys = Object.keys(reactionsObj);
+            if (keys.length > 0) {
+                reactionsHTML = '<div class="message-reactions-row" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; margin-bottom: 2px;">';
+                keys.forEach(emo => {
+                    const usersWhoReacted = reactionsObj[emo] || [];
+                    if (usersWhoReacted.length > 0) {
+                        const isMyReaction = usersWhoReacted.includes(currentUser.username);
+                        const activeStyle = isMyReaction ? 'border: 1px solid var(--primary-color); background-color: var(--primary-light); color: var(--primary-color);' : 'border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main);';
+                        reactionsHTML += `
+                            <span class="reaction-pill" data-emoji="${emo}" data-msg-id="${msg.id}" style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.75rem; padding: 2px 6px; border-radius: 12px; cursor: pointer; user-select: none; ${activeStyle}" title="${usersWhoReacted.join(', ')}">
+                                <span>${emo}</span>
+                                <span style="font-size: 0.65rem; font-weight: 600;">${usersWhoReacted.length}</span>
+                            </span>
+                        `;
+                    }
+                });
+                reactionsHTML += '</div>';
+            }
+        }
+
         let senderNameHTML = '';
         if (activeChatGroupId && !isSentByMe) {
             senderNameHTML = `<div style="font-size:0.75rem; font-weight:600; color:var(--primary-color); margin-bottom: 2.5px;">${escapeHTML(msg.sender_name || 'Grup Üyesi')}</div>`;
@@ -2716,11 +2828,16 @@ async function renderMessages() {
         let editedBadge = msg.is_edited === 1 ? '<span class="msg-edited-badge" style="font-size:0.65rem; color:var(--text-muted); margin-left: 4px; font-style: italic;">(düzenlendi)</span>' : '';
         let e2eeIcon = msg.is_encrypted === 1 ? '<span class="message-encrypted-badge" title="Uçtan Uca Şifreli" style="font-size: 0.7rem; color: #10b981; display: inline-flex; align-items: center; gap: 0.2rem;">🔒 E2EE</span>' : '';
 
+        const isSticker = msg.message_type === 'sticker' || msg.message === '🎨 Sticker';
+        const bubbleClass = isSticker ? 'message-bubble sticker-bubble' : 'message-bubble';
+
         row.innerHTML = `
-            <div class="message-bubble" data-msg-id="${msg.id}" data-sender-id="${msg.sender_id}">
+            <div class="${bubbleClass}" data-msg-id="${msg.id}" data-sender-id="${msg.sender_id}">
+                <span class="ctx-trigger-arrow" style="position: absolute; top: 4px; right: 6px; display: none; cursor: pointer; font-size: 0.7rem; color: var(--text-muted); user-select: none; z-index: 10;" title="Menü">▼</span>
                 ${replyQuoteHTML}
                 ${senderNameHTML}
                 <div class="message-text">${msgContentHTML}</div>
+                ${reactionsHTML}
                 <span class="message-time" style="display:inline-flex; align-items:center; gap: 2px;">
                     ${e2eeIcon}
                     ${msgTime}
@@ -2768,6 +2885,31 @@ async function renderMessages() {
             });
             bubbleEl.addEventListener('touchmove', () => {
                 clearTimeout(pressTimer);
+            });
+
+            // 3. Sağ üstteki Menü Oku Olayı
+            const arrowEl = bubbleEl.querySelector('.ctx-trigger-arrow');
+            if (arrowEl) {
+                arrowEl.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rect = arrowEl.getBoundingClientRect();
+                    showContextMenu(rect.left, rect.bottom + window.scrollY, msg);
+                });
+            }
+
+            // 4. Tepki Hapları (Reaction Pills) Tıklama Olayı
+            bubbleEl.querySelectorAll('.reaction-pill').forEach(pill => {
+                pill.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const emoji = pill.getAttribute('data-emoji');
+                    socket.emit('message_reaction', {
+                        messageId: msg.id,
+                        emoji: emoji,
+                        targetUserId: activeChatPartnerId,
+                        groupId: activeChatGroupId
+                    });
+                });
             });
         }
 
@@ -3713,10 +3855,29 @@ function showContextMenu(x, y, msg) {
         ctxBtnDelete.style.display = 'none';
     }
 
+    // Emoji tepki butonlarını bağlama
+    const reactionElements = chatContextMenu.querySelectorAll('.ctx-reaction-emoji');
+    reactionElements.forEach(elm => {
+        const newElm = elm.cloneNode(true);
+        elm.parentNode.replaceChild(newElm, elm);
+        
+        newElm.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const emoji = newElm.getAttribute('data-emoji');
+            socket.emit('message_reaction', {
+                messageId: msg.id,
+                emoji: emoji,
+                targetUserId: activeChatPartnerId,
+                groupId: activeChatGroupId
+            });
+            chatContextMenu.classList.add('hidden');
+        });
+    });
+
     // Pozisyonu ayarla (ekrandan taşmayı engellemek için)
     chatContextMenu.classList.remove('hidden');
-    const menuWidth = chatContextMenu.offsetWidth || 140;
-    const menuHeight = chatContextMenu.offsetHeight || 120;
+    const menuWidth = chatContextMenu.offsetWidth || 200;
+    const menuHeight = chatContextMenu.offsetHeight || 160;
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
 
@@ -3801,6 +3962,124 @@ if (ctxBtnDelete) {
 
         chatContextMenu.classList.add('hidden');
     });
+}
+
+// Mesaj İletme (Forward) Olayları ve Yardımcı Fonksiyonları
+if (ctxBtnForward) {
+    ctxBtnForward.addEventListener('click', () => {
+        if (!activeContextMessage) return;
+        chatContextMenu.classList.add('hidden');
+        if (forwardModal) {
+            forwardModal.classList.remove('hidden');
+            renderForwardTargets();
+        }
+    });
+}
+
+if (closeForwardModal) {
+    closeForwardModal.addEventListener('click', () => {
+        forwardModal.classList.add('hidden');
+    });
+}
+
+function renderForwardTargets() {
+    if (!forwardTargetsList) return;
+    forwardTargetsList.innerHTML = '';
+    
+    // Arkadaşları listele
+    users.forEach(u => {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.gap = '0.75rem';
+        div.style.padding = '0.6rem';
+        div.style.border = '1px solid var(--border-color)';
+        div.style.borderRadius = '10px';
+        div.style.cursor = 'pointer';
+        div.style.backgroundColor = 'var(--bg-white)';
+        div.style.transition = 'background 0.2s, transform 0.1s';
+        
+        div.addEventListener('mouseover', () => {
+            div.style.backgroundColor = 'var(--bg-hover)';
+            div.style.transform = 'translateY(-1px)';
+        });
+        div.addEventListener('mouseout', () => {
+            div.style.backgroundColor = 'var(--bg-white)';
+            div.style.transform = 'none';
+        });
+        
+        div.innerHTML = `
+            <div class="user-avatar" style="width:32px; height:32px; font-size:0.8rem; background-color: var(--primary-light); color: var(--primary-color); font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 50%;">${u.username.substring(0, 2).toUpperCase()}</div>
+            <div style="font-size:0.85rem; font-weight:600; flex:1; color: var(--text-main);">${escapeHTML(u.username)}</div>
+            <button class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 20px; font-weight: 600;">İlet</button>
+        `;
+        div.addEventListener('click', (e) => {
+            e.stopPropagation();
+            forwardMessageTo(activeContextMessage, u.id, null);
+        });
+        forwardTargetsList.appendChild(div);
+    });
+    
+    // Grupları listele
+    groups.forEach(g => {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.alignItems = 'center';
+        div.style.gap = '0.75rem';
+        div.style.padding = '0.6rem';
+        div.style.border = '1px solid var(--border-color)';
+        div.style.borderRadius = '10px';
+        div.style.cursor = 'pointer';
+        div.style.backgroundColor = 'var(--bg-white)';
+        div.style.transition = 'background 0.2s, transform 0.1s';
+        
+        div.addEventListener('mouseover', () => {
+            div.style.backgroundColor = 'var(--bg-hover)';
+            div.style.transform = 'translateY(-1px)';
+        });
+        div.addEventListener('mouseout', () => {
+            div.style.backgroundColor = 'var(--bg-white)';
+            div.style.transform = 'none';
+        });
+        
+        div.innerHTML = `
+            <div class="user-avatar" style="width:32px; height:32px; font-size:0.8rem; background-color: #e0e7ff; color: #4f46e5; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 50%;">${g.name.substring(0, 2).toUpperCase()}</div>
+            <div style="font-size:0.85rem; font-weight:600; flex:1; color: var(--text-main);">${escapeHTML(g.name)}</div>
+            <button class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-radius: 20px; font-weight: 600;">İlet</button>
+        `;
+        div.addEventListener('click', (e) => {
+            e.stopPropagation();
+            forwardMessageTo(activeContextMessage, null, g.id);
+        });
+        forwardTargetsList.appendChild(div);
+    });
+}
+
+async function forwardMessageTo(msg, targetUserId, targetGroupId) {
+    try {
+        forwardModal.classList.add('hidden');
+        
+        const res = await apiCall('/messages', 'POST', {
+            receiverId: targetUserId,
+            groupId: targetGroupId,
+            messageType: msg.message_type || 'text',
+            fileUrl: msg.file_url || null,
+            message: msg.decrypted_message || msg.message,
+            isEncrypted: 0
+        });
+        
+        const isCurrentPrivate = !activeChatGroupId && targetUserId && activeChatPartnerId === targetUserId;
+        const isCurrentGroup = activeChatGroupId && targetGroupId && activeChatGroupId === targetGroupId;
+        if (isCurrentPrivate || isCurrentGroup) {
+            messages.push(res);
+            renderMessages();
+        }
+        
+        socket.emit('send_message', res);
+    } catch(err) {
+        console.error('İletme hatası:', err);
+        alert('Mesaj iletilemedi.');
+    }
 }
 
 // Menüyü veya diğer öğeleri kapatmak için boşluğa tıklama
