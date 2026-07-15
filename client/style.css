@@ -2,6 +2,7 @@
 :root {
     --primary-color: #6366f1; /* Modern Indigo */
     --primary-hover: #4f46e5;
+    --primary-light: #e0e7ff; /* Soft Indigo */
     --bg-light: #f8fafc; /* Slate 50 */
     --bg-white: #ffffff;
     --text-main: #0f172a; /* Slate 900 */
@@ -17,6 +18,7 @@
 
 /* ELİT KARANLIK MOD TEMA DEĞİŞKENLERİ */
 body.dark-theme {
+    --primary-light: #1e1b4b; /* Deep Indigo */
     --bg-light: #0b0f19; /* Çok şık koyu lacivert/siyah */
     --bg-white: #131c2e; /* Slate 800 tınısı */
     --text-main: #f8fafc;
@@ -1461,4 +1463,72 @@ body.dark-theme .settings-sidebar-btn:hover {
 }
 .message-row.received .voice-duration-premium {
     color: var(--text-muted);
+}
+
+/* MODERN EMOJI REACTION PILLS (Saydamlık giderildi, modern gölgeli kartlar) */
+.reaction-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    padding: 3px 8px;
+    border-radius: 20px;
+    cursor: pointer;
+    user-select: none;
+    line-height: 1;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    
+    /* Light Mode Default: Soft slate pill */
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.reaction-pill:hover {
+    transform: scale(1.08) translateY(-1px);
+    background-color: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #1e293b;
+}
+
+/* Aktif (mevcut kullanıcının bastığı) tepki */
+.reaction-pill.active {
+    background-color: var(--primary-light) !important;
+    border: 1px solid var(--primary-color) !important;
+    color: var(--primary-color) !important;
+    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.15);
+}
+
+.reaction-pill.active:hover {
+    background-color: var(--primary-hover) !important;
+    border-color: var(--primary-hover) !important;
+    color: #ffffff !important;
+}
+
+/* Dark Mode Overrides */
+body.dark-theme .reaction-pill {
+    background-color: #1e293b !important;
+    border: 1px solid #334155 !important;
+    color: #94a3b8 !important;
+}
+
+body.dark-theme .reaction-pill:hover {
+    background-color: #334155 !important;
+    border-color: #475569 !important;
+    color: #f8fafc !important;
+}
+
+body.dark-theme .reaction-pill.active {
+    background-color: var(--primary-light) !important;
+    border: 1px solid var(--primary-color) !important;
+    color: #c7d2fe !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+}
+
+body.dark-theme .reaction-pill.active:hover {
+    background-color: var(--primary-color) !important;
+    border-color: var(--primary-color) !important;
+    color: #ffffff !important;
 }

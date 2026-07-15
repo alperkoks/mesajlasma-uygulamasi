@@ -766,6 +766,12 @@ if (btnSelectBannerPhoto && settingsBannerFileInput) {
                 }
             };
             reader.readAsDataURL(file);
+
+            // Önizlemeyi görmek için yumuşak bir şekilde yukarı kaydır
+            const contentArea = document.querySelector('.settings-content-area');
+            if (contentArea) {
+                contentArea.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         }
     });
 }
@@ -776,6 +782,12 @@ document.querySelectorAll('.banner-select-btn').forEach(btn => {
         tempBanner = bannerVal; // Geçici durum olarak sakla
         tempBannerFile = null; // Özel dosya seçimini temizle
         applyTemporaryBannerUI(tempBanner);
+
+        // Önizlemeyi görmek için yumuşak bir şekilde yukarı kaydır
+        const contentArea = document.querySelector('.settings-content-area');
+        if (contentArea) {
+            contentArea.scrollTo({ top: 0, behavior: 'smooth' });
+        }
     });
 });
 
@@ -3663,13 +3675,11 @@ async function renderMessages() {
                     reactionsHTML = `<div class="message-reactions-row" style="position: absolute; bottom: -12px; ${reactionsAlignStyle} display: flex; gap: 4px; z-index: 15;">`;
                     top4.forEach(item => {
                         const isMyReaction = item.users.includes(currentUser.username);
-                        const activeStyle = isMyReaction 
-                            ? 'border: 1.5px solid var(--primary-color); background-color: var(--primary-light); color: var(--primary-color); box-shadow: 0 2px 5px rgba(99,102,241,0.2);' 
-                            : 'border: 1px solid var(--border-color); background-color: var(--bg-white); color: var(--text-main); box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
+                        const activeClass = isMyReaction ? 'active' : '';
                         reactionsHTML += `
-                            <span class="reaction-pill" data-emoji="${item.emoji}" data-msg-id="${msg.id}" style="display: inline-flex; align-items: center; gap: 4px; font-size: 0.8rem; padding: 2px 6px; border-radius: 12px; cursor: pointer; user-select: none; line-height: 1; ${activeStyle} transition: all 0.15s ease;" title="${item.users.join(', ')}">
+                            <span class="reaction-pill ${activeClass}" data-emoji="${item.emoji}" data-msg-id="${msg.id}" title="${item.users.join(', ')}">
                                 <span>${item.emoji}</span>
-                                <span style="font-size: 0.65rem; font-weight: 700;">${item.count}</span>
+                                <span style="font-size: 0.65rem; font-weight: 700; margin-left: 2px;">${item.count}</span>
                             </span>
                         `;
                     });
