@@ -1649,6 +1649,52 @@ async function fetchAndRenderLinkPreview(url, msgId) {
     }
 }
 
+function getFileAttachmentHTML(fileUrl, filename) {
+    const escapedName = escapeHTML(filename);
+    const ext = filename.includes('.') ? filename.split('.').pop().toLowerCase() : 'bin';
+    
+    let badgeColor = '#4b5563'; // generic slate
+    let typeName = 'File';
+    
+    if (ext === 'pdf') {
+        badgeColor = '#ef4444';
+        typeName = 'PDF Document';
+    } else if (ext === 'udf') {
+        badgeColor = '#dc2626'; // UYAP crimson
+        typeName = 'UDF Document';
+    } else if (ext === 'doc' || ext === 'docx') {
+        badgeColor = '#2563eb';
+        typeName = 'Word Document';
+    } else if (ext === 'xls' || ext === 'xlsx') {
+        badgeColor = '#16a34a';
+        typeName = 'Excel Sheet';
+    } else if (ext === 'ppt' || ext === 'pptx') {
+        badgeColor = '#ea580c';
+        typeName = 'PowerPoint';
+    } else if (['zip', 'rar', 'tar', 'gz', '7z'].includes(ext)) {
+        badgeColor = '#7c3aed';
+        typeName = 'Archive';
+    }
+    
+    return `
+        <a href="${fileUrl}" download="${escapedName}" style="text-decoration:none; color:inherit; display:block; margin: 2px 0;">
+            <div class="file-attachment-card" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.8rem; background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.06); border-radius: 8px; width: 100%; max-width: 290px; transition: all 0.2s ease; box-sizing: border-box;">
+                <div class="file-icon-badge" style="width: 38px; height: 38px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 0.6rem; text-transform: uppercase; background-color: ${badgeColor}; flex-shrink: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                    <span style="margin-top: 1px; font-size: 0.55rem; letter-spacing: 0.3px; line-height: 1;">${ext.substring(0, 4)}</span>
+                </div>
+                <div style="flex: 1; min-width: 0; text-align: left;">
+                    <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapedName}">${escapedName}</div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; margin-top: 1px;">${typeName}</div>
+                </div>
+                <div class="file-download-icon" style="color: var(--text-muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: color 0.2s;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                </div>
+            </div>
+        </a>
+    `;
+}
+
 // 2. KANAL YAZMA YETKİSİ KONTROLÜ
 function checkChannelPostPermission() {
     if (activeChatGroupId) {

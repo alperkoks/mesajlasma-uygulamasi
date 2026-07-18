@@ -330,14 +330,14 @@
 
     <!-- 3. EKRAN: PROFİL AYARLARI MODALI (Varsayılan olarak gizli) -->
     <div id="settings-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 680px; height: 520px; display: flex; flex-direction: column;">
+        <div class="modal-content settings-modal-content">
             <div class="modal-header" style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--border-color);">
                 <h3 id="settings-modal-title" style="margin: 0; font-size: 1.2rem; font-weight: 700;">Ayarlar</h3>
                 <span id="close-settings" class="close-btn" title="Kapat" style="font-size: 1.5rem; cursor: pointer;">&times;</span>
             </div>
-            <div class="settings-layout" style="display: flex; flex: 1; overflow: hidden;">
+            <div class="settings-layout">
                 <!-- Sol Sidebar Menü -->
-                <div class="settings-sidebar" style="width: 180px; background: rgba(0,0,0,0.02); border-right: 1px solid var(--border-color); padding: 1rem 0.5rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                <div class="settings-sidebar">
                     <button type="button" class="settings-sidebar-btn active" data-tab="tab-profile">👤 Profilim</button>
                     <button type="button" class="settings-sidebar-btn" data-tab="tab-appearance">🎨 Görünüm</button>
                     <button type="button" class="settings-sidebar-btn" data-tab="tab-notifications">🔔 Bildirim & Ses</button>
@@ -345,7 +345,7 @@
                 </div>
                 
                 <!-- Sağ İçerik Alanı -->
-                <div class="settings-content-area" style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column;">
+                <div class="settings-content-area">
                     <form id="settings-form" style="display: flex; flex-direction: column; height: 100%; gap: 1rem; margin: 0;">
                         
                         <!-- TAB: PROFİLİM -->
@@ -364,11 +364,11 @@
                             <!-- Profil Kapağı Seçeneği -->
                             <div class="input-group" style="margin-bottom: 0.75rem;">
                                 <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Profil Kapağı / Banner</label>
-                                <div style="display: flex; gap: 0.25rem; margin-top: 0.25rem; justify-content: space-between;">
-                                    <button type="button" class="btn banner-select-btn" data-banner="linear-gradient(135deg, #4f46e5, #06b6d4)" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; background: linear-gradient(135deg, #4f46e5, #06b6d4); color: white; border-radius: 6px; flex: 1;">İndigo</button>
-                                    <button type="button" class="btn banner-select-btn" data-banner="linear-gradient(135deg, #f43f5e, #f59e0b)" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; background: linear-gradient(135deg, #f43f5e, #f59e0b); color: white; border-radius: 6px; flex: 1;">Sunset</button>
-                                    <button type="button" class="btn banner-select-btn" data-banner="linear-gradient(135deg, #10b981, #06b6d4)" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; background: linear-gradient(135deg, #10b981, #06b6d4); color: white; border-radius: 6px; flex: 1;">Zümrüt</button>
-                                    <button type="button" class="btn banner-select-btn" data-banner="linear-gradient(135deg, #a855f7, #ec4899)" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; background: linear-gradient(135deg, #a855f7, #ec4899); color: white; border-radius: 6px; flex: 1;">Neon</button>
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.25rem;">
+                                    <button type="button" class="btn banner-select-btn" data-banner="linear-gradient(135deg, #4f46e5, #06b6d4)" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; background: linear-gradient(135deg, #4f46e5, #06b6d4); color: white; border-radius: 6px; border: none; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">İndigo</button>
+                                    <button type="button" class="btn banner-select-btn" data-banner="linear-gradient(135deg, #f43f5e, #f59e0b)" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; background: linear-gradient(135deg, #f43f5e, #f59e0b); color: white; border-radius: 6px; border: none; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">Sunset</button>
+                                    <button type="button" class="btn banner-select-btn" data-banner="linear-gradient(135deg, #10b981, #06b6d4)" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; background: linear-gradient(135deg, #10b981, #06b6d4); color: white; border-radius: 6px; border: none; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">Zümrüt</button>
+                                    <button type="button" class="btn banner-select-btn" data-banner="linear-gradient(135deg, #a855f7, #ec4899)" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; background: linear-gradient(135deg, #a855f7, #ec4899); color: white; border-radius: 6px; border: none; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">Neon</button>
                                 </div>
                                 <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 0.5rem;">
                                     <input type="file" id="settings-banner-file-input" accept="image/*" class="hidden">
@@ -407,12 +407,12 @@
                             <!-- Sohbet Arka Planı Seçeneği -->
                             <div class="input-group">
                                 <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Sohbet Arka Planı / Wallpaper</label>
-                                <div style="display: flex; gap: 0.25rem; margin-top: 0.5rem; justify-content: space-between;">
-                                    <button type="button" class="btn wp-select-btn" data-wp="wp-default" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: var(--bg-light); color: var(--text-main); border-radius: 6px; flex: 1;">Klasik</button>
-                                    <button type="button" class="btn wp-select-btn" data-wp="wp-neon" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border-radius: 6px; flex: 1;">Neon</button>
-                                    <button type="button" class="btn wp-select-btn" data-wp="wp-sunset" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #f43f5e, #f59e0b); color: white; border-radius: 6px; flex: 1;">Gün Batımı</button>
-                                    <button type="button" class="btn wp-select-btn" data-wp="wp-emerald" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #10b981, #06b6d4); color: white; border-radius: 6px; flex: 1;">Zümrüt</button>
-                                    <button type="button" class="btn wp-select-btn" data-wp="wp-abstract" style="padding: 0.4rem 0.2rem; font-size: 0.72rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #ec4899); color: white; border-radius: 6px; flex: 1;">Soyut</button>
+                                <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem;">
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-default" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; border: 1px solid var(--border-color); background: var(--bg-light); color: var(--text-main); border-radius: 6px; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">Klasik</button>
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-neon" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border-radius: 6px; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">Neon</button>
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-sunset" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #f43f5e, #f59e0b); color: white; border-radius: 6px; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">Gün Batımı</button>
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-emerald" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #10b981, #06b6d4); color: white; border-radius: 6px; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">Zümrüt</button>
+                                    <button type="button" class="btn wp-select-btn" data-wp="wp-abstract" style="padding: 0.4rem 0.6rem; font-size: 0.75rem; border: 1px solid var(--border-color); background: linear-gradient(135deg, #6366f1, #ec4899); color: white; border-radius: 6px; cursor: pointer; flex: 1; min-width: 70px; text-align: center;">Soyut</button>
                                 </div>
                             </div>
                         </div>
