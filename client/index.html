@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=21">
+    <link rel="stylesheet" href="style.css?v=23">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -299,14 +299,14 @@
                                  
                                  <!-- Stickerlar Bölümü (Varsayılan olarak gizli) -->
                                  <div id="stickers-container" class="hidden" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
-                                     <div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: center; align-items: center; gap: 0.5rem; background-color: var(--bg-hover);">
-                                         <button type="button" id="btn-add-sticker" style="display: flex; align-items: center; gap: 0.2rem; padding: 0.35rem 0.6rem; background-color: var(--primary-color); color: white; border: none; border-radius: 20px; font-size: 0.75rem; font-weight: 600; cursor: pointer;">
+                                     <div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background-color: var(--bg-hover); overflow: hidden;">
+                                         <button type="button" id="btn-add-sticker" style="display: flex; align-items: center; gap: 0.2rem; padding: 0.35rem 0.6rem; background-color: var(--primary-color); color: white; border: none; border-radius: 20px; font-size: 0.75rem; font-weight: 600; cursor: pointer; flex-shrink: 0;">
                                              <span>➕</span> <span id="lbl-add-sticker">Ekle</span>
                                          </button>
                                          <input type="file" id="sticker-file-input" style="display: none;" accept="image/*">
                                          
-                                         <!-- Sticker Alt Sekmesi: Kategori Filtreleri -->
-                                         <div class="sticker-filters-row" style="display: flex; gap: 0.35rem; margin-left: auto; overflow-x: auto; white-space: nowrap; max-width: 70%; padding: 4px 0; scrollbar-width: none;">
+                                         <!-- Sticker Alt Sekmesi: Kategori Filtreleri (Mobilde sağa kaydırılabilir) -->
+                                         <div class="sticker-filters-row" style="display: flex; gap: 0.35rem; overflow-x: auto; white-space: nowrap; padding: 4px 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex: 1;">
                                              <button type="button" id="sticker-filter-all" class="sticker-filter-pill active" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--primary-light); color: var(--primary-color); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">Tümü</button>
                                              <button type="button" id="sticker-filter-happy" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">😊 Mutlu</button>
                                              <button type="button" id="sticker-filter-sad" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">😢 Üzgün</button>

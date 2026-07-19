@@ -1651,3 +1651,8 @@ body.dark-theme .file-attachment-card:hover {
     border-color: rgba(255, 255, 255, 0.12) !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
+
+/* Hide scrollbars for sticker filters row on Webkit */
+.sticker-filters-row::-webkit-scrollbar {
+    display: none;
+}
