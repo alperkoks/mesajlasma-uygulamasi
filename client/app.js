@@ -1890,51 +1890,51 @@ const emojiGroups = {
 
 const stickerCategories = {
     happy: [
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f600.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f601.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f602.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f604.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f609.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f60a.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f60d.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f618.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f929.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f970.svg"
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f600.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f601.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f602.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f604.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f609.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f60a.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f60d.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f618.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f929.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f970.svg"
     ],
     sad: [
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f614.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f61e.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f622.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f625.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f62d.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f630.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f62b.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f97a.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f494.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f327.svg"
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f614.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f61e.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f622.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f625.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f62d.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f630.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f62b.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f97a.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f494.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f327.svg"
     ],
     playful: [
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f61c.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f61d.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f61b.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f92a.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f92f.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f973.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f974.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f60e.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f917.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f47b.svg"
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f61c.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f61d.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f61b.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f92a.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f92f.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f973.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f974.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f60e.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f917.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f47b.svg"
     ],
     angry: [
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f620.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f621.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f92c.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f624.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f47f.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f4a9.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f480.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f47a.svg",
-        "https://cdn.jsdelivr.net/npm/twemoji@14.0.2/assets/svg/1f525.svg"
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f620.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f621.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f92c.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f624.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f47f.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f4a9.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f480.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f47a.svg",
+        "https://cdn.jsdelivr.net/npm/@twemoji/svg@latest/1f525.svg"
     ]
 };
 
@@ -2048,7 +2048,12 @@ function populateStickers() {
         return;
     }
 
-    displayStickers.forEach(url => {
+    displayStickers.forEach(rawUrl => {
+        let url = rawUrl;
+        if (url.includes('twemoji@14.0.2/assets/svg/')) {
+            url = url.replace('twemoji@14.0.2/assets/svg/', '@twemoji/svg@latest/');
+        }
+        
         const div = document.createElement('div');
         div.style.position = 'relative';
         div.style.width = '100%';
@@ -3971,7 +3976,11 @@ async function renderMessages() {
         if (msg.message_type === 'deleted') {
             msgContentHTML = `<span style="color:var(--text-muted); font-style:italic; opacity:0.75; display:inline-flex; align-items:center; gap:0.25rem;">🚫 ${escapeHTML(displayText)}</span>`;
         } else if (msg.message_type === 'sticker' || msg.message === '🎨 Sticker') {
-            msgContentHTML = `<img src="${msg.file_url}" alt="sticker" style="width:110px; height:110px; object-fit:contain; display:block; border:none; background:transparent; box-shadow:none;">`;
+            let stickerUrl = msg.file_url || '';
+            if (stickerUrl.includes('twemoji@14.0.2/assets/svg/')) {
+                stickerUrl = stickerUrl.replace('twemoji@14.0.2/assets/svg/', '@twemoji/svg@latest/');
+            }
+            msgContentHTML = `<img src="${stickerUrl}" alt="sticker" style="width:110px; height:110px; object-fit:contain; display:block; border:none; background:transparent; box-shadow:none;">`;
         } else if (msg.message_type === 'image') {
             msgContentHTML = `<img src="${msg.file_url}" alt="görsel" style="max-width:100%; max-height:240px; border-radius:8px; display:block; cursor:pointer; margin-bottom: 2px;" onclick="window.open('${msg.file_url}', '_blank')">`;
         } else if (msg.message_type === 'file') {
