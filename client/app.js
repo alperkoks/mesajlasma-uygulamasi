@@ -2068,8 +2068,16 @@ function populateStickers() {
             </button>
         `;
         
+        const isCustom = localCustoms.includes(rawUrl);
+        const deleteButtonHTML = isCustom ? `
+            <button class="delete-sticker-btn" style="position: absolute; top: 4px; left: 4px; width: 22px; height: 22px; border-radius: 50%; background: rgba(239,68,68,0.9); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; border: none; cursor: pointer; transition: all 0.2s ease; z-index: 5; box-shadow: 0 2px 4px rgba(0,0,0,0.15); line-height: 1; padding: 0;" title="${currentLanguage === 'tr' ? 'Sil' : 'Delete'}">
+                ×
+            </button>
+        ` : '';
+        
         div.innerHTML = `
             ${starButtonHTML}
+            ${deleteButtonHTML}
             <img src="${url}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px; transition: transform 0.15s;">
         `;
         
@@ -2077,21 +2085,48 @@ function populateStickers() {
         img.addEventListener('mouseover', () => img.style.transform = 'scale(1.05)');
         img.addEventListener('mouseout', () => img.style.transform = 'scale(1)');
         
-        // Single click: Send sticker
         img.addEventListener('click', async () => {
             emojiPopover.classList.add('hidden');
             await sendStickerMessage(url);
         });
 
-        // Click Star Button: Toggle favorite
         const favBtn = div.querySelector('.fav-sticker-btn');
         favBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleFavoriteSticker(url);
         });
         
+        const deleteBtn = div.querySelector('.delete-sticker-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (confirm(currentLanguage === 'tr' ? 'Bu çıkartmayı tamamen silmek istediğinize emin misiniz?' : 'Are you sure you want to delete this sticker?')) {
+                    deleteCustomSticker(rawUrl);
+                }
+            });
+        }
+        
         stickersGrid.appendChild(div);
     });
+}
+
+function deleteCustomSticker(rawUrl) {
+    let localCustoms = [];
+    try {
+        localCustoms = JSON.parse(localStorage.getItem('custom_stickers')) || [];
+    } catch(e) {}
+    
+    localCustoms = localCustoms.filter(u => u !== rawUrl);
+    localStorage.setItem('custom_stickers', JSON.stringify(localCustoms));
+    
+    let favs = [];
+    try {
+        favs = JSON.parse(localStorage.getItem('favorite_stickers')) || [];
+    } catch(e) {}
+    favs = favs.filter(u => u !== rawUrl);
+    localStorage.setItem('favorite_stickers', JSON.stringify(favs));
+    
+    populateStickers();
 }
 
 function toggleFavoriteSticker(url) {
