@@ -296,7 +296,6 @@
                                  <div id="emojis-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; padding: 0.75rem; font-size: 1.5rem; text-align: center; cursor: pointer; user-select: none;">
                                      <!-- Javascript tarafından doldurulacak -->
                                  </div>
-                                 
                                  <!-- Stickerlar Bölümü (Varsayılan olarak gizli) -->
                                  <div id="stickers-container" class="hidden" style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
                                      <div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background-color: var(--bg-hover); overflow: hidden;">
@@ -305,15 +304,47 @@
                                          </button>
                                          <input type="file" id="sticker-file-input" style="display: none;" accept="image/*">
                                          
-                                         <!-- Sticker Alt Sekmesi: Kategori Filtreleri (Mobilde sağa kaydırılabilir) -->
-                                         <div class="sticker-filters-row" style="display: flex; gap: 0.35rem; overflow-x: auto; white-space: nowrap; padding: 4px 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex: 1;">
-                                             <button type="button" id="sticker-filter-all" class="sticker-filter-pill active" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--primary-light); color: var(--primary-color); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">Tümü</button>
-                                             <button type="button" id="sticker-filter-happy" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">😊 Mutlu</button>
-                                             <button type="button" id="sticker-filter-sad" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">😢 Üzgün</button>
-                                             <button type="button" id="sticker-filter-playful" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">🤪 Eğlenceli</button>
-                                             <button type="button" id="sticker-filter-angry" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">😡 Kızgın</button>
-                                             <button type="button" id="sticker-filter-fav" class="sticker-filter-pill" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; font-weight: 600; border: 1px solid var(--border-color); border-radius: 12px; background-color: var(--bg-white); color: var(--text-muted); cursor: pointer; flex-shrink: 0; transition: all 0.2s;">⭐ Favori</button>
-                                         </div>
+                                         <!-- Sticker Alt Sekmesi: Premium Kompakt Segmented Butonlar (Kaydırma gerektirmez) -->
+                                          <div class="sticker-filters-row" style="display: flex; gap: 0.35rem; align-items: center;">
+                                              <style>
+                                                  .sticker-filter-pill { 
+                                                      width: 30px; 
+                                                      height: 30px; 
+                                                      border-radius: 50%; 
+                                                      border: 1px solid var(--border-color); 
+                                                      background: var(--bg-white); 
+                                                      display: flex; 
+                                                      align-items: center; 
+                                                      justify-content: center; 
+                                                      font-size: 0.95rem; 
+                                                      cursor: pointer; 
+                                                      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+                                                      padding: 0; 
+                                                  }
+                                                  .sticker-filter-pill:hover {
+                                                      background: var(--bg-hover);
+                                                      transform: scale(1.05);
+                                                  }
+                                                  .sticker-filter-pill.active { 
+                                                      background: var(--primary-light) !important; 
+                                                      border-color: var(--primary-color) !important; 
+                                                      transform: scale(1.1); 
+                                                      box-shadow: 0 2px 6px rgba(99, 102, 241, 0.2);
+                                                  }
+                                                  body.dark-theme .sticker-filter-pill {
+                                                      background: #1e293b;
+                                                  }
+                                                  body.dark-theme .sticker-filter-pill.active {
+                                                      background: rgba(99, 102, 241, 0.2) !important;
+                                                  }
+                                              </style>
+                                              <button type="button" id="sticker-filter-all" class="sticker-filter-pill active" title="Tümü">✨</button>
+                                              <button type="button" id="sticker-filter-happy" class="sticker-filter-pill" title="Mutlu">😊</button>
+                                              <button type="button" id="sticker-filter-sad" class="sticker-filter-pill" title="Üzgün">😢</button>
+                                              <button type="button" id="sticker-filter-playful" class="sticker-filter-pill" title="Eğlenceli">🤪</button>
+                                              <button type="button" id="sticker-filter-angry" class="sticker-filter-pill" title="Kızgın">😡</button>
+                                              <button type="button" id="sticker-filter-fav" class="sticker-filter-pill" title="Favori">⭐</button>
+                                          </div>
                                      </div>
                                      <div id="stickers-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; padding: 0.75rem;">
                                          <!-- Javascript tarafından doldurulacak -->
