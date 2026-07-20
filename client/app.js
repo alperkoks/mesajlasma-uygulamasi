@@ -3427,28 +3427,34 @@ async function initApp() {
         history.replaceState({ screen: 'sentinel' }, '');
         history.pushState({ screen: 'main' }, '');
 
-        await loadArchivedChats();
-        await loadUsers();
-        await loadPendingRequests();
-        await loadGroups();
-        
         // --- SOCKET.IO BAĞLANTISINI KURMA ---
         // Sayfa her yüklendiğinde ve giriş yapıldığında soket hattını açıyoruz.
         // Kimliğimizi doğrulamak için token bilgisini soket bağlantı isteğine ekliyoruz.
-        socket = io({
-            auth: {
-                token: token
-            }
-        });
+        try {
+            socket = io({
+                auth: {
+                    token: token
+                }
+            });
 
-        // Bağlantı hatası alırsak (örneğin token geçersizse) otomatik çıkış yap
-        socket.on('connect_error', (err) => {
-            console.error('Soket bağlantı hatası:', err.message);
-            // Sadece kimlik doğrulama/token yetki hatalarında çıkış yap, geçici ağ kesintilerinde çıkış yapma!
-            if (err.message === 'Yetkisiz bağlantı.' || err.message === 'Geçersiz anahtar.') {
-                logoutBtn.click();
-            }
-        });
+            // Bağlantı hatası alırsak (örneğin token geçersizse) otomatik çıkış yap
+            socket.on('connect_error', (err) => {
+                console.error('Soket bağlantı hatası:', err.message);
+                // Sadece kimlik doğrulama/token yetki hatalarında çıkış yap, geçici ağ kesintilerinde çıkış yapma!
+                if (err.message === 'Yetkisiz bağlantı.' || err.message === 'Geçersiz anahtar.') {
+                    logoutBtn.click();
+                }
+            });
+        } catch (sockErr) {
+            console.error('Soket bağlantısı kurulurken hata:', sockErr);
+        }
+
+        // Veri yükleme fonksiyonlarını bağımsız çalışacak şekilde çağırıyoruz.
+        // Biri hata verse bile diğeri veya soket bağlantısı engellenmeyecek.
+        try { await loadArchivedChats(); } catch (e) { console.error('Arşiv hatası:', e); }
+        try { await loadUsers(); } catch (e) { console.error('Kullanıcı hatası:', e); }
+        try { await loadPendingRequests(); } catch (e) { console.error('İstek hatası:', e); }
+        try { await loadGroups(); } catch (e) { console.error('Grup hatası:', e); }
 
         // Başka bir kullanıcının ÇEVRİMİÇİ/ÇEVRİMDIŞI durumu değiştiğinde çalışan olay
         socket.on('user_status_change', (data) => {
@@ -4185,6 +4191,7 @@ function renderCallHistory(calls) {
                 // Set active partner so calling works!
                 activeChatPartnerId = pId;
                 activeChatPartner = btn.getAttribute('data-partner-name');
+                activeChatGroupId = null; // Grup ID'sini sıfırla ki 1-1 arama çalışsın
                 
                 startWebRtcCall(type === 'video');
             });
@@ -4923,7 +4930,7 @@ messageForm.addEventListener('submit', async (e) => {
                 partner.last_message_time = newMsg.created_at;
                 renderUsersList();
             }
-            if (isCurrentlyTyping) {
+            if (isCurrentlyTyping && socket) {
                 isCurrentlyTyping = false;
                 socket.emit('stop_typing', { receiverId: activeChatPartnerId });
             }
@@ -4971,14 +4978,14 @@ if (messageInput) {
             if (btnSend) btnSend.classList.add('hidden');
         }
 
-        if (!isCurrentlyTyping && activeChatPartnerId) {
+        if (socket && !isCurrentlyTyping && activeChatPartnerId) {
             isCurrentlyTyping = true;
             socket.emit('typing', { receiverId: activeChatPartnerId });
         }
 
         clearTimeout(typingTimeout);
         typingTimeout = setTimeout(() => {
-            if (isCurrentlyTyping && activeChatPartnerId) {
+            if (socket && isCurrentlyTyping && activeChatPartnerId) {
                 isCurrentlyTyping = false;
                 socket.emit('stop_typing', { receiverId: activeChatPartnerId });
             }
@@ -4986,7 +4993,7 @@ if (messageInput) {
     });
 
     messageInput.addEventListener('blur', () => {
-        if (isCurrentlyTyping && activeChatPartnerId) {
+        if (socket && isCurrentlyTyping && activeChatPartnerId) {
             isCurrentlyTyping = false;
             socket.emit('stop_typing', { receiverId: activeChatPartnerId });
         }
