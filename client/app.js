@@ -482,7 +482,6 @@ forgotForm.addEventListener('submit', async (e) => {
         loginForm.classList.remove('hidden');
     } catch (err) {}
 });
-
 loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = document.getElementById('login-username').value.trim();
@@ -496,7 +495,13 @@ loginForm.addEventListener('submit', async (e) => {
         localStorage.setItem('token', token);
         localStorage.setItem('currentUser', JSON.stringify(currentUser));
         
-        // --- SOHBET ARŞİVLEME / TEK KULLANIMLIK / GRUP WEBRTC EK FONKSİYONLARI ---
+        await initApp();
+    } catch (err) {
+        showAuthError(err.message);
+    }
+});
+
+// --- SOHBET ARŞİVLEME / TEK KULLANIMLIK / GRUP WEBRTC EK FONKSİYONLARI ---
 async function loadArchivedChats() {
     try {
         const list = await apiCall('/chats/archived');
@@ -841,10 +846,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-});
-
-initApp();
-    } catch (err) {}
 });
 
 // Çıkış Butonuna Basıldığında Soket Bağlantısını da Kopar
