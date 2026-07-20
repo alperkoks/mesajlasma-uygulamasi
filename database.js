@@ -158,6 +158,8 @@ async function initDatabase() {
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_encrypted INTEGER DEFAULT 0`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS reactions TEXT DEFAULT '{}'`);
             await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_forwarded INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_view_once INTEGER DEFAULT 0`);
+            await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_opened INTEGER DEFAULT 0`);
 
             await client.query(`
                 CREATE TABLE IF NOT EXISTS call_logs (
@@ -168,6 +170,17 @@ async function initDatabase() {
                     status VARCHAR(20) DEFAULT 'missed',
                     duration INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS archived_chats (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    peer_id INTEGER NOT NULL,
+                    is_group INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, peer_id, is_group)
                 )
             `);
 
@@ -286,6 +299,12 @@ async function initDatabase() {
         if (!columnsMsg.includes('is_forwarded')) {
             await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_forwarded INTEGER DEFAULT 0");
         }
+        if (!columnsMsg.includes('is_view_once')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_view_once INTEGER DEFAULT 0");
+        }
+        if (!columnsMsg.includes('is_opened')) {
+            await dbSqlite.exec("ALTER TABLE messages ADD COLUMN is_opened INTEGER DEFAULT 0");
+        }
 
         await dbSqlite.exec(`
             CREATE TABLE IF NOT EXISTS friendships (
@@ -384,6 +403,18 @@ async function initDatabase() {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(caller_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY(receiver_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS archived_chats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                peer_id INTEGER NOT NULL,
+                is_group INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, peer_id, is_group)
             )
         `);
 
@@ -561,19 +592,19 @@ const dbQueries = {
     },
 
     // Yeni mesaj kaydetme (Grup, dosya tipleri, alıntılama, süreli mesaj ve şifreleme desteğiyle)
-    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null, parentMessageId = null, expiresAt = null, isEncrypted = 0, isForwarded = 0) {
+    async saveMessage(senderId, receiverId, messageText, groupId = null, messageType = 'text', fileUrl = null, parentMessageId = null, expiresAt = null, isEncrypted = 0, isForwarded = 0, isViewOnce = 0) {
         if (isPostgres) {
             const finalReceiverId = groupId ? null : receiverId;
             const res = await dbPostgresPool.query(
-                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted, is_forwarded) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted, isForwarded]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted, is_forwarded, is_view_once) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted, isForwarded, isViewOnce]
             );
             return res.rows[0];
         } else {
             const finalReceiverId = groupId ? 0 : receiverId;
             const result = await dbSqlite.run(
-                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted, is_forwarded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted, isForwarded]
+                'INSERT INTO messages (sender_id, receiver_id, message, group_id, message_type, file_url, parent_message_id, expires_at, is_encrypted, is_forwarded, is_view_once) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [senderId, finalReceiverId, messageText, groupId, messageType, fileUrl, parentMessageId, expiresAt, isEncrypted, isForwarded, isViewOnce]
             );
             return await dbSqlite.get('SELECT * FROM messages WHERE id = ?', [result.lastID]);
         }
@@ -715,6 +746,67 @@ const dbQueries = {
             await dbSqlite.run(
                 'UPDATE messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ? AND is_read = 0',
                 [senderId, receiverId]
+            );
+        }
+    },
+
+    // Sohbeti arşive ekleme
+    async archiveChat(userId, peerId, isGroup = 0) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'INSERT INTO archived_chats (user_id, peer_id, is_group) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+                [userId, peerId, isGroup]
+            );
+        } else {
+            await dbSqlite.run(
+                'INSERT OR IGNORE INTO archived_chats (user_id, peer_id, is_group) VALUES (?, ?, ?)',
+                [userId, peerId, isGroup]
+            );
+        }
+    },
+
+    // Sohbeti arşivden çıkarma
+    async unarchiveChat(userId, peerId, isGroup = 0) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                'DELETE FROM archived_chats WHERE user_id = $1 AND peer_id = $2 AND is_group = $3',
+                [userId, peerId, isGroup]
+            );
+        } else {
+            await dbSqlite.run(
+                'DELETE FROM archived_chats WHERE user_id = ? AND peer_id = ? AND is_group = ?',
+                [userId, peerId, isGroup]
+            );
+        }
+    },
+
+    // Arşivlenmiş sohbetlerin listesini getirme
+    async getArchivedChats(userId) {
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(
+                'SELECT peer_id, is_group FROM archived_chats WHERE user_id = $1',
+                [userId]
+            );
+            return res.rows;
+        } else {
+            return await dbSqlite.all(
+                'SELECT peer_id, is_group FROM archived_chats WHERE user_id = ?',
+                [userId]
+            );
+        }
+    },
+
+    // Tek kullanımlık mesajı açıldı olarak işaretle ve dosya url'ini imha et
+    async markMessageAsOpened(messageId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(
+                "UPDATE messages SET is_opened = 1, file_url = NULL, message = '👁️ Açıldı' WHERE id = $1",
+                [messageId]
+            );
+        } else {
+            await dbSqlite.run(
+                "UPDATE messages SET is_opened = 1, file_url = NULL, message = '👁️ Açıldı' WHERE id = ?",
+                [messageId]
             );
         }
     },

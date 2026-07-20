@@ -447,6 +447,51 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- GRUP & ÇOKLU WEBRTC ARAMA SİNYALLEŞMESİ ---
+    socket.on('join_call_room', ({ roomId, isVideoCall }) => {
+        const roomName = `call_room_${roomId}`;
+        socket.join(roomName);
+        socket.to(roomName).emit('peer_joined', {
+            userId: userId,
+            username: socket.user.username,
+            profile_pic: socket.user.profile_pic || null,
+            isVideoCall: isVideoCall
+        });
+    });
+
+    socket.on('invite_to_call', ({ targetUserId, roomId, isVideoCall }) => {
+        const receiverId = Number(targetUserId);
+        const targetSockets = userSockets.get(receiverId);
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(socketId => {
+                io.to(socketId).emit('call_incoming', {
+                    fromUserId: userId,
+                    fromUsername: socket.user.username,
+                    roomId: roomId,
+                    isVideoCall: isVideoCall
+                });
+            });
+        }
+    });
+
+    socket.on('call_signal', ({ targetUserId, signalData }) => {
+        const targetSockets = userSockets.get(Number(targetUserId));
+        if (targetSockets && targetSockets.size > 0) {
+            targetSockets.forEach(socketId => {
+                io.to(socketId).emit('call_signal', {
+                    fromUserId: userId,
+                    signalData: signalData
+                });
+            });
+        }
+    });
+
+    socket.on('leave_call_room', ({ roomId }) => {
+        const roomName = `call_room_${roomId}`;
+        socket.leave(roomName);
+        io.to(roomName).emit('peer_left', { userId });
+    });
+
     // --- MESAJ EMOJİ TEPKİLERİ (REACTIONS) OLAYI ---
     socket.on('message_reaction', async ({ messageId, emoji, targetUserId, groupId }) => {
         try {
@@ -1032,6 +1077,9 @@ app.post('/api/messages/upload', authenticateToken, upload.single('file'), async
 app.get('/api/users', authenticateToken, async (req, res) => {
     const userId = req.user.id;
     try {
+        const db = getDbInstance();
+        
+        // 1. Arkadaşları getir
         const friends = await dbQueries.getFriends(userId);
         const friendsWithStatus = friends.map(friend => {
             const isOnlineActual = onlineUsers.has(friend.id);
@@ -1048,9 +1096,53 @@ app.get('/api/users', authenticateToken, async (req, res) => {
                 last_message_time: friend.last_message_time || null,
                 isOnline: isOnlineActual && showOnline,
                 show_last_seen: friend.show_last_seen,
-                show_online: friend.show_online
+                show_online: friend.show_online,
+                isSelf: false
             };
         });
+
+        // 2. Kendi kendine sohbet (Kendime Notlar) istatistiklerini getir
+        let lastSelfMsg;
+        if (isPostgres) {
+            const selfMsgRes = await db.query(
+                'SELECT message, created_at, message_type FROM messages WHERE sender_id = $1 AND receiver_id = $1 AND group_id IS NULL ORDER BY created_at DESC LIMIT 1',
+                [userId]
+            );
+            lastSelfMsg = selfMsgRes.rows[0];
+        } else {
+            lastSelfMsg = await db.get(
+                'SELECT message, created_at, message_type FROM messages WHERE sender_id = ? AND receiver_id = ? AND group_id IS NULL ORDER BY created_at DESC LIMIT 1',
+                [userId, userId]
+            );
+        }
+
+        let currentUserDetails;
+        if (isPostgres) {
+            const userRes = await db.query('SELECT username, profile_pic, profile_banner, bio FROM users WHERE id = $1', [userId]);
+            currentUserDetails = userRes.rows[0];
+        } else {
+            currentUserDetails = await db.get('SELECT username, profile_pic, profile_banner, bio FROM users WHERE id = ?', [userId]);
+        }
+
+        const selfChat = {
+            id: userId,
+            username: currentUserDetails ? currentUserDetails.username : req.user.username,
+            profile_pic: currentUserDetails ? currentUserDetails.profile_pic : null,
+            profile_banner: currentUserDetails ? currentUserDetails.profile_banner : null,
+            bio: currentUserDetails ? currentUserDetails.bio : '',
+            last_seen: null,
+            unread_count: 0,
+            last_message: lastSelfMsg ? (lastSelfMsg.message_type === 'text' ? lastSelfMsg.message : '📁 Dosya / File') : null,
+            last_message_time: lastSelfMsg ? lastSelfMsg.created_at : null,
+            isOnline: true,
+            show_last_seen: 0,
+            show_online: 0,
+            isSelf: true
+        };
+
+        // Kendime notlar en başta çıksın
+        friendsWithStatus.unshift(selfChat);
+
         res.json(friendsWithStatus);
     } catch (error) {
         console.error('Arkadaş listesi getirme hatası:', error);
@@ -1383,7 +1475,7 @@ app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => 
             return res.status(403).json({ message: 'Bu grubun üyesi değilsiniz.' });
         }
 
-        const messages = await dbQueries.getGroupMessageHistory(groupId);
+        const messages = await dbQueries.getGroupMessageHistory(groupId, userId);
         res.json(messages);
     } catch (error) {
         console.error('Grup mesaj geçmişi çekme hatası:', error);
@@ -1674,7 +1766,7 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
 app.post('/api/messages', authenticateToken, async (req, res) => {
     const senderId = req.user.id;
     const receiverId = req.body.receiverId ? parseInt(req.body.receiverId) : null;
-    const { message, groupId, messageType, fileUrl, parentMessageId, durationSeconds, isEncrypted, isForwarded } = req.body;
+    const { message, groupId, messageType, fileUrl, parentMessageId, durationSeconds, isEncrypted, isForwarded, isViewOnce } = req.body;
 
     if (!groupId && !receiverId) {
         return res.status(400).json({ message: 'Alıcı ID veya Grup ID zorunludur.' });
@@ -1732,6 +1824,7 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
         const isEncryptedVal = isEncrypted ? 1 : 0;
 
         const isForwardedVal = isForwarded ? 1 : 0;
+        const isViewOnceVal = isViewOnce ? 1 : 0;
 
         // Mesajı veritabanına kaydet
         const savedMessage = await dbQueries.saveMessage(
@@ -1744,8 +1837,10 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
             parentMessageId || null,
             expiresAt,
             isEncryptedVal,
-            isForwardedVal
+            isForwardedVal,
+            isViewOnceVal
         );
+        savedMessage.sender_name = req.user.username;
         
         // --- GERÇEK ZAMANLI SOKET İLETİMİ ---
         if (groupId) {
@@ -1970,6 +2065,88 @@ app.get('/api/calls/history', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Arama geçmişi getirme hatası:', error);
         res.status(500).json({ message: 'Arama geçmişi alınırken hata oluştu.' });
+    }
+});
+
+// --- SOHBET ARŞİVLEME ROTALARI ---
+app.post('/api/chats/archive', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { peerId, isGroup } = req.body;
+    if (!peerId) return res.status(400).json({ message: 'peerId gereklidir.' });
+    try {
+        await dbQueries.archiveChat(userId, parseInt(peerId), isGroup ? 1 : 0);
+        res.json({ message: 'Sohbet başarıyla arşivlendi.' });
+    } catch (error) {
+        console.error('Sohbet arşivleme hatası:', error);
+        res.status(500).json({ message: 'Sohbet arşivlenirken hata oluştu.' });
+    }
+});
+
+app.post('/api/chats/unarchive', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const { peerId, isGroup } = req.body;
+    if (!peerId) return res.status(400).json({ message: 'peerId gereklidir.' });
+    try {
+        await dbQueries.unarchiveChat(userId, parseInt(peerId), isGroup ? 1 : 0);
+        res.json({ message: 'Sohbet arşivden çıkarıldı.' });
+    } catch (error) {
+        console.error('Sohbet arşivden çıkarma hatası:', error);
+        res.status(500).json({ message: 'Sohbet arşivden çıkarılırken hata oluştu.' });
+    }
+});
+
+app.get('/api/chats/archived', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const list = await dbQueries.getArchivedChats(userId);
+        res.json(list);
+    } catch (error) {
+        console.error('Arşivlenmiş sohbetleri getirme hatası:', error);
+        res.status(500).json({ message: 'Arşivlenmiş sohbetler listelenirken hata oluştu.' });
+    }
+});
+
+// --- TEK KULLANIMLIK RESİM AÇILMA ROTASI ---
+app.post('/api/messages/:messageId/opened', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const messageId = parseInt(req.params.messageId);
+    try {
+        const msg = await dbQueries.getMessageById(messageId);
+        if (!msg) return res.status(404).json({ message: 'Mesaj bulunamadı.' });
+        
+        if (msg.sender_id !== userId && msg.receiver_id !== userId) {
+            return res.status(403).json({ message: 'Bu işlem için yetkiniz yok.' });
+        }
+        
+        await dbQueries.markMessageAsOpened(messageId);
+        
+        const updatedMsg = {
+            id: messageId,
+            is_opened: 1,
+            file_url: null,
+            message: '👁️ Açıldı',
+            message_type: msg.message_type,
+            group_id: msg.group_id || null,
+            receiver_id: msg.receiver_id || null,
+            sender_id: msg.sender_id
+        };
+        
+        const targets = [msg.sender_id, msg.receiver_id];
+        targets.forEach(tId => {
+            if (tId) {
+                const sockets = userSockets.get(Number(tId));
+                if (sockets) {
+                    sockets.forEach(sId => {
+                        io.to(sId).emit('message_opened', updatedMsg);
+                    });
+                }
+            }
+        });
+        
+        res.json({ message: 'Görsel başarıyla imha edildi.', updatedMsg });
+    } catch (error) {
+        console.error('Tek kullanımlık görsel açma hatası:', error);
+        res.status(500).json({ message: 'Görsel imha edilirken hata oluştu.' });
     }
 });
 

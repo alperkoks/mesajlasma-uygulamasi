@@ -1656,3 +1656,154 @@ body.dark-theme .file-attachment-card:hover {
 .sticker-filters-row::-webkit-scrollbar {
     display: none;
 }
+
+/* --- WEBRTC MINIMIZED (FLOAT PiP) CALL SCREEN --- */
+#webrtc-call-screen.minimized {
+    width: 220px !important;
+    height: 320px !important;
+    top: auto !important;
+    left: auto !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    border-radius: 20px !important;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5) !important;
+    border: 1px solid rgba(255,255,255,0.2) !important;
+    padding: 1rem 0.75rem !important;
+    background: linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(49, 16, 66, 0.95)) !important;
+    backdrop-filter: blur(10px) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    justify-content: space-between !important;
+}
+
+#webrtc-call-screen.minimized #btn-minimize-call {
+    top: 8px !important;
+    left: 8px !important;
+    width: 28px !important;
+    height: 28px !important;
+}
+
+#webrtc-call-screen.minimized #btn-minimize-call svg {
+    width: 14px !important;
+    height: 14px !important;
+}
+
+#webrtc-call-screen.minimized #call-partner-avatar {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 1.5rem !important;
+    margin-bottom: 0.5rem !important;
+    margin-top: 1rem !important;
+}
+
+#webrtc-call-screen.minimized #call-partner-username {
+    font-size: 1rem !important;
+    margin-bottom: 0.25rem !important;
+}
+
+#webrtc-call-screen.minimized #call-status {
+    font-size: 0.7rem !important;
+    letter-spacing: 0.5px !important;
+}
+
+#webrtc-call-screen.minimized #call-videos-container {
+    max-width: 100% !important;
+    aspect-ratio: 3/4 !important;
+    margin: 8px 0 !important;
+    border-radius: 10px !important;
+}
+
+#webrtc-call-screen.minimized #local-video {
+    width: 45px !important;
+    top: 5px !important;
+    right: 5px !important;
+    border-radius: 4px !important;
+}
+
+#webrtc-call-screen.minimized #active-call-buttons {
+    justify-content: space-around !important;
+    gap: 0.25rem !important;
+}
+
+#webrtc-call-screen.minimized .btn-icon {
+    width: 34px !important;
+    height: 34px !important;
+}
+
+#webrtc-call-screen.minimized .btn-icon svg {
+    width: 14px !important;
+    height: 14px !important;
+}
+
+#webrtc-call-screen.minimized #btn-end-call {
+    width: 40px !important;
+    height: 40px !important;
+}
+
+#webrtc-call-screen.minimized #btn-end-call svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+/* --- MULTI-PARTY MESH VIDEO GRID --- */
+.call-video-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    height: 100% !important;
+    padding: 8px !important;
+    box-sizing: border-box !important;
+    background-color: #111 !important;
+    border-radius: 12px !important;
+    overflow-y: auto !important;
+}
+
+.call-video-wrapper {
+    position: relative !important;
+    width: 100% !important;
+    aspect-ratio: 3/4 !important;
+    background-color: #222 !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+}
+
+.call-video-wrapper video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+
+.call-video-label {
+    position: absolute !important;
+    bottom: 6px !important;
+    left: 6px !important;
+    background-color: rgba(0,0,0,0.6) !important;
+    color: white !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-size: 0.7rem !important;
+    backdrop-filter: blur(4px) !important;
+}
+
+/* --- CONTEXT MENUS HOVER EFFECT --- */
+#chat-context-menu button:hover,
+#sidebar-context-menu button:hover {
+    background-color: var(--bg-hover) !important;
+}
+
+/* Disappearing messages badge style */
+.disappearing-active-badge {
+    animation: pulse-timer 2s infinite ease-in-out;
+}
+
+@keyframes pulse-timer {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; filter: drop-shadow(0 0 4px var(--primary-color)); }
+    100% { opacity: 0.7; }
+}
+
+/* Arama butonlarının sohbet açıkken görünmesini garanti et */
+#btn-call-voice, #btn-call-video {
+    display: flex !important;
+}

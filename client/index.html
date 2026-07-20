@@ -6,7 +6,7 @@
     <title>Hızlı Mesajlaşma</title>
     <!-- Modern ve şık bir yazı tipi olan Inter'i Google Fonts'tan çekiyoruz -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=23">
+    <link rel="stylesheet" href="style.css?v=24">
     
     <!-- PWA VE MOBİL UYUMLULUK METADATALARI -->
     <link rel="manifest" href="manifest.json">
@@ -676,6 +676,10 @@
 
     <!-- 8. EKRAN: WEBRTC SESLİ VE GÖRÜNTÜLÜ ARAMA EKRANI -->
     <div id="webrtc-call-screen" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #1e1b4b, #311042); z-index: 12000; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 2.5rem 1.5rem; color: white; text-align: center; font-family: 'Inter', sans-serif;">
+        <button type="button" id="btn-minimize-call" style="position: absolute; top: 15px; left: 15px; background: rgba(255,255,255,0.15); border: none; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; z-index: 100;" title="Aşağı Al / Minimize">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+
         <div style="margin-top: 2rem;">
             <div id="call-partner-avatar" style="width: 100px; height: 100px; border-radius: 50%; background-color: var(--primary-color); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; margin: 0 auto 1rem; border: 3px solid rgba(255,255,255,0.2); overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);"></div>
             <h2 id="call-partner-username" style="font-size: 1.5rem; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Kullanıcı</h2>
@@ -706,6 +710,9 @@
                 <button type="button" id="btn-toggle-video" class="btn-icon" style="width: 48px; height: 48px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;" title="Kamerayı Kapat/Aç">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
                 </button>
+                <button type="button" id="btn-add-to-call" class="btn-icon" style="width: 48px; height: 48px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center;" title="Kişi Ekle / Add Person">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="16" x2="22" y1="11" y2="11"/></svg>
+                </button>
                 <button type="button" id="btn-switch-camera" class="btn-icon" style="width: 48px; height: 48px; border-radius: 50%; background-color: rgba(255,255,255,0.15); border: none; cursor: pointer; color: white; display: none; align-items: center; justify-content: center;" title="Kamerayı Değiştir (Ön/Arka)">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
                 </button>
@@ -716,10 +723,55 @@
         </div>
     </div>
 
+    <!-- 6.1 EKRAN: SIDEBAR CONTEXT MENU -->
+    <div id="sidebar-context-menu" class="hidden" style="position: absolute; z-index: 10000; background-color: var(--bg-white); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-lg); width: 180px; overflow: hidden; display: flex; flex-direction: column;">
+        <button type="button" id="sidebar-ctx-archive" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;">📥 Sohbeti Arşivle</button>
+        <button type="button" id="sidebar-ctx-unarchive" class="hidden" style="padding: 0.6rem 0.8rem; border: none; background: transparent; text-align: left; font-size: 0.85rem; color: var(--text-main); cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s;">📤 Arşivden Çıkar</button>
+    </div>
+
+    <!-- 9. EKRAN: TEK KULLANIMLIK GÖRSEL ONAY MODALI (WhatsApp Tarzı) -->
+    <div id="view-once-confirm-modal" class="modal hidden" style="z-index: 15000;">
+        <div class="modal-content" style="max-width: 360px; padding: 1.5rem; text-align: center; border-radius: 16px;">
+            <h3 style="margin-top: 0; color: var(--text-main);">📸 Görsel Gönder</h3>
+            <div id="view-once-preview-container" style="width: 100%; aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; background-color: #000; margin: 1rem 0; display: flex; align-items: center; justify-content: center;">
+                <img id="view-once-preview-img" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+            </div>
+            
+            <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 1.5rem; padding: 0.5rem; background-color: var(--bg-hover); border-radius: 20px;">
+                <button type="button" id="btn-toggle-view-once" style="width: 32px; height: 32px; border-radius: 50%; border: none; background-color: var(--border-color); color: var(--text-main); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Tek Kullanımlık / View Once">
+                    ①
+                </button>
+                <span id="lbl-view-once-status" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">Normal Görsel / Standard Photo</span>
+            </div>
+            
+            <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                <button type="button" id="btn-view-once-cancel" class="btn btn-secondary" style="flex: 1; padding: 0.6rem;">İptal</button>
+                <button type="button" id="btn-view-once-send" class="btn btn-primary" style="flex: 1; padding: 0.6rem;">Gönder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 10. EKRAN: ARAMAYA KULLANICI DAVET ETME MODALI -->
+    <div id="call-invite-modal" class="modal hidden" style="z-index: 15000;">
+        <div class="modal-content" style="max-width: 360px; padding: 1.5rem; border-radius: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; color: var(--text-main); font-size: 1.2rem;">➕ Görüşmeye Kişi Ekle</h3>
+                <span id="btn-close-call-invite" style="font-size: 1.5rem; cursor: pointer; color: var(--text-muted); line-height: 1;">&times;</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+                Mevcut sesli/görüntülü görüşmeye eklemek istediğiniz arkadaşınızı seçin:
+            </div>
+            <ul id="call-invite-friends-list" class="users-list" style="max-height: 240px; overflow-y: auto;">
+                <!-- Arkadaşlar buraya listelenecek -->
+            </ul>
+        </div>
+    </div>
+
     <audio id="remote-audio" autoplay style="display:none;"></audio>
+    <div id="call-video-grid-container" class="hidden"></div>
 
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js?v=33"></script>
+    <script src="app.js?v=34"></script>
 </body>
 </html>
