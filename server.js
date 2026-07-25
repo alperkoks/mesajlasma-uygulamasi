@@ -1789,15 +1789,7 @@ app.post('/api/messages/:messageId/read', authenticateToken, async (req, res) =>
     const userId = req.user.id;
     const messageId = parseInt(req.params.messageId);
     try {
-        await dbQueries.recordSingleMessageRead(messageId, userId);
         const db = getDbInstance();
-        if (isPostgres) {
-            await db.query('UPDATE messages SET is_read = 1 WHERE id = $1 AND receiver_id = $2', [messageId, userId]);
-        } else {
-            await db.run('UPDATE messages SET is_read = 1 WHERE id = ? AND receiver_id = ?', [messageId, userId]);
-        }
-        
-        // Okundu bilgisini ilgili soketlere yayınla
         let msgObj;
         if (isPostgres) {
             const queryRes = await db.query('SELECT * FROM messages WHERE id = $1', [messageId]);
@@ -1805,7 +1797,24 @@ app.post('/api/messages/:messageId/read', authenticateToken, async (req, res) =>
         } else {
             msgObj = await db.get('SELECT * FROM messages WHERE id = ?', [messageId]);
         }
+
+        if (!msgObj) {
+            return res.status(404).json({ error: 'Mesaj bulunamadı' });
+        }
+
+        // Gönderen kişi kendi mesajını okundu işaretleyemez
+        if (msgObj.sender_id === userId) {
+            return res.json({ success: true });
+        }
+
+        await dbQueries.recordSingleMessageRead(messageId, userId);
+        if (isPostgres) {
+            await db.query('UPDATE messages SET is_read = 1 WHERE id = $1 AND receiver_id = $2', [messageId, userId]);
+        } else {
+            await db.run('UPDATE messages SET is_read = 1 WHERE id = ? AND receiver_id = ?', [messageId, userId]);
+        }
         
+        // Okundu bilgisini ilgili soketlere yayınla
         if (msgObj) {
             if (msgObj.group_id) {
                 io.to(`group_${msgObj.group_id}`).emit('message_read_update', {

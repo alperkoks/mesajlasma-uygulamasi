@@ -4059,7 +4059,9 @@ async function initApp() {
                         messages.push(msg);
                         renderMessages();
                     }
-                    apiCall(`/messages/${msg.id}/read`, 'POST').catch(e => {});
+                    if (msg.sender_id !== currentUser.id) {
+                        apiCall(`/messages/${msg.id}/read`, 'POST').catch(e => {});
+                    }
                 }
                 
                 // Grubun son mesajını güncelle ve okunmamış bildirim sayısını artır
@@ -4103,7 +4105,9 @@ async function initApp() {
                     messages.push(msg);
                     renderMessages();
                 }
-                apiCall(`/messages/${msg.id}/read`, 'POST').catch(e => {});
+                if (msg.sender_id !== currentUser.id) {
+                    apiCall(`/messages/${msg.id}/read`, 'POST').catch(e => {});
+                }
                 apiCall(`/messages/${msg.sender_id}`).catch(() => {});
             }
             

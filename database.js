@@ -822,7 +822,8 @@ const dbQueries = {
             SELECT users.id, users.username, users.profile_pic, message_reads.read_at
             FROM message_reads
             JOIN users ON users.id = message_reads.user_id
-            WHERE message_reads.message_id = $1
+            WHERE message_reads.message_id = $1 
+              AND message_reads.user_id != (SELECT sender_id FROM messages WHERE id = $1)
             ORDER BY message_reads.read_at ASC
         `;
         if (isPostgres) {

@@ -1,0 +1,6 @@
+{
+  "appId": "com.antigravity.chat",
+  "appName": "Antigravity Chat",
+  "webDir": "client",
+  "bundledWebRuntime": false
+}
