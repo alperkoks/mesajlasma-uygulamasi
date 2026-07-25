@@ -1658,6 +1658,26 @@ body.dark-theme .file-attachment-card:hover {
     display: none;
 }
 
+/* --- WEBRTC CALL SCREEN --- */
+#webrtc-call-screen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: linear-gradient(135deg, #1e1b4b, #311042) !important;
+    z-index: 12000 !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2.5rem 1.5rem;
+    color: white;
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* --- WEBRTC MINIMIZED (FLOAT PiP) CALL SCREEN --- */
 #webrtc-call-screen.minimized {
     width: 220px !important;

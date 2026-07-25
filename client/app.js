@@ -3438,13 +3438,16 @@ function initPeerConnection(partnerId) {
     });
     
     peerConnection.addEventListener('track', (e) => {
-        const stream = e.streams[0];
-        if (remoteVideo) {
-            remoteVideo.srcObject = stream;
-        }
+        const stream = e.streams[0] || new MediaStream([e.track]);
         const remoteAudio = document.getElementById('remote-audio');
         if (remoteAudio) {
             remoteAudio.srcObject = stream;
+        }
+        
+        if (remoteVideo) {
+            remoteVideo.srcObject = null;
+            remoteVideo.srcObject = stream;
+            remoteVideo.play().catch(err => {});
         }
         
         // Dynamically toggle video container visibility based on video track presence
@@ -5018,7 +5021,7 @@ async function renderMessages() {
                     }
                 }
             } else {
-                msgContentHTML = `<img src="${msg.file_url}" alt="görsel" style="max-width:100%; max-height:240px; border-radius:8px; display:block; cursor:pointer; margin-bottom: 2px;" onclick="window.open('${msg.file_url}', '_blank')">`;
+                msgContentHTML = `<img src="${msg.file_url}" alt="görsel" style="max-width:100%; max-height:240px; border-radius:8px; display:block; cursor:pointer; margin-bottom: 2px;" onclick="openImageLightbox('${msg.file_url}')">`;
             }
         } else if (msg.message_type === 'file') {
             msgContentHTML = `<a href="${msg.file_url}" download="${escapeHTML(displayText)}" style="color:inherit; font-weight:600; display:inline-flex; align-items:center; gap:6px; text-decoration:underline; word-break:break-all;">📁 ${escapeHTML(displayText)}</a>`;
@@ -5566,6 +5569,15 @@ function escapeHTML(str) {
             '"': '&quot;'
         }[tag] || tag)
     );
+}
+
+function openImageLightbox(imgSrc) {
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxModal = document.getElementById('lightbox-modal');
+    if (lightboxImg && lightboxModal) {
+        lightboxImg.src = imgSrc;
+        lightboxModal.classList.remove('hidden');
+    }
 }
 
 // --- GRUP SOHBETLERİ UI VE İŞLEVSELLİK MANTIĞI ---
