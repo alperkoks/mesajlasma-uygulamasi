@@ -374,7 +374,12 @@ let viewOnceActiveMessageId = null;
 let viewOncePendingFile = null;
 let isViewOnceActive = false; // Toggle state for sending photo
 let peerConnections = new Map();
+let groupMembers = new Map();
 let activeCallRoomId = null;
+let isScreenSharing = false;
+let screenStream = null;
+let audioAnalyzers = new Map();
+let audioCtx = null;
 
 // API Sunucu Adresi (Hem lokalde hem bulutta otomatik çalışması için bağıl yol yapıyoruz)
 const API_URL = '/api';
@@ -646,12 +651,34 @@ function removeGroupPeerConnection(peerId) {
     }
     const wrapper = document.getElementById(`video-wrapper-${peerId}`);
     if (wrapper) wrapper.remove();
+    
+    const audioEl = document.getElementById(`audio-peer-${peerId}`);
+    if (audioEl) audioEl.remove();
+    
+    // Clean up audio analyzer for this peer
+    if (audioAnalyzers.has(peerId)) {
+        const val = audioAnalyzers.get(peerId);
+        clearInterval(val.interval);
+        audioAnalyzers.delete(peerId);
+    }
+    
     rearrangeVideoGrid();
 }
 
 function addParticipantVideo(peerId, username, stream) {
     const container = document.getElementById('call-videos-container');
     container.classList.remove('hidden');
+    
+    // Create a hidden audio element to guarantee audio plays even when video is display: none
+    let audioEl = document.getElementById(`audio-peer-${peerId}`);
+    if (!audioEl) {
+        audioEl = document.createElement('audio');
+        audioEl.id = `audio-peer-${peerId}`;
+        audioEl.autoplay = true;
+        audioEl.style.display = 'none';
+        document.body.appendChild(audioEl);
+    }
+    audioEl.srcObject = stream;
     
     let wrapper = document.getElementById(`video-wrapper-${peerId}`);
     if (!wrapper) {
@@ -664,11 +691,17 @@ function addParticipantVideo(peerId, username, stream) {
         video.playsInline = true;
         video.srcObject = stream;
         
+        // Avatar placeholder for voice-only
+        const avatarPlaceholder = document.createElement('div');
+        avatarPlaceholder.className = 'call-avatar-placeholder';
+        avatarPlaceholder.innerHTML = `<div class="avatar-circle">${username ? username.substring(0,2).toUpperCase() : 'U'}</div>`;
+        
         const label = document.createElement('div');
         label.className = 'call-video-label';
         label.textContent = username || `User ${peerId}`;
         
         wrapper.appendChild(video);
+        wrapper.appendChild(avatarPlaceholder);
         wrapper.appendChild(label);
         container.appendChild(wrapper);
     } else {
@@ -676,16 +709,125 @@ function addParticipantVideo(peerId, username, stream) {
         if (video) video.srcObject = stream;
     }
     
+    // Toggle video visibility based on active video tracks
+    const video = wrapper.querySelector('video');
+    const avatar = wrapper.querySelector('.call-avatar-placeholder');
+    const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
+    
+    if (hasVideo) {
+        if (video) video.style.display = 'block';
+        if (avatar) avatar.style.display = 'none';
+    } else {
+        if (video) video.style.display = 'none';
+        if (avatar) avatar.style.display = 'flex';
+    }
+    
+    // Setup audio speaking detection for this peer
+    setupAudioAnalysis(peerId, stream, wrapper);
+    
     rearrangeVideoGrid();
+}
+
+function setupAudioAnalysis(peerId, stream, elementToGlow) {
+    if (!stream || stream.getAudioTracks().length === 0) return;
+    
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        if (audioCtx.state === 'suspended') {
+            const resumeCtx = () => {
+                audioCtx.resume();
+                document.removeEventListener('click', resumeCtx);
+                document.removeEventListener('touchstart', resumeCtx);
+            };
+            document.addEventListener('click', resumeCtx);
+            document.addEventListener('touchstart', resumeCtx);
+        }
+        
+        if (audioAnalyzers.has(peerId)) {
+            const old = audioAnalyzers.get(peerId);
+            clearInterval(old.interval);
+            audioAnalyzers.delete(peerId);
+        }
+        
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        const interval = setInterval(() => {
+            if (!callActive && peerConnections.size === 0) {
+                clearInterval(interval);
+                return;
+            }
+            
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / bufferLength;
+            
+            // If average audio level > 8, they are speaking
+            if (average > 8) {
+                elementToGlow.classList.add('is-speaking');
+            } else {
+                elementToGlow.classList.remove('is-speaking');
+            }
+        }, 150);
+        
+        audioAnalyzers.set(peerId, { source, analyser, interval });
+    } catch (e) {
+        console.error('Audio analysis setup error:', e);
+    }
+}
+
+async function stopScreenSharing() {
+    if (!isScreenSharing) return;
+    isScreenSharing = false;
+    
+    const btnShareScreen = document.getElementById('btn-share-screen');
+    if (btnShareScreen) btnShareScreen.style.backgroundColor = 'rgba(255,255,255,0.15)';
+    
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+        screenStream = null;
+    }
+    
+    if (localStream) {
+        const cameraTrack = localStream.getVideoTracks()[0];
+        if (cameraTrack) {
+            if (peerConnection) {
+                const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) {
+                    sender.replaceTrack(cameraTrack);
+                }
+            }
+            peerConnections.forEach(pc => {
+                const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                if (sender) {
+                    sender.replaceTrack(cameraTrack);
+                }
+            });
+        }
+    }
+    
+    if (localVideo) {
+        localVideo.srcObject = localStream;
+        if (!isVideoCallActive) {
+            callVideosContainer.classList.add('hidden');
+        }
+    }
 }
 
 function rearrangeVideoGrid() {
     const container = document.getElementById('call-videos-container');
-    const childCount = container.children.length;
-    
-    // Clear default full screen classes, set grid
     container.classList.add('call-video-grid');
-    // Hide standard remote video placeholder
     const remVid = document.getElementById('remote-video');
     if (remVid) remVid.style.display = 'none';
 }
@@ -703,6 +845,9 @@ async function joinGroupCallRoom(roomId, isVideo) {
         localVideo.srcObject = localStream;
     }
     
+    // Auto speaking detection for local user
+    setupAudioAnalysis('local', localStream, callPartnerAvatar);
+    
     // Tell socket server we are joining
     socket.emit('join_call_room', {
         roomId: roomId,
@@ -710,6 +855,29 @@ async function joinGroupCallRoom(roomId, isVideo) {
     });
     
     callStatus.textContent = currentLanguage === 'tr' ? 'Grup Araması' : 'Group Call';
+
+    // OTOMATİK OLARAK TÜM GRUP ÜYELERİNİ DAVET ET (BİLDİRİM GİTSİN)
+    if (activeChatGroupId) {
+        let members = groupMembers.get(activeChatGroupId);
+        if (!members) {
+            try {
+                members = await apiCall(`/groups/${activeChatGroupId}/members`);
+                groupMembers.set(activeChatGroupId, members);
+            } catch (err) {
+                console.error(err);
+                members = [];
+            }
+        }
+        members.forEach(m => {
+            if (m.id !== currentUser.id && socket) {
+                socket.emit('invite_to_call', {
+                    targetUserId: m.id,
+                    roomId: roomId,
+                    isVideoCall: isVideo
+                });
+            }
+        });
+    }
 }
 
 function showCallInviteModal() {
@@ -2975,7 +3143,6 @@ let incomingOfferSignal = null;
 let iceCandidatesQueue = [];
 
 let ringInterval = null;
-let audioCtx = null;
 
 function startRingtone() {
     stopRingtone();
@@ -3296,6 +3463,54 @@ if (btnToggleVideo) {
     });
 }
 
+const btnShareScreen = document.getElementById('btn-share-screen');
+if (btnShareScreen) {
+    btnShareScreen.addEventListener('click', async () => {
+        if (!isScreenSharing) {
+            try {
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+                isScreenSharing = true;
+                btnShareScreen.style.backgroundColor = '#10b981'; // Green active color
+                
+                const screenTrack = screenStream.getVideoTracks()[0];
+                
+                // Replace on P2P connection
+                if (peerConnection) {
+                    const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(screenTrack);
+                    }
+                }
+                
+                // Replace on Mesh/Group connections
+                peerConnections.forEach(pc => {
+                    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (sender) {
+                        sender.replaceTrack(screenTrack);
+                    }
+                });
+                
+                // Show locally
+                if (localVideo) {
+                    localVideo.srcObject = screenStream;
+                    callVideosContainer.classList.remove('hidden');
+                }
+                
+                // Stop share event listener (from browser native stop sharing button)
+                screenTrack.addEventListener('ended', () => {
+                    stopScreenSharing();
+                });
+            } catch (err) {
+                console.error('Ekran paylaşımı başlatılamadı:', err);
+                isScreenSharing = false;
+                btnShareScreen.style.backgroundColor = 'rgba(255,255,255,0.15)';
+            }
+        } else {
+            stopScreenSharing();
+        }
+    });
+}
+
 if (btnSwitchCamera) {
     btnSwitchCamera.addEventListener('click', async () => {
         if (!localStream) return;
@@ -3346,6 +3561,14 @@ if (btnSwitchCamera) {
 
 function endCallSession() {
     stopRingtone();
+    stopScreenSharing();
+    
+    // Clear audio analyzers
+    audioAnalyzers.forEach(val => {
+        clearInterval(val.interval);
+    });
+    audioAnalyzers.clear();
+    
     webrtcCallScreen.classList.add('hidden');
     
     if (activeCallRoomId) {
@@ -5195,10 +5418,11 @@ if (tabFriends && tabGroups && tabCalls) {
 if (btnCreateGroupOpen) {
     btnCreateGroupOpen.addEventListener('click', () => {
         groupFriendsCheckboxes.innerHTML = '';
-        if (users.length === 0) {
+        const actualFriends = users.filter(u => !u.isSelf);
+        if (actualFriends.length === 0) {
             groupFriendsCheckboxes.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding-top:1rem;">Gruba eklenecek arkadaşınız bulunmuyor.</div>';
         } else {
-            users.forEach(user => {
+            actualFriends.forEach(user => {
                 const div = document.createElement('div');
                 div.style.display = 'flex';
                 div.style.alignItems = 'center';
