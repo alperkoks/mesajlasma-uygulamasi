@@ -2025,8 +2025,12 @@ select {
     text-decoration: none !important;
     border-radius: 4px !important;
     padding: 1px 4px !important;
-    background-color: rgba(var(--primary-rgb), 0.1) !important;
+    background-color: rgba(99, 102, 241, 0.15) !important;
 }
 .mention-tag:hover {
     text-decoration: underline !important;
+}
+.message-row.sent .mention-tag {
+    color: #e0f2fe !important;
+    background-color: rgba(255, 255, 255, 0.2) !important;
 }

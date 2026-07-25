@@ -7,7 +7,7 @@ window.onerror = function(message, source, lineno, colno, error) {
 // SERVICE WORKER KAYDI (PWA DESTEĞİ İÇİN)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+        navigator.serviceWorker.register('/service-worker.js')
             .then((reg) => console.log('✅ Service Worker başarıyla kaydedildi:', reg.scope))
             .catch((err) => console.error('❌ Service Worker kaydı başarısız:', err));
     });
