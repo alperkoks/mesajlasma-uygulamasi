@@ -2259,7 +2259,7 @@ function autolinkText(text) {
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--primary-color); text-decoration: underline; word-break: break-all;">${url}</a>`;
     });
     
-    const mentionPattern = /@([a-zA-Z0-9_]+)/g;
+    const mentionPattern = /@([a-zA-Z0-9_ğüşöçıİĞÜŞÖÇ]+)/g;
     processed = processed.replace(mentionPattern, (match, username) => {
         return `<span class="mention-tag" onclick="openUserProfileByName('${escapeHTML(username)}')">@${escapeHTML(username)}</span>`;
     });
@@ -5783,7 +5783,7 @@ if (messageInput && mentionDropdown) {
 function renderMentionDropdown(usersList) {
     mentionDropdown.innerHTML = '';
     mentionDropdown.classList.remove('hidden');
-    mentionSelectedIndex = -1;
+    mentionSelectedIndex = 0;
     
     usersList.forEach((u, idx) => {
         const item = document.createElement('div');
@@ -5805,6 +5805,7 @@ function renderMentionDropdown(usersList) {
         
         mentionDropdown.appendChild(item);
     });
+    highlightMentionItem();
 }
 
 function highlightMentionItem() {

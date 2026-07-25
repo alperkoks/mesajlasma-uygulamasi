@@ -1054,14 +1054,34 @@ app.post('/api/messages/upload', authenticateToken, upload.single('file'), async
         const isImageExt = ['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext);
         const isImage = req.file.mimetype.startsWith('image/') || isImageExt;
         
-        // Benzersiz dosya ismi oluştur (UDF, PDF vb. orijinal uzantıları koruyarak)
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-        const cleanFilename = uniqueSuffix + '-' + originalNameUtf8.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const filePath = path.join(__dirname, 'client', 'uploads', cleanFilename);
+        let fileUrl = '';
         
-        // Dosyayı diske yaz
-        fs.writeFileSync(filePath, req.file.buffer);
-        const fileUrl = `/uploads/${cleanFilename}`;
+        // Eğer Cloudinary yapılandırması mevcutsa Cloudinary'e kalıcı olarak yükle
+        if (process.env.CLOUDINARY_CLOUD_NAME) {
+            const uploadResult = await new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                    { 
+                        folder: 'chat_attachments',
+                        resource_type: 'auto'
+                    },
+                    (error, result) => {
+                        if (result) resolve(result);
+                        else reject(error);
+                    }
+                );
+                stream.end(req.file.buffer);
+            });
+            fileUrl = uploadResult.secure_url;
+        } else {
+            // Benzersiz dosya ismi oluştur (UDF, PDF vb. orijinal uzantıları koruyarak)
+            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+            const cleanFilename = uniqueSuffix + '-' + originalNameUtf8.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const filePath = path.join(__dirname, 'client', 'uploads', cleanFilename);
+            
+            // Dosyayı diske yaz
+            fs.writeFileSync(filePath, req.file.buffer);
+            fileUrl = `/uploads/${cleanFilename}`;
+        }
 
         res.json({
             fileUrl: fileUrl,
