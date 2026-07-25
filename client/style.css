@@ -1678,6 +1678,17 @@ body.dark-theme .file-attachment-card:hover {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Widescreen mode for horizontal screen sharing */
+#call-videos-container.widescreen {
+    aspect-ratio: 16/9 !important;
+    max-width: 900px !important;
+    width: 90% !important;
+}
+
+#call-videos-container.widescreen video {
+    object-fit: contain !important;
+}
+
 /* --- WEBRTC MINIMIZED (FLOAT PiP) CALL SCREEN --- */
 #webrtc-call-screen.minimized {
     width: 220px !important;

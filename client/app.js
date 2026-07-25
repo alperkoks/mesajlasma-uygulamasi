@@ -856,9 +856,11 @@ async function stopScreenSharing() {
     if (localVideo) {
         localVideo.srcObject = localStream;
         if (!isVideoCallActive) {
+            localVideo.style.display = 'none';
             callVideosContainer.classList.add('hidden');
         }
     }
+    callVideosContainer.classList.remove('widescreen');
 }
 let keepAliveOscillator = null;
 
@@ -1067,6 +1069,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 callScreen.classList.toggle('bubble-mode');
                 callScreen.style.width = '';
                 callScreen.style.height = '';
+            }
+        });
+    }
+    
+    const btnToggleStreamView = document.getElementById('btn-toggle-stream-view');
+    if (btnToggleStreamView) {
+        btnToggleStreamView.addEventListener('click', () => {
+            if (callVideosContainer.classList.contains('hidden')) {
+                callVideosContainer.classList.remove('hidden');
+                callPartnerAvatar.style.display = 'none';
+                btnToggleStreamView.style.backgroundColor = 'rgba(255,255,255,0.15)';
+                btnToggleStreamView.title = currentLanguage === 'tr' ? 'Yayını Gizle' : 'Hide Stream';
+            } else {
+                callVideosContainer.classList.add('hidden');
+                callPartnerAvatar.style.display = 'flex';
+                btnToggleStreamView.style.backgroundColor = '#ef4444';
+                btnToggleStreamView.title = currentLanguage === 'tr' ? 'Yayını Göster' : 'Show Stream';
             }
         });
     }
@@ -3404,6 +3423,12 @@ function showCallScreen(partnerUser, isVideo, isIncoming) {
     const btnCompact = document.getElementById('btn-compact-call');
     if (btnCompact) btnCompact.style.display = 'none';
     
+    const btnToggleStreamView = document.getElementById('btn-toggle-stream-view');
+    if (btnToggleStreamView) {
+        btnToggleStreamView.style.backgroundColor = 'rgba(255,255,255,0.15)';
+        btnToggleStreamView.title = currentLanguage === 'tr' ? 'Yayını Gizle' : 'Hide Stream';
+    }
+    
     callPartnerUsername.textContent = partnerUser ? partnerUser.username : 'Kullanıcı';
     
     if (partnerUser && partnerUser.profile_pic) {
@@ -3412,9 +3437,12 @@ function showCallScreen(partnerUser, isVideo, isIncoming) {
         callPartnerAvatar.textContent = partnerUser ? partnerUser.username.substring(0, 2).toUpperCase() : 'U';
     }
     
+    if (localVideo) localVideo.style.display = 'none';
+
     if (isVideo) {
         callVideosContainer.classList.remove('hidden');
         if (btnSwitchCamera) btnSwitchCamera.style.display = 'flex';
+        if (localVideo) localVideo.style.display = 'block';
     } else {
         callVideosContainer.classList.add('hidden');
         if (btnSwitchCamera) btnSwitchCamera.style.display = 'none';
@@ -3439,29 +3467,71 @@ function initPeerConnection(partnerId) {
     
     peerConnection.addEventListener('track', (e) => {
         const stream = e.streams[0] || new MediaStream([e.track]);
+        const track = e.track;
+        
         const remoteAudio = document.getElementById('remote-audio');
         if (remoteAudio) {
             remoteAudio.srcObject = stream;
         }
         
-        if (remoteVideo) {
-            remoteVideo.srcObject = null;
-            remoteVideo.srcObject = stream;
-            remoteVideo.play().catch(err => {});
-        }
-        
-        // Dynamically toggle video container visibility based on video track presence
-        const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
-        if (hasVideo) {
-            callVideosContainer.classList.remove('hidden');
-            if (remoteVideo) remoteVideo.style.display = 'block';
-            callPartnerAvatar.style.display = 'none';
-        } else {
-            if (!isVideoCallActive) {
-                callVideosContainer.classList.add('hidden');
-                if (remoteVideo) remoteVideo.style.display = 'none';
-                callPartnerAvatar.style.display = 'flex';
-            }
+        if (track.kind === 'video') {
+            const updateVideoView = () => {
+                const settings = track.getSettings();
+                const hasVideo = stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
+                
+                if (hasVideo) {
+                    if (remoteVideo) {
+                        remoteVideo.srcObject = null;
+                        remoteVideo.srcObject = stream;
+                        remoteVideo.play().catch(err => {});
+                        remoteVideo.style.display = 'block';
+                    }
+                    callVideosContainer.classList.remove('hidden');
+                    callPartnerAvatar.style.display = 'none';
+                    
+                    // Apply widescreen if settings indicate landscape
+                    if (settings.width && settings.height && settings.width > settings.height) {
+                        callVideosContainer.classList.add('widescreen');
+                    } else {
+                        callVideosContainer.classList.remove('widescreen');
+                    }
+                } else {
+                    if (remoteVideo) remoteVideo.srcObject = null;
+                    if (!isVideoCallActive) {
+                        callVideosContainer.classList.add('hidden');
+                        callVideosContainer.classList.remove('widescreen');
+                        if (remoteVideo) remoteVideo.style.display = 'none';
+                        callPartnerAvatar.style.display = 'flex';
+                    }
+                }
+            };
+            
+            track.addEventListener('mute', () => {
+                console.log('Remote video track muted');
+                if (remoteVideo) remoteVideo.srcObject = null;
+                if (!isVideoCallActive) {
+                    callVideosContainer.classList.add('hidden');
+                    callVideosContainer.classList.remove('widescreen');
+                    callPartnerAvatar.style.display = 'flex';
+                }
+            });
+
+            track.addEventListener('unmute', () => {
+                console.log('Remote video track unmuted');
+                updateVideoView();
+            });
+
+            track.addEventListener('ended', () => {
+                console.log('Remote video track ended');
+                if (remoteVideo) remoteVideo.srcObject = null;
+                if (!isVideoCallActive) {
+                    callVideosContainer.classList.add('hidden');
+                    callVideosContainer.classList.remove('widescreen');
+                    callPartnerAvatar.style.display = 'flex';
+                }
+            });
+            
+            updateVideoView();
         }
     });
     
@@ -3649,7 +3719,9 @@ if (btnShareScreen) {
                 // Show locally
                 if (localVideo) {
                     localVideo.srcObject = screenStream;
+                    localVideo.style.display = 'block';
                     callVideosContainer.classList.remove('hidden');
+                    callVideosContainer.classList.add('widescreen');
                 }
                 
                 // Stop share event listener (from browser native stop sharing button)
