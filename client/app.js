@@ -330,6 +330,12 @@ const ctxBtnReply = document.getElementById('ctx-btn-reply');
 const ctxBtnForward = document.getElementById('ctx-btn-forward');
 const ctxBtnEdit = document.getElementById('ctx-btn-edit');
 const ctxBtnDelete = document.getElementById('ctx-btn-delete');
+const ctxBtnInfo = document.getElementById('ctx-btn-info');
+const messageInfoModal = document.getElementById('message-info-modal');
+const closeMsgInfoModal = document.getElementById('close-msg-info-modal');
+const msgInfoContentPreview = document.getElementById('msg-info-content-preview');
+const msgInfoReadCount = document.getElementById('msg-info-read-count');
+const msgInfoReadList = document.getElementById('msg-info-read-list');
 const forwardModal = document.getElementById('forward-modal');
 const closeForwardModal = document.getElementById('close-forward-modal');
 const forwardTargetsList = document.getElementById('forward-targets-list');
@@ -4035,6 +4041,14 @@ async function initApp() {
             }
         });
 
+        socket.on('message_read_update', (data) => {
+            const msg = messages.find(m => Number(m.id) === Number(data.messageId));
+            if (msg) {
+                msg.is_read = 1;
+                renderMessages();
+            }
+        });
+
         // SUNUCUDAN ANLIK MESAJ GELDİĞİNDE çalışan olay
         socket.on('receive_message', (msg) => {
             if (msg.group_id) {
@@ -4045,6 +4059,7 @@ async function initApp() {
                         messages.push(msg);
                         renderMessages();
                     }
+                    apiCall(`/messages/${msg.id}/read`, 'POST').catch(e => {});
                 }
                 
                 // Grubun son mesajını güncelle ve okunmamış bildirim sayısını artır
@@ -4088,7 +4103,7 @@ async function initApp() {
                     messages.push(msg);
                     renderMessages();
                 }
-                
+                apiCall(`/messages/${msg.id}/read`, 'POST').catch(e => {});
                 apiCall(`/messages/${msg.sender_id}`).catch(() => {});
             }
             
@@ -5110,14 +5125,19 @@ async function renderMessages() {
 
         let ticksHTML = '';
         if (isSentByMe) {
-            if (msg.is_read === 1) {
-                ticksHTML = '<span class="msg-tick read" style="color:#60a5fa; margin-left:4px; font-weight:bold;">✓✓</span>';
+            if (msg.group_id) {
+                const isGroupRead = msg.is_read === 1;
+                ticksHTML = `<span class="msg-tick group-tick ${isGroupRead ? 'read' : ''}" style="color:${isGroupRead ? '#60a5fa' : 'var(--text-muted)'}; margin-left:4px; font-weight:bold; cursor:pointer;" onclick="event.stopPropagation(); openMessageInfoById(${msg.id})">✓✓</span>`;
             } else {
-                const partner = users.find(u => u.id === msg.receiver_id);
-                if (partner && partner.isOnline) {
-                    ticksHTML = '<span class="msg-tick delivered" style="color:var(--text-muted); margin-left:4px;">✓✓</span>';
+                if (msg.is_read === 1) {
+                    ticksHTML = `<span class="msg-tick read" style="color:#60a5fa; margin-left:4px; font-weight:bold; cursor:pointer;" onclick="event.stopPropagation(); openMessageInfoById(${msg.id})">✓✓</span>`;
                 } else {
-                    ticksHTML = '<span class="msg-tick sent" style="color:var(--text-muted); margin-left:4px;">✓</span>';
+                    const partner = users.find(u => u.id === msg.receiver_id);
+                    if (partner && partner.isOnline) {
+                        ticksHTML = `<span class="msg-tick delivered" style="color:var(--text-muted); margin-left:4px; cursor:pointer;" onclick="event.stopPropagation(); openMessageInfoById(${msg.id})">✓✓</span>`;
+                    } else {
+                        ticksHTML = `<span class="msg-tick sent" style="color:var(--text-muted); margin-left:4px; cursor:pointer;" onclick="event.stopPropagation(); openMessageInfoById(${msg.id})">✓</span>`;
+                    }
                 }
             }
         }
@@ -5501,6 +5521,12 @@ if (messageInput) {
             if (e.shiftKey) {
                 // Shift + Enter: Yeni satır ekle
             } else {
+                // Eğer etiket menüsü açıksa formu submit etme, seçime izin ver
+                const mentionDropdown = document.getElementById('mention-dropdown');
+                if (mentionDropdown && !mentionDropdown.classList.contains('hidden')) {
+                    return;
+                }
+                
                 // Sadece Enter: Formu gönder
                 e.preventDefault();
                 messageForm.dispatchEvent(new Event('submit'));
@@ -6673,6 +6699,10 @@ function showContextMenu(x, y, msg) {
     }
     // Silme seçeneği (Herkesten veya Benden sil) her iki taraf için de görünür olsun
     ctxBtnDelete.style.display = 'block';
+    
+    if (ctxBtnInfo) {
+        ctxBtnInfo.style.display = isMyMessage ? 'block' : 'none';
+    }
 
     // Emoji tepki butonlarını bağlama
     const reactionElements = chatContextMenu.querySelectorAll('.ctx-reaction-emoji');
@@ -6818,6 +6848,94 @@ if (ctxBtnDelete) {
         }
 
         hideContextMenu();
+    });
+}
+
+if (ctxBtnInfo) {
+    ctxBtnInfo.addEventListener('click', async () => {
+        if (!activeContextMessage) return;
+        hideContextMenu();
+        
+        // Show message preview
+        if (msgInfoContentPreview) {
+            let previewText = activeContextMessage.decrypted_message || activeContextMessage.message;
+            if (activeContextMessage.message_type === 'image') {
+                previewText = currentLanguage === 'tr' ? '📷 Görsel' : '📷 Image';
+            } else if (activeContextMessage.message_type === 'file') {
+                previewText = `📁 ${activeContextMessage.message}`;
+            } else if (activeContextMessage.message_type === 'voice') {
+                previewText = currentLanguage === 'tr' ? '🎤 Sesli Mesaj' : '🎤 Voice Message';
+            }
+            msgInfoContentPreview.innerText = previewText;
+        }
+        
+        // Clear previous list
+        if (msgInfoReadList) msgInfoReadList.innerHTML = '';
+        if (msgInfoReadCount) msgInfoReadCount.textContent = '0';
+        
+        try {
+            const details = await apiCall(`/messages/${activeContextMessage.id}/read-details`);
+            if (msgInfoReadCount) msgInfoReadCount.textContent = details.length;
+            
+            if (msgInfoReadList) {
+                if (details.length === 0) {
+                    msgInfoReadList.innerHTML = `<div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1rem 0;">${currentLanguage === 'tr' ? 'Henüz kimse okumadı' : 'No one has read it yet'}</div>`;
+                } else {
+                    details.forEach(item => {
+                        const date = new Date(item.read_at);
+                        const timeStr = date.toLocaleTimeString(navigator.language, { hour: '2-digit', minute: '2-digit' });
+                        const dateStr = date.toLocaleDateString(navigator.language, { day: '2-digit', month: '2-digit', year: 'numeric' });
+                        
+                        const row = document.createElement('div');
+                        row.style.display = 'flex';
+                        row.style.alignItems = 'center';
+                        row.style.justifyContent = 'space-between';
+                        row.style.padding = '0.5rem 0';
+                        row.style.borderBottom = '1px solid var(--border-color)';
+                        
+                        const userDiv = document.createElement('div');
+                        userDiv.style.display = 'flex';
+                        userDiv.style.alignItems = 'center';
+                        userDiv.style.gap = '0.5rem';
+                        
+                        const avatar = item.profile_pic 
+                            ? `<img src="${item.profile_pic}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">`
+                            : `<div style="width:28px; height:28px; border-radius:50%; background:var(--primary-light); color:var(--primary-color); font-weight:bold; display:flex; align-items:center; justify-content:center; font-size:0.75rem;">${item.username.substring(0, 2).toUpperCase()}</div>`;
+                            
+                        userDiv.innerHTML = `
+                            ${avatar}
+                            <span style="font-weight: 500; font-size: 0.85rem; color: var(--text-main);">${escapeHTML(item.username)}</span>
+                        `;
+                        
+                        const timeSpan = document.createElement('span');
+                        timeSpan.style.fontSize = '0.75rem';
+                        timeSpan.style.color = 'var(--text-muted)';
+                        timeSpan.innerText = `${dateStr} ${timeStr}`;
+                        
+                        row.appendChild(userDiv);
+                        row.appendChild(timeSpan);
+                        msgInfoReadList.appendChild(row);
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Mesaj ayrıntıları getirilemedi:', e);
+            if (msgInfoReadList) {
+                msgInfoReadList.innerHTML = `<div style="color: #ff4d4d; font-size: 0.85rem; text-align: center; padding: 1rem 0;">Hata oluştu.</div>`;
+            }
+        }
+        
+        if (messageInfoModal) {
+            messageInfoModal.classList.remove('hidden');
+        }
+    });
+}
+
+if (closeMsgInfoModal) {
+    closeMsgInfoModal.addEventListener('click', () => {
+        if (messageInfoModal) {
+            messageInfoModal.classList.add('hidden');
+        }
     });
 }
 
@@ -7254,5 +7372,16 @@ if (callScreen) {
         dragEnd();
     });
 }
+
+function openMessageInfoById(msgId) {
+    const msg = messages.find(m => Number(m.id) === Number(msgId));
+    if (msg) {
+        activeContextMessage = msg;
+        if (ctxBtnInfo) {
+            ctxBtnInfo.click();
+        }
+    }
+}
+window.openMessageInfoById = openMessageInfoById;
 
 initApp();

@@ -184,6 +184,15 @@ async function initDatabase() {
                 )
             `);
 
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS message_reads (
+                    message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (message_id, user_id)
+                )
+            `);
+
             console.log('PostgreSQL Tabloları kontrol edildi/oluşturuldu.');
         } finally {
             client.release();
@@ -415,6 +424,15 @@ async function initDatabase() {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
                 UNIQUE(user_id, peer_id, is_group)
+            )
+        `);
+
+        await dbSqlite.exec(`
+            CREATE TABLE IF NOT EXISTS message_reads (
+                message_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                read_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (message_id, user_id)
             )
         `);
 
@@ -750,6 +768,72 @@ const dbQueries = {
         }
     },
 
+    async recordMessageReads(readerId, senderId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(`
+                INSERT INTO message_reads (message_id, user_id)
+                SELECT id, $1 FROM messages
+                WHERE sender_id = $2 AND receiver_id = $1
+                ON CONFLICT (message_id, user_id) DO NOTHING
+            `, [readerId, senderId]);
+        } else {
+            await dbSqlite.run(`
+                INSERT OR IGNORE INTO message_reads (message_id, user_id)
+                SELECT id, ? FROM messages
+                WHERE sender_id = ? AND receiver_id = ?
+            `, [readerId, senderId, readerId]);
+        }
+    },
+
+    async recordGroupMessageReads(groupId, userId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(`
+                INSERT INTO message_reads (message_id, user_id)
+                SELECT id, $1 FROM messages
+                WHERE group_id = $2 AND sender_id != $1
+                ON CONFLICT (message_id, user_id) DO NOTHING
+            `, [userId, groupId]);
+        } else {
+            await dbSqlite.run(`
+                INSERT OR IGNORE INTO message_reads (message_id, user_id)
+                SELECT id, ? FROM messages
+                WHERE group_id = ? AND sender_id != ?
+            `, [userId, groupId, userId]);
+        }
+    },
+
+    async recordSingleMessageRead(messageId, userId) {
+        if (isPostgres) {
+            await dbPostgresPool.query(`
+                INSERT INTO message_reads (message_id, user_id)
+                VALUES ($1, $2)
+                ON CONFLICT (message_id, user_id) DO NOTHING
+            `, [messageId, userId]);
+        } else {
+            await dbSqlite.run(`
+                INSERT OR IGNORE INTO message_reads (message_id, user_id)
+                VALUES (?, ?)
+            `, [messageId, userId]);
+        }
+    },
+
+    async getMessageReadDetails(messageId) {
+        const queryStr = `
+            SELECT users.id, users.username, users.profile_pic, message_reads.read_at
+            FROM message_reads
+            JOIN users ON users.id = message_reads.user_id
+            WHERE message_reads.message_id = $1
+            ORDER BY message_reads.read_at ASC
+        `;
+        if (isPostgres) {
+            const res = await dbPostgresPool.query(queryStr, [messageId]);
+            return res.rows;
+        } else {
+            const queryStrSqlite = queryStr.replace(/\$1/g, '?');
+            return await dbSqlite.all(queryStrSqlite, [messageId]);
+        }
+    },
+
     // Sohbeti arşive ekleme
     async archiveChat(userId, peerId, isGroup = 0) {
         if (isPostgres) {
@@ -1026,7 +1110,15 @@ const dbQueries = {
     // Grubun mesaj geçmişini getir (Kullanıcının kendisi için sildiği mesajları filtreleyerek)
     async getGroupMessageHistory(groupId, userId) {
         const queryStr = `
-            SELECT messages.*, users.username AS sender_name 
+            SELECT 
+                messages.*, 
+                users.username AS sender_name,
+                COALESCE((
+                    SELECT 1 FROM message_reads 
+                    WHERE message_reads.message_id = messages.id 
+                      AND message_reads.user_id != messages.sender_id 
+                    LIMIT 1
+                ), 0) AS is_read
             FROM messages 
             JOIN users ON users.id = messages.sender_id 
             WHERE messages.group_id = $1 

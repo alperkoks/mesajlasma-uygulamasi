@@ -1496,6 +1496,7 @@ app.get('/api/groups/:groupId/messages', authenticateToken, async (req, res) => 
             return res.status(403).json({ message: 'Bu grubun üyesi değilsiniz.' });
         }
 
+        await dbQueries.recordGroupMessageReads(groupId, userId);
         const messages = await dbQueries.getGroupMessageHistory(groupId, userId);
         res.json(messages);
     } catch (error) {
@@ -1766,6 +1767,7 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
     try {
         // Mesaj geçmişini getirmeden önce karşı taraftan gelen okunmamış mesajları okundu olarak işaretle
         await dbQueries.markMessagesAsRead(receiverId, senderId);
+        await dbQueries.recordMessageReads(senderId, receiverId);
         
         // Göndericiye mesajlarının okunduğunu soketle bildir
         const senderSockets = userSockets.get(receiverId);
@@ -1780,6 +1782,66 @@ app.get('/api/messages/:receiverId', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Mesaj geçmişi getirme hatası:', error);
         res.status(500).json({ message: 'Mesaj geçmişi getirilirken hata oluştu.' });
+    }
+});
+
+app.post('/api/messages/:messageId/read', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    const messageId = parseInt(req.params.messageId);
+    try {
+        await dbQueries.recordSingleMessageRead(messageId, userId);
+        const db = getDbInstance();
+        if (isPostgres) {
+            await db.query('UPDATE messages SET is_read = 1 WHERE id = $1 AND receiver_id = $2', [messageId, userId]);
+        } else {
+            await db.run('UPDATE messages SET is_read = 1 WHERE id = ? AND receiver_id = ?', [messageId, userId]);
+        }
+        
+        // Okundu bilgisini ilgili soketlere yayınla
+        let msgObj;
+        if (isPostgres) {
+            const queryRes = await db.query('SELECT * FROM messages WHERE id = $1', [messageId]);
+            msgObj = queryRes.rows[0];
+        } else {
+            msgObj = await db.get('SELECT * FROM messages WHERE id = ?', [messageId]);
+        }
+        
+        if (msgObj) {
+            if (msgObj.group_id) {
+                io.to(`group_${msgObj.group_id}`).emit('message_read_update', {
+                    messageId: messageId,
+                    userId: userId,
+                    readAt: new Date().toISOString()
+                });
+            } else {
+                const senderSockets = userSockets.get(msgObj.sender_id);
+                if (senderSockets && senderSockets.size > 0) {
+                    senderSockets.forEach(socketId => {
+                        io.to(socketId).emit('message_read_update', {
+                            messageId: messageId,
+                            userId: userId,
+                            readAt: new Date().toISOString()
+                        });
+                    });
+                }
+            }
+        }
+        
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Mesaj okundu işaretleme hatası:', e);
+        res.status(500).json({ error: 'Hata oluştu' });
+    }
+});
+
+app.get('/api/messages/:messageId/read-details', authenticateToken, async (req, res) => {
+    const messageId = parseInt(req.params.messageId);
+    try {
+        const details = await dbQueries.getMessageReadDetails(messageId);
+        res.json(details);
+    } catch (e) {
+        console.error('Mesaj detayları getirme hatası:', e);
+        res.status(500).json({ error: 'Hata oluştu' });
     }
 });
 
