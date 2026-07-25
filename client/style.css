@@ -454,6 +454,7 @@ body {
     display: flex;
     flex-direction: column;
     background-color: var(--bg-light);
+    position: relative !important;
 }
 
 /* Durum Ekranları (Boş sohbet veya aktif sohbet) */

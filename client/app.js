@@ -3395,6 +3395,15 @@ async function startWebRtcCall(isVideo) {
 
 function showCallScreen(partnerUser, isVideo, isIncoming) {
     webrtcCallScreen.classList.remove('hidden');
+    webrtcCallScreen.classList.remove('minimized');
+    webrtcCallScreen.classList.remove('bubble-mode');
+    webrtcCallScreen.removeAttribute('style');
+    webrtcCallScreen.style.display = 'flex';
+    
+    // Reset compact button display
+    const btnCompact = document.getElementById('btn-compact-call');
+    if (btnCompact) btnCompact.style.display = 'none';
+    
     callPartnerUsername.textContent = partnerUser ? partnerUser.username : 'Kullanıcı';
     
     if (partnerUser && partnerUser.profile_pic) {
@@ -3429,12 +3438,27 @@ function initPeerConnection(partnerId) {
     });
     
     peerConnection.addEventListener('track', (e) => {
+        const stream = e.streams[0];
         if (remoteVideo) {
-            remoteVideo.srcObject = e.streams[0];
+            remoteVideo.srcObject = stream;
         }
         const remoteAudio = document.getElementById('remote-audio');
         if (remoteAudio) {
-            remoteAudio.srcObject = e.streams[0];
+            remoteAudio.srcObject = stream;
+        }
+        
+        // Dynamically toggle video container visibility based on video track presence
+        const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
+        if (hasVideo) {
+            callVideosContainer.classList.remove('hidden');
+            if (remoteVideo) remoteVideo.style.display = 'block';
+            callPartnerAvatar.style.display = 'none';
+        } else {
+            if (!isVideoCallActive) {
+                callVideosContainer.classList.add('hidden');
+                if (remoteVideo) remoteVideo.style.display = 'none';
+                callPartnerAvatar.style.display = 'flex';
+            }
         }
     });
     
@@ -5372,112 +5396,164 @@ if (messageInput) {
     });
 }
 
+// --- SOHBET İÇİ DOSYA VE RESİM GÖNDERİMİ YARDIMCILARI (GLOBAL ES6) ---
+async function handleDroppedFile(file) {
+    if (!file || (!activeChatPartnerId && !activeChatGroupId)) return;
+
+    // Dosya boyutu limiti (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        alert('Dosya boyutu 10MB\'tan büyük olamaz moruk.');
+        const fileInputEl = document.getElementById('file-input');
+        if (fileInputEl) fileInputEl.value = '';
+        return;
+    }
+
+    // Intercept images for View Once choice
+    const ext = file.name.split('.').pop().toLowerCase();
+    const isImageExt = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
+    if (file.type.startsWith('image/') || isImageExt) {
+        viewOncePendingFile = file;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            document.getElementById('view-once-preview-img').src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+        
+        isViewOnceActive = false;
+        const btnTog = document.getElementById('btn-toggle-view-once');
+        btnTog.style.backgroundColor = 'var(--border-color)';
+        btnTog.style.color = 'var(--text-main)';
+        document.getElementById('lbl-view-once-status').textContent = currentLanguage === 'tr' ? 'Normal Görsel' : 'Standard Photo';
+        
+        document.getElementById('view-once-confirm-modal').classList.remove('hidden');
+        const fileInputEl = document.getElementById('file-input');
+        if (fileInputEl) fileInputEl.value = '';
+        return;
+    }
+
+    await executeFileUpload(file);
+}
+
+async function executeFileUpload(file, isViewOnce = false) {
+    const btnAttachEl = document.getElementById('btn-attach');
+    const fileInputEl = document.getElementById('file-input');
+    
+    // Arayüz yükleme görsel geri bildirimi
+    let originalHTML = '📎';
+    if (btnAttachEl) {
+        btnAttachEl.disabled = true;
+        originalHTML = btnAttachEl.innerHTML;
+        btnAttachEl.innerHTML = '⏳';
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        // Sunucuya yükle
+        const uploadRes = await fetch('/api/messages/upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (!uploadRes.ok) {
+            const errData = await uploadRes.json();
+            throw new Error(errData.message || 'Yükleme başarısız.');
+        }
+
+        const data = await uploadRes.json();
+
+        // Mesajı veritabanına gönder
+        const newMsg = await apiCall('/messages', 'POST', {
+            receiverId: activeChatPartnerId,
+            groupId: activeChatGroupId,
+            message: data.fileName,
+            messageType: data.messageType,
+            fileUrl: data.fileUrl,
+            isViewOnce: isViewOnce ? 1 : 0
+        });
+
+        const isAlreadyAdded = messages.some(m => m.id === newMsg.id);
+        if (!isAlreadyAdded) {
+            messages.push(newMsg);
+            renderMessages();
+        }
+
+        // Son mesaj bilgisini listede güncelle
+        if (activeChatGroupId) {
+            const grp = groups.find(g => g.id === activeChatGroupId);
+            if (grp) {
+                grp.last_message = newMsg.message;
+                grp.last_message_time = newMsg.created_at;
+                renderGroupsList();
+            }
+        } else {
+            const partner = users.find(u => u.id === activeChatPartnerId);
+            if (partner) {
+                partner.last_message = newMsg.message;
+                partner.last_message_time = newMsg.created_at;
+                renderUsersList();
+            }
+        }
+    } catch (err) {
+        alert('Dosya gönderilemedi moruk: ' + err.message);
+    } finally {
+        if (btnAttachEl) {
+            btnAttachEl.disabled = false;
+            btnAttachEl.innerHTML = originalHTML;
+        }
+        if (fileInputEl) {
+            fileInputEl.value = '';
+        }
+    }
+}
+
 // --- SOHBET İÇİ DOSYA VE RESİM GÖNDERİMİ ---
 if (btnAttach && fileInput) {
     btnAttach.addEventListener('click', () => fileInput.click());
 
     fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        if (!file || (!activeChatPartnerId && !activeChatGroupId)) return;
-
-        // Dosya boyutu limiti (10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            alert('Dosya boyutu 10MB\'tan büyük olamaz moruk.');
-            fileInput.value = '';
-            return;
-        }
-
-        // Intercept images for View Once choice
-        const ext = file.name.split('.').pop().toLowerCase();
-        const isImageExt = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
-        if (file.type.startsWith('image/') || isImageExt) {
-            viewOncePendingFile = file;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                document.getElementById('view-once-preview-img').src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
-            
-            isViewOnceActive = false;
-            const btnTog = document.getElementById('btn-toggle-view-once');
-            btnTog.style.backgroundColor = 'var(--border-color)';
-            btnTog.style.color = 'var(--text-main)';
-            document.getElementById('lbl-view-once-status').textContent = currentLanguage === 'tr' ? 'Normal Görsel' : 'Standard Photo';
-            
-            document.getElementById('view-once-confirm-modal').classList.remove('hidden');
-            fileInput.value = '';
-            return;
-        }
-
-        await executeFileUpload(file);
+        handleDroppedFile(file);
     });
 
-    async function executeFileUpload(file, isViewOnce = false) {
-        // Arayüz yükleme görsel geri bildirimi
-        btnAttach.disabled = true;
-        const originalHTML = btnAttach.innerHTML;
-        btnAttach.innerHTML = '⏳';
+    // Drag & Drop Event Listeners
+    const chatArea = document.querySelector('.chat-area');
+    const dragOverlay = document.getElementById('drag-drop-overlay');
 
-        const formData = new FormData();
-        formData.append('file', file);
+    if (chatArea && dragOverlay) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            chatArea.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
 
-        try {
-            // Sunucuya yükle
-            const uploadRes = await fetch('/api/messages/upload', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
-
-            if (!uploadRes.ok) {
-                const errData = await uploadRes.json();
-                throw new Error(errData.message || 'Yükleme başarısız.');
-            }
-
-            const data = await uploadRes.json();
-
-            // Mesajı veritabanına gönder
-            const newMsg = await apiCall('/messages', 'POST', {
-                receiverId: activeChatPartnerId,
-                groupId: activeChatGroupId,
-                message: data.fileName,
-                messageType: data.messageType,
-                fileUrl: data.fileUrl,
-                isViewOnce: isViewOnce ? 1 : 0
-            });
-
-            const isAlreadyAdded = messages.some(m => m.id === newMsg.id);
-            if (!isAlreadyAdded) {
-                messages.push(newMsg);
-                renderMessages();
-            }
-
-            // Son mesaj bilgisini listede güncelle
-            if (activeChatGroupId) {
-                const grp = groups.find(g => g.id === activeChatGroupId);
-                if (grp) {
-                    grp.last_message = newMsg.message;
-                    grp.last_message_time = newMsg.created_at;
-                    renderGroupsList();
+        ['dragenter', 'dragover'].forEach(eventName => {
+            chatArea.addEventListener(eventName, () => {
+                if (activeChatPartnerId || activeChatGroupId) {
+                    dragOverlay.style.display = 'flex';
                 }
-            } else {
-                const partner = users.find(u => u.id === activeChatPartnerId);
-                if (partner) {
-                    partner.last_message = newMsg.message;
-                    partner.last_message_time = newMsg.created_at;
-                    renderUsersList();
-                }
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            chatArea.addEventListener(eventName, () => {
+                dragOverlay.style.display = 'none';
+            }, false);
+        });
+
+        chatArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files && files.length > 0) {
+                handleDroppedFile(files[0]);
             }
-        } catch (err) {
-            alert('Dosya gönderilemedi moruk: ' + err.message);
-        } finally {
-            btnAttach.disabled = false;
-            btnAttach.innerHTML = originalHTML;
-            fileInput.value = '';
-        }
-}
+        }, false);
+    }
 }
 
 function escapeHTML(str) {
