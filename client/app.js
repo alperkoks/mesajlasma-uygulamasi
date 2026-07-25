@@ -378,6 +378,9 @@ let groupMembers = new Map();
 let activeCallRoomId = null;
 let isScreenSharing = false;
 let screenStream = null;
+let activeGroupMembers = [];
+let callTimerInterval = null;
+let callStartTime = null;
 let audioAnalyzers = new Map();
 let audioCtx = null;
 
@@ -855,12 +858,8 @@ async function stopScreenSharing() {
     
     if (localVideo) {
         localVideo.srcObject = localStream;
-        if (!isVideoCallActive) {
-            localVideo.style.display = 'none';
-            callVideosContainer.classList.add('hidden');
-        }
     }
-    callVideosContainer.classList.remove('widescreen');
+    updateCallVideosContainerVisibility();
 }
 let keepAliveOscillator = null;
 
@@ -913,6 +912,7 @@ function rearrangeVideoGrid() {
 async function joinGroupCallRoom(roomId, isVideo) {
     activeCallRoomId = roomId;
     callActive = true;
+    startCallDurationTimer();
     
     localStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -2251,13 +2251,20 @@ function translatePage() {
 // 1.1 BAĞLANTI (LINK) TIKLANABİLİR YAPMA VE ZENGİN ÖNİZLEME (LINK PREVIEW) YORDAMLARI
 function autolinkText(text) {
     const urlPattern = /(https?:\/\/[^\s<]+)/g;
-    return text.replace(urlPattern, (url) => {
+    let processed = text.replace(urlPattern, (url) => {
         const cleanUrl = url.replace(/&amp;/g, '&')
                            .replace(/&lt;/g, '<')
                            .replace(/&gt;/g, '>')
                            .replace(/&quot;/g, '"');
         return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--primary-color); text-decoration: underline; word-break: break-all;">${url}</a>`;
     });
+    
+    const mentionPattern = /@([a-zA-Z0-9_]+)/g;
+    processed = processed.replace(mentionPattern, (match, username) => {
+        return `<span class="mention-tag" onclick="openUserProfileByName('${escapeHTML(username)}')">@${escapeHTML(username)}</span>`;
+    });
+    
+    return processed;
 }
 
 async function fetchAndRenderLinkPreview(url, msgId) {
@@ -3412,6 +3419,77 @@ async function startWebRtcCall(isVideo) {
     }
 }
 
+function updateCallVideosContainerVisibility() {
+    const remoteHasVideo = remoteVideo && remoteVideo.srcObject && remoteVideo.srcObject.getVideoTracks().length > 0 && remoteVideo.srcObject.getVideoTracks()[0].enabled;
+    const localHasVideo = (localStream && localStream.getVideoTracks().length > 0 && localStream.getVideoTracks()[0].enabled) || isScreenSharing;
+    
+    if (localVideo) {
+        if (localHasVideo) {
+            localVideo.style.display = 'block';
+        } else {
+            localVideo.style.display = 'none';
+        }
+    }
+    
+    if (remoteVideo) {
+        if (remoteHasVideo) {
+            remoteVideo.style.display = 'block';
+        } else {
+            remoteVideo.style.display = 'none';
+        }
+    }
+    
+    if (remoteHasVideo || localHasVideo) {
+        callVideosContainer.classList.remove('hidden');
+        callPartnerAvatar.style.display = 'none';
+    } else {
+        callVideosContainer.classList.add('hidden');
+        callVideosContainer.classList.remove('widescreen');
+        callPartnerAvatar.style.display = 'flex';
+    }
+}
+
+function startCallDurationTimer() {
+    if (callTimerInterval) {
+        clearInterval(callTimerInterval);
+    }
+    
+    callStartTime = Date.now();
+    callTimerInterval = setInterval(() => {
+        if (!callActive) {
+            clearInterval(callTimerInterval);
+            return;
+        }
+        
+        const diffMs = Date.now() - callStartTime;
+        const diffSecs = Math.floor(diffMs / 1000);
+        
+        const hours = Math.floor(diffSecs / 3600);
+        const mins = Math.floor((diffSecs % 3600) / 60);
+        const secs = diffSecs % 60;
+        
+        let timeString = '';
+        if (hours > 0) {
+            timeString = `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            timeString = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        const labelText = currentLanguage === 'tr' ? 'Görüşme' : 'Call';
+        callStatus.textContent = `${labelText} • ${timeString}`;
+    }, 1000);
+}
+
+function stopCallDurationTimer() {
+    if (callTimerInterval) {
+        clearInterval(callTimerInterval);
+        callTimerInterval = null;
+    }
+    if (callStatus) {
+        callStatus.textContent = '';
+    }
+}
+
 function showCallScreen(partnerUser, isVideo, isIncoming) {
     webrtcCallScreen.classList.remove('hidden');
     webrtcCallScreen.classList.remove('minimized');
@@ -3437,14 +3515,12 @@ function showCallScreen(partnerUser, isVideo, isIncoming) {
         callPartnerAvatar.textContent = partnerUser ? partnerUser.username.substring(0, 2).toUpperCase() : 'U';
     }
     
-    if (localVideo) localVideo.style.display = 'none';
+    stopCallDurationTimer();
+    updateCallVideosContainerVisibility();
 
     if (isVideo) {
-        callVideosContainer.classList.remove('hidden');
         if (btnSwitchCamera) btnSwitchCamera.style.display = 'flex';
-        if (localVideo) localVideo.style.display = 'block';
     } else {
-        callVideosContainer.classList.add('hidden');
         if (btnSwitchCamera) btnSwitchCamera.style.display = 'none';
     }
     
@@ -3579,8 +3655,9 @@ if (btnAcceptCall) {
                 signalData: answer
             });
             
-            callStatus.textContent = currentLanguage === 'tr' ? 'Görüşme' : 'Connected';
             callActive = true;
+            startCallDurationTimer();
+            updateCallVideosContainerVisibility();
         } catch (err) {
             console.error('Arama kabul edilme hatası:', err);
             socket.emit('reject_call', { targetUserId: currentCallPartnerId });
@@ -3627,6 +3704,7 @@ if (btnToggleVideo) {
                 // Eğer zaten video track varsa kapat/aç yap
                 videoTrack.enabled = !videoTrack.enabled;
                 btnToggleVideo.style.backgroundColor = videoTrack.enabled ? 'rgba(255,255,255,0.15)' : '#ef4444';
+                updateCallVideosContainerVisibility();
             } else {
                 // Sesli arama esnasında kamerayı ilk defa açmak istiyorsa (Video call upgrade)
                 try {
@@ -3639,7 +3717,6 @@ if (btnToggleVideo) {
                     
                     // Görsel arayüz elemanlarını görüntülü moda geçir
                     isVideoCallActive = true;
-                    callVideosContainer.classList.remove('hidden');
                     if (btnSwitchCamera) btnSwitchCamera.style.display = 'flex';
                     if (localVideo) {
                         localVideo.srcObject = null;
@@ -3658,6 +3735,8 @@ if (btnToggleVideo) {
                             isVideoCall: true
                         });
                     }
+                    
+                    updateCallVideosContainerVisibility();
                     
                     // Karşı tarafa kamerayı açma komutunu (upgrade) soketle bildir
                     socket.emit('upgrade_to_video', { targetUserId: currentCallPartnerId });
@@ -3719,10 +3798,9 @@ if (btnShareScreen) {
                 // Show locally
                 if (localVideo) {
                     localVideo.srcObject = screenStream;
-                    localVideo.style.display = 'block';
-                    callVideosContainer.classList.remove('hidden');
-                    callVideosContainer.classList.add('widescreen');
                 }
+                updateCallVideosContainerVisibility();
+                callVideosContainer.classList.add('widescreen');
                 
                 // Stop share event listener (from browser native stop sharing button)
                 screenTrack.addEventListener('ended', () => {
@@ -3791,6 +3869,7 @@ function endCallSession() {
     stopRingtone();
     stopScreenSharing();
     stopBackgroundAudioKeepAlive();
+    stopCallDurationTimer();
     
     // Clear audio analyzers
     audioAnalyzers.forEach(val => {
@@ -4342,8 +4421,8 @@ async function initApp() {
 
         socket.on('call_accepted', async ({ signalData }) => {
             stopRingtone();
-            callStatus.textContent = currentLanguage === 'tr' ? 'Görüşme' : 'Connected';
             callActive = true;
+            startCallDurationTimer();
             if (peerConnection) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData));
                 processQueuedIceCandidates();
@@ -4363,7 +4442,6 @@ async function initApp() {
 
         socket.on('upgrade_to_video', async () => {
             isVideoCallActive = true;
-            callVideosContainer.classList.remove('hidden');
             if (btnSwitchCamera) btnSwitchCamera.style.display = 'flex';
             
             // Eğer yerel video track'imiz yoksa bizim kameramızı da açıp akışa dahil et
@@ -4394,6 +4472,7 @@ async function initApp() {
                     console.error('Kamera otomatik açma hatası:', e);
                 }
             }
+            updateCallVideosContainerVisibility();
         });
 
         socket.on('webrtc_ice_candidate', async ({ candidate }) => {
@@ -4839,6 +4918,7 @@ async function selectUserChat(user) {
         activeChatPartner = user.username;
         activeChatPartnerId = user.id;
         activeChatGroupId = null;
+        activeGroupMembers = [];
         updateMuteButtonUI();
 
         // Arama barını kapat ve sıfırla
@@ -5631,6 +5711,151 @@ if (btnAttach && fileInput) {
     }
 }
 
+// --- KULLANICI ETİKETLEME (MENTION) MANTIĞI ---
+const mentionDropdown = document.getElementById('mention-dropdown');
+let mentionSelectedIndex = -1;
+let filteredMentionUsers = [];
+
+if (messageInput && mentionDropdown) {
+    messageInput.addEventListener('input', (e) => {
+        const val = messageInput.value;
+        const cursorPos = messageInput.selectionStart;
+        
+        // Find if there is an '@' preceding the cursor
+        const textBeforeCursor = val.substring(0, cursorPos);
+        const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+        
+        if (lastAtIdx !== -1) {
+            // Check if the '@' is at the start of a word
+            const charBeforeAt = lastAtIdx > 0 ? textBeforeCursor[lastAtIdx - 1] : ' ';
+            if (charBeforeAt === ' ' || charBeforeAt === '\n') {
+                // Extract the query after '@'
+                const query = textBeforeCursor.substring(lastAtIdx + 1).toLowerCase();
+                
+                // Only trigger if the query doesn't contain spaces
+                if (!query.includes(' ')) {
+                    // Get users to display
+                    const targetList = activeChatGroupId ? activeGroupMembers : users;
+                    
+                    filteredMentionUsers = targetList.filter(u => {
+                        if (!u || !u.username) return false;
+                        // Exclude ourselves
+                        if (currentUser && u.id === currentUser.id) return false;
+                        return u.username.toLowerCase().startsWith(query);
+                    });
+                    
+                    if (filteredMentionUsers.length > 0) {
+                        renderMentionDropdown(filteredMentionUsers);
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Hide if no query or no matches
+        hideMentionDropdown();
+    });
+
+    // Handle navigation and selection in the dropdown using keydown
+    messageInput.addEventListener('keydown', (e) => {
+        if (mentionDropdown.classList.contains('hidden')) return;
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            mentionSelectedIndex = (mentionSelectedIndex + 1) % filteredMentionUsers.length;
+            highlightMentionItem();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            mentionSelectedIndex = (mentionSelectedIndex - 1 + filteredMentionUsers.length) % filteredMentionUsers.length;
+            highlightMentionItem();
+        } else if (e.key === 'Enter') {
+            if (mentionSelectedIndex !== -1 && filteredMentionUsers[mentionSelectedIndex]) {
+                e.preventDefault();
+                selectMentionUser(filteredMentionUsers[mentionSelectedIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            hideMentionDropdown();
+        }
+    });
+}
+
+function renderMentionDropdown(usersList) {
+    mentionDropdown.innerHTML = '';
+    mentionDropdown.classList.remove('hidden');
+    mentionSelectedIndex = -1;
+    
+    usersList.forEach((u, idx) => {
+        const item = document.createElement('div');
+        item.className = 'mention-item';
+        item.dataset.index = idx;
+        
+        const avatar = u.profile_pic 
+            ? `<img src="${u.profile_pic}" class="avatar" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">`
+            : `<div class="avatar">${u.username.substring(0, 2).toUpperCase()}</div>`;
+            
+        item.innerHTML = `
+            ${avatar}
+            <span style="font-weight: 500;">${escapeHTML(u.username)}</span>
+        `;
+        
+        item.addEventListener('click', () => {
+            selectMentionUser(u);
+        });
+        
+        mentionDropdown.appendChild(item);
+    });
+}
+
+function highlightMentionItem() {
+    const items = mentionDropdown.querySelectorAll('.mention-item');
+    items.forEach((item, idx) => {
+        if (idx === mentionSelectedIndex) {
+            item.classList.add('active');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
+function selectMentionUser(u) {
+    if (!messageInput) return;
+    const val = messageInput.value;
+    const cursorPos = messageInput.selectionStart;
+    const textBeforeCursor = val.substring(0, cursorPos);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+    
+    const before = val.substring(0, lastAtIdx);
+    const after = val.substring(cursorPos);
+    
+    // Complete username with @ and add space after
+    messageInput.value = `${before}@${u.username} ${after}`;
+    
+    // Put cursor after the completed username
+    const newCursorPos = lastAtIdx + u.username.length + 2; // +2 for @ and space
+    messageInput.focus();
+    messageInput.setSelectionRange(newCursorPos, newCursorPos);
+    
+    hideMentionDropdown();
+}
+
+function hideMentionDropdown() {
+    if (mentionDropdown) {
+        mentionDropdown.classList.add('hidden');
+        mentionDropdown.innerHTML = '';
+    }
+    mentionSelectedIndex = -1;
+    filteredMentionUsers = [];
+}
+
+function openUserProfileByName(username) {
+    const user = users.find(u => u.username === username);
+    if (user) {
+        showUserProfile(user);
+    }
+}
+
 function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, 
         tag => ({
@@ -5920,6 +6145,16 @@ async function selectGroupChat(group) {
         activeChatPartnerId = null;
         activeChatGroupId = group.id;
         updateMuteButtonUI();
+        
+        // Load active group members for tagging
+        try {
+            apiCall('/groups/' + group.id + '/members').then(members => {
+                activeGroupMembers = members;
+            }).catch(e => {
+                console.error('Grup üyeleri yüklenemedi:', e);
+                activeGroupMembers = [];
+            });
+        } catch(e) {}
 
         // Arama barını kapat ve sıfırla
         if (chatSearchBar) chatSearchBar.classList.add('hidden');
