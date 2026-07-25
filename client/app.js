@@ -799,7 +799,8 @@ async function stopScreenSharing() {
         screenStream = null;
     }
     
-    if (localStream) {
+    // If it was a video call, restore camera track
+    if (isVideoCallActive && localStream) {
         const cameraTrack = localStream.getVideoTracks()[0];
         if (cameraTrack) {
             if (peerConnection) {
@@ -815,6 +816,41 @@ async function stopScreenSharing() {
                 }
             });
         }
+    } else {
+        // If it was a voice-only call, remove the video track entirely and renegotiate
+        if (peerConnection) {
+            const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) {
+                peerConnection.removeTrack(sender);
+                try {
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    socket.emit('call_user', {
+                        targetUserId: currentCallPartnerId,
+                        signalData: offer,
+                        isVideoCall: false
+                    });
+                } catch(e) {
+                    console.error('P2P arama düşürme anlaşması başarısız:', e);
+                }
+            }
+        }
+        peerConnections.forEach(async (pc, peerId) => {
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) {
+                pc.removeTrack(sender);
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    socket.emit('call_signal', {
+                        targetUserId: peerId,
+                        signalData: offer
+                    });
+                } catch(e) {
+                    console.error('Grup arama düşürme anlaşması başarısız:', e);
+                }
+            }
+        });
     }
     
     if (localVideo) {
@@ -822,6 +858,46 @@ async function stopScreenSharing() {
         if (!isVideoCallActive) {
             callVideosContainer.classList.add('hidden');
         }
+    }
+}
+let keepAliveOscillator = null;
+
+function startBackgroundAudioKeepAlive() {
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        
+        if (!keepAliveOscillator) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            // Subsonic tone (20Hz) at extremely low volume (0.0001) to keep audio context active
+            osc.frequency.setValueAtTime(20, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            
+            keepAliveOscillator = osc;
+            console.log('Background audio keepalive started.');
+        }
+    } catch(e) {
+        console.error('Failed to start background audio keepalive:', e);
+    }
+}
+
+function stopBackgroundAudioKeepAlive() {
+    if (keepAliveOscillator) {
+        try {
+            keepAliveOscillator.stop();
+        } catch(e) {}
+        keepAliveOscillator = null;
+        console.log('Background audio keepalive stopped.');
     }
 }
 
@@ -846,6 +922,7 @@ async function joinGroupCallRoom(roomId, isVideo) {
     }
     
     // Auto speaking detection for local user
+    startBackgroundAudioKeepAlive();
     setupAudioAnalysis('local', localStream, callPartnerAvatar);
     
     // Tell socket server we are joining
@@ -952,15 +1029,44 @@ function inviteFriendToCall(friendId) {
 document.addEventListener('DOMContentLoaded', () => {
     // Disappearing timers, View once cancel/confirm, minimize/add callers buttons
     const btnMinimize = document.getElementById('btn-minimize-call');
+    const btnCompact = document.getElementById('btn-compact-call');
     if (btnMinimize) {
         btnMinimize.addEventListener('click', () => {
             const callScreen = document.getElementById('webrtc-call-screen');
             if (callScreen.classList.contains('minimized')) {
                 callScreen.classList.remove('minimized');
+                callScreen.classList.remove('bubble-mode');
+                if (btnCompact) btnCompact.style.display = 'none';
+                
+                // Restore standard position styling when expanded
+                callScreen.style.left = '0';
+                callScreen.style.top = '0';
+                callScreen.style.width = '100%';
+                callScreen.style.height = '100%';
+                callScreen.style.bottom = 'auto';
+                callScreen.style.right = 'auto';
+                
                 btnMinimize.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`;
             } else {
                 callScreen.classList.add('minimized');
+                if (btnCompact) btnCompact.style.display = 'flex';
+                
+                // Reset styling to stylesheet defaults for minimized view
+                callScreen.removeAttribute('style');
+                callScreen.style.display = 'flex';
+                
                 btnMinimize.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>`;
+            }
+        });
+    }
+    
+    if (btnCompact) {
+        btnCompact.addEventListener('click', () => {
+            const callScreen = document.getElementById('webrtc-call-screen');
+            if (callScreen.classList.contains('minimized')) {
+                callScreen.classList.toggle('bubble-mode');
+                callScreen.style.width = '';
+                callScreen.style.height = '';
             }
         });
     }
@@ -3266,6 +3372,9 @@ async function startWebRtcCall(isVideo) {
             localVideo.srcObject = localStream;
         }
         
+        startBackgroundAudioKeepAlive();
+        setupAudioAnalysis('local', localStream, callPartnerAvatar);
+        
         initPeerConnection(activeChatPartnerId);
         
         const offer = await peerConnection.createOffer();
@@ -3356,6 +3465,9 @@ if (btnAcceptCall) {
             if (isVideoCallActive && localVideo) {
                 localVideo.srcObject = localStream;
             }
+            
+            startBackgroundAudioKeepAlive();
+            setupAudioAnalysis('local', localStream, callPartnerAvatar);
             
             initPeerConnection(currentCallPartnerId);
             
@@ -3479,14 +3591,31 @@ if (btnShareScreen) {
                     const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
                     if (sender) {
                         sender.replaceTrack(screenTrack);
+                    } else {
+                        peerConnection.addTrack(screenTrack, localStream);
+                        const offer = await peerConnection.createOffer();
+                        await peerConnection.setLocalDescription(offer);
+                        socket.emit('call_user', {
+                            targetUserId: currentCallPartnerId,
+                            signalData: offer,
+                            isVideoCall: true
+                        });
                     }
                 }
                 
                 // Replace on Mesh/Group connections
-                peerConnections.forEach(pc => {
+                peerConnections.forEach(async (pc, peerId) => {
                     const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
                     if (sender) {
                         sender.replaceTrack(screenTrack);
+                    } else {
+                        pc.addTrack(screenTrack, localStream);
+                        const offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        socket.emit('call_signal', {
+                            targetUserId: peerId,
+                            signalData: offer
+                        });
                     }
                 });
                 
@@ -3562,6 +3691,7 @@ if (btnSwitchCamera) {
 function endCallSession() {
     stopRingtone();
     stopScreenSharing();
+    stopBackgroundAudioKeepAlive();
     
     // Clear audio analyzers
     audioAnalyzers.forEach(val => {
@@ -4011,7 +4141,7 @@ async function initApp() {
             }
         });
         
-        socket.on('call_incoming', ({ fromUserId, fromUsername, roomId, signalData, isVideoCall }) => {
+        socket.on('call_incoming', async ({ fromUserId, fromUsername, roomId, signalData, isVideoCall }) => {
             if (roomId) {
                 activeCallRoomId = roomId;
                 if (callActive) {
@@ -4028,6 +4158,24 @@ async function initApp() {
                 }
             } else {
                 activeCallRoomId = null;
+            }
+            
+            // Renegotiation handling (if already in call and signal is offer)
+            if (callActive && signalData && signalData.type === 'offer') {
+                try {
+                    if (peerConnection) {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(signalData));
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        socket.emit('accept_call', {
+                            targetUserId: fromUserId,
+                            signalData: answer
+                        });
+                    }
+                } catch (e) {
+                    console.error('Yeniden anlaşma (renegotiation) başarısız:', e);
+                }
+                return;
             }
             
             currentCallPartnerId = fromUserId;
@@ -5240,7 +5388,9 @@ if (btnAttach && fileInput) {
         }
 
         // Intercept images for View Once choice
-        if (file.type.startsWith('image/')) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        const isImageExt = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext);
+        if (file.type.startsWith('image/') || isImageExt) {
             viewOncePendingFile = file;
             const reader = new FileReader();
             reader.onload = (ev) => {
@@ -6573,6 +6723,140 @@ function formatLastSeen(isoString) {
     } catch (e) {
         return 'yakınlarda';
     }
+}
+
+// --- MOBİL/DESKTOP KAYDIRMA VE SÜRÜKLEME ARALARI ---
+
+// 1. Sidebar Touch/Drag Swipe Tabs Switcher
+const sidebarListContainer = document.querySelector('.sidebar-list-container');
+if (sidebarListContainer) {
+    let startX = 0;
+    let endX = 0;
+    
+    const handleGesture = () => {
+        const threshold = 70; // minimum swipe distance
+        const diff = endX - startX;
+        
+        const tabs = ['friends', 'groups', 'calls'];
+        const activeTabBtn = document.querySelector('.tab-btn.active');
+        if (!activeTabBtn) return;
+        
+        let activeIdx = 0;
+        if (activeTabBtn.id === 'tab-groups') activeIdx = 1;
+        if (activeTabBtn.id === 'tab-calls') activeIdx = 2;
+        
+        if (diff > threshold) {
+            // Swipe right -> go to previous tab
+            if (activeIdx > 0) {
+                const prevTabId = `tab-${tabs[activeIdx - 1]}`;
+                const prevBtn = document.getElementById(prevTabId);
+                if (prevBtn) prevBtn.click();
+            }
+        } else if (diff < -threshold) {
+            // Swipe left -> go to next tab
+            if (activeIdx < tabs.length - 1) {
+                const nextTabId = `tab-${tabs[activeIdx + 1]}`;
+                const nextBtn = document.getElementById(nextTabId);
+                if (nextBtn) nextBtn.click();
+            }
+        }
+    };
+    
+    sidebarListContainer.addEventListener('touchstart', (e) => {
+        startX = e.changedTouches[0].screenX;
+    }, { passive: true });
+    
+    sidebarListContainer.addEventListener('touchend', (e) => {
+        endX = e.changedTouches[0].screenX;
+        handleGesture();
+    }, { passive: true });
+    
+    let isMouseDown = false;
+    sidebarListContainer.addEventListener('mousedown', (e) => {
+        startX = e.screenX;
+        isMouseDown = true;
+    });
+    
+    sidebarListContainer.addEventListener('mouseup', (e) => {
+        if (!isMouseDown) return;
+        isMouseDown = false;
+        endX = e.screenX;
+        handleGesture();
+    });
+    
+    sidebarListContainer.addEventListener('mouseleave', () => {
+        isMouseDown = false;
+    });
+}
+
+// 2. Draggable Minimized Call Screen
+const callScreen = document.getElementById('webrtc-call-screen');
+if (callScreen) {
+    let isDragging = false;
+    let offsetX = 0;
+    let offsetY = 0;
+    
+    const dragStart = (clientX, clientY) => {
+        isDragging = true;
+        offsetX = clientX - callScreen.offsetLeft;
+        offsetY = clientY - callScreen.offsetTop;
+        callScreen.style.transition = 'none';
+    };
+    
+    const dragMove = (clientX, clientY) => {
+        if (!isDragging) return;
+        let x = clientX - offsetX;
+        let y = clientY - offsetY;
+        
+        const maxX = window.innerWidth - callScreen.offsetWidth;
+        const maxY = window.innerHeight - callScreen.offsetHeight;
+        x = Math.max(0, Math.min(x, maxX));
+        y = Math.max(0, Math.min(y, maxY));
+        
+        callScreen.style.left = `${x}px`;
+        callScreen.style.top = `${y}px`;
+        callScreen.style.bottom = 'auto';
+        callScreen.style.right = 'auto';
+    };
+    
+    const dragEnd = () => {
+        if (isDragging) {
+            isDragging = false;
+            callScreen.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+        }
+    };
+    
+    callScreen.addEventListener('mousedown', (e) => {
+        if (!callScreen.classList.contains('minimized')) return;
+        if (e.target.closest('button') || e.target.closest('video')) return;
+        dragStart(e.clientX, e.clientY);
+        e.preventDefault();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        dragMove(e.clientX, e.clientY);
+    });
+    
+    document.addEventListener('mouseup', () => {
+        dragEnd();
+    });
+    
+    callScreen.addEventListener('touchstart', (e) => {
+        if (!callScreen.classList.contains('minimized')) return;
+        if (e.target.closest('button') || e.target.closest('video')) return;
+        const touch = e.touches[0];
+        dragStart(touch.clientX, touch.clientY);
+    }, { passive: true });
+    
+    callScreen.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        const touch = e.touches[0];
+        dragMove(touch.clientX, touch.clientY);
+    }, { passive: true });
+    
+    callScreen.addEventListener('touchend', () => {
+        dragEnd();
+    });
 }
 
 initApp();

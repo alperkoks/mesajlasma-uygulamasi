@@ -1048,10 +1048,11 @@ app.post('/api/messages/upload', authenticateToken, upload.single('file'), async
     }
 
     try {
-        const isImage = req.file.mimetype.startsWith('image/');
-        
         // Multer'ın Türkçe karakter bozulmasını (latin1 -> utf8) gider
         const originalNameUtf8 = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+        const ext = path.extname(originalNameUtf8).toLowerCase();
+        const isImageExt = ['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext);
+        const isImage = req.file.mimetype.startsWith('image/') || isImageExt;
         
         // Benzersiz dosya ismi oluştur (UDF, PDF vb. orijinal uzantıları koruyarak)
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
