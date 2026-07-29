@@ -17,7 +17,7 @@ function createWindow() {
     });
 
     // Render canlı sunucu adresi
-    const liveUrl = 'https://mesajlasma-uygulamasi.onrender.com';
+    const liveUrl = 'https://mesajlasma-uygulamasi-5rev.onrender.com';
     
     // Canlı sunucuyu yükle, başarısız olursa şık bir hata sayfası göster
     win.loadURL(liveUrl).catch(() => {
