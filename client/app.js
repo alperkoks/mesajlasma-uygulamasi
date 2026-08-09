@@ -4084,6 +4084,17 @@ async function initApp() {
         // --- MÜZİK BOTU ARAMA SOKET DİNLEYİCİLERİ ---
         socket.on('bot_joined_call', (data) => {
             console.log('🤖 Müzik Botu görüşmeye katıldı:', data);
+            
+            // 1e1 aramalarda, üstteki tekli avatarı gizle ve aranan kişiyi de botla birlikte grid içinde listele
+            if (!activeChatGroupId) {
+                if (callPartnerAvatar) callPartnerAvatar.style.display = 'none';
+                const partnerUserHeading = document.getElementById('call-partner-username');
+                if (partnerUserHeading) partnerUserHeading.style.display = 'none';
+                
+                const partnerName = callPartnerUsername ? callPartnerUsername.textContent : 'Katılımcı';
+                addParticipantVideo(currentCallPartnerId, partnerName, null);
+            }
+            
             addParticipantVideo('bot', 'Müzik Botu', null);
             
             let botAudio = document.getElementById('bot-call-audio');
@@ -4113,6 +4124,22 @@ async function initApp() {
             
             const botAudio = document.getElementById('bot-call-audio');
             if (botAudio) botAudio.remove();
+            
+            // 1e1 aramalarda, bot ayrıldığında eski tekli üst avatar görünümünü geri yükle
+            if (!activeChatGroupId) {
+                if (callPartnerAvatar) callPartnerAvatar.style.display = 'flex';
+                const partnerUserHeading = document.getElementById('call-partner-username');
+                if (partnerUserHeading) partnerUserHeading.style.display = 'block';
+                
+                const partnerWrapper = document.getElementById(`video-wrapper-${currentCallPartnerId}`);
+                if (partnerWrapper) partnerWrapper.remove();
+                
+                const gridContainer = document.getElementById('call-videos-container');
+                const remainingWrappers = gridContainer.querySelectorAll('.call-video-wrapper');
+                if (remainingWrappers.length === 0) {
+                    gridContainer.classList.add('hidden');
+                }
+            }
             
             rearrangeVideoGrid();
         });

@@ -2614,9 +2614,7 @@ async function handleMusicBotCommand(msg) {
 
         } catch (err) {
             console.error('Müzik çalma hatası:', err);
-            if (!botState.inCall) {
-                await sendBotMessage(`❌ Müzik çalınırken hata oluştu: ${err.message || err}`);
-            }
+            await sendBotMessage(`❌ Müzik çalınırken hata oluştu: ${err.message || err}`);
         }
         return;
     }
@@ -2625,6 +2623,35 @@ async function handleMusicBotCommand(msg) {
 // Sunucuyu başlat
 async function startServer() {
     try {
+        // Linux ortamları için sanal python alias/symlink kurulumu
+        if (process.platform === 'linux') {
+            const { execSync } = require('child_process');
+            try {
+                execSync('which python');
+            } catch (e) {
+                console.log('🐍 Sistemde python komutu bulunamadı. python3 kontrol ediliyor...');
+                try {
+                    const python3Path = execSync('which python3').toString().trim();
+                    console.log(`✅ python3 konumu: ${python3Path}. Sanal python symlink kuruluyor...`);
+                    
+                    const virtualBinDir = path.join(__dirname, 'virtual_bin');
+                    if (!fs.existsSync(virtualBinDir)) {
+                        fs.mkdirSync(virtualBinDir, { recursive: true });
+                    }
+                    
+                    const symlinkPath = path.join(virtualBinDir, 'python');
+                    if (!fs.existsSync(symlinkPath)) {
+                        fs.symlinkSync(python3Path, symlinkPath);
+                    }
+                    
+                    process.env.PATH = virtualBinDir + ':' + process.env.PATH;
+                    console.log(`🚀 Sanal python PATH'e eklendi.`);
+                } catch (err) {
+                    console.error('❌ Sanal python kurulum hatası:', err);
+                }
+            }
+        }
+
         await initDatabase();
         isPostgres = require('./database').isPostgres;
         await initMusicBot();
