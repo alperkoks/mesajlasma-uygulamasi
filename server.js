@@ -2453,7 +2453,11 @@ async function initMusicBot() {
 async function getCobaltFallbackUrl(youtubeUrl) {
     try {
         console.log('🔄 Aktif Cobalt sunucuları listesi çekiliyor...');
-        const response = await fetch('https://instances.cobalt.best/api/v1/instances');
+        const response = await fetch('https://instances.cobalt.best/api/v1/instances', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
         if (response.ok) {
             const instances = await response.json();
             // Durumu online olan sunucuları filtrele
@@ -2466,7 +2470,6 @@ async function getCobaltFallbackUrl(youtubeUrl) {
             console.log(`🚀 Seçilen 5 rastgele sunucu denenecek...`);
             
             for (const inst of selectedInstances) {
-                // Cobalt v10 standardı API adresleri için POST genellikle doğrudan kök URL'ye (/) yapılır
                 const apiEndpoint = inst.url.endsWith('/') ? inst.url : inst.url + '/';
                 console.log(`Cobalt deneniyor: ${apiEndpoint}`);
                 
@@ -2476,6 +2479,7 @@ async function getCobaltFallbackUrl(youtubeUrl) {
                     const res = await fetch(apiEndpoint, {
                         method: 'POST',
                         headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                             'Accept': 'application/json',
                             'Content-Type': 'application/json'
                         },
@@ -2527,6 +2531,7 @@ async function getCobaltFallbackUrl(youtubeUrl) {
             const res = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Accept': 'application/json',
                     'Content-Type': 'application/json'
                 },
@@ -2571,12 +2576,16 @@ async function getInvidiousFallbackUrl(youtubeUrl) {
     
     try {
         console.log('🔄 Aktif Invidious sunucuları çekiliyor...');
-        const response = await fetch('https://api.invidious.io/instances.json?sort_by=type,health');
+        const response = await fetch('https://api.invidious.io/instances.json?sort_by=type,health', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
+        });
         if (response.ok) {
             const instancesList = await response.json();
             const onlineDomains = [];
             for (const [domain, details] of instancesList) {
-                if (details.type === 'https' && details.monitor && details.monitor.status === 1 && details.api) {
+                if (details.type === 'https' && details.monitor && details.monitor.status === 1) {
                     onlineDomains.push(domain);
                 }
             }
@@ -2593,11 +2602,20 @@ async function getInvidiousFallbackUrl(youtubeUrl) {
                 const controller = new AbortController();
                 const timeout = setTimeout(() => controller.abort(), 6000);
                 try {
-                    const res = await fetch(apiEndpoint, { signal: controller.signal });
+                    const res = await fetch(apiEndpoint, { 
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                            'Accept': 'application/json'
+                        },
+                        signal: controller.signal 
+                    });
                     clearTimeout(timeout);
                     
+                    const responseText = await res.text();
+                    console.log(`Invidious Yanıtı (${domain}): Durum ${res.status} - Gövde boyutu: ${responseText.length}`);
+                    
                     if (res.ok) {
-                        const data = await res.json();
+                        const data = JSON.parse(responseText);
                         if (data.adaptiveFormats && data.adaptiveFormats.length > 0) {
                             const audioFormats = data.adaptiveFormats.filter(f => f.type && f.type.startsWith('audio/'));
                             if (audioFormats.length > 0) {
@@ -2635,10 +2653,20 @@ async function getInvidiousFallbackUrl(youtubeUrl) {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 6000);
         try {
-            const res = await fetch(apiEndpoint, { signal: controller.signal });
+            const res = await fetch(apiEndpoint, { 
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'application/json'
+                },
+                signal: controller.signal 
+            });
             clearTimeout(timeout);
+            
+            const responseText = await res.text();
+            console.log(`Yedek Invidious Yanıtı (${domain}): Durum ${res.status}`);
+            
             if (res.ok) {
-                const data = await res.json();
+                const data = JSON.parse(responseText);
                 if (data.adaptiveFormats && data.adaptiveFormats.length > 0) {
                     const audioFormats = data.adaptiveFormats.filter(f => f.type && f.type.startsWith('audio/'));
                     if (audioFormats.length > 0) {
