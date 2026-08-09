@@ -2559,6 +2559,106 @@ async function getCobaltFallbackUrl(youtubeUrl) {
     throw new Error('Tüm indirme sunucuları ve alternatif kanallar başarısız oldu.');
 }
 
+function extractVideoId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+async function getInvidiousFallbackUrl(youtubeUrl) {
+    const videoId = extractVideoId(youtubeUrl);
+    if (!videoId) throw new Error('Geçersiz YouTube adresi.');
+    
+    try {
+        console.log('🔄 Aktif Invidious sunucuları çekiliyor...');
+        const response = await fetch('https://api.invidious.io/instances.json?sort_by=type,health');
+        if (response.ok) {
+            const instancesList = await response.json();
+            const onlineDomains = [];
+            for (const [domain, details] of instancesList) {
+                if (details.type === 'https' && details.monitor && details.monitor.status === 1 && details.api) {
+                    onlineDomains.push(domain);
+                }
+            }
+            
+            console.log(`🔍 ${onlineDomains.length} online Invidious sunucusu bulundu.`);
+            // Karıştır ve ilk 5 tanesini dene
+            onlineDomains.sort(() => Math.random() - 0.5);
+            const selectedDomains = onlineDomains.slice(0, 5);
+            
+            for (const domain of selectedDomains) {
+                const apiEndpoint = `https://${domain}/api/v1/videos/${videoId}`;
+                console.log(`Invidious deneniyor: ${apiEndpoint}`);
+                
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 6000);
+                try {
+                    const res = await fetch(apiEndpoint, { signal: controller.signal });
+                    clearTimeout(timeout);
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.adaptiveFormats && data.adaptiveFormats.length > 0) {
+                            const audioFormats = data.adaptiveFormats.filter(f => f.type && f.type.startsWith('audio/'));
+                            if (audioFormats.length > 0) {
+                                const selectedAudio = audioFormats[0];
+                                const rawUrl = selectedAudio.url;
+                                const urlObj = new URL(rawUrl);
+                                const proxiedUrl = `https://${domain}/videoplayback${urlObj.search}`;
+                                console.log(`✅ Invidious üzerinden proxied müzik adresi alındı: ${proxiedUrl}`);
+                                return proxiedUrl;
+                            }
+                        }
+                    }
+                } catch (err) {
+                    clearTimeout(timeout);
+                    console.log(`Invidious sunucusu başarısız (${domain}): ${err.message}`);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Invidious listesi çekilemedi:', e.message);
+    }
+    
+    // Sabit yedek Invidious sunucuları
+    const hardcodedInvidious = [
+        'yewtu.be',
+        'invidious.nerd.gg',
+        'inv.tux.im',
+        'invidious.flokinet.to',
+        'invidious.lunar.icu'
+    ];
+    
+    for (const domain of hardcodedInvidious) {
+        console.log(`Yedek Invidious deneniyor: ${domain}`);
+        const apiEndpoint = `https://${domain}/api/v1/videos/${videoId}`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        try {
+            const res = await fetch(apiEndpoint, { signal: controller.signal });
+            clearTimeout(timeout);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.adaptiveFormats && data.adaptiveFormats.length > 0) {
+                    const audioFormats = data.adaptiveFormats.filter(f => f.type && f.type.startsWith('audio/'));
+                    if (audioFormats.length > 0) {
+                        const selectedAudio = audioFormats[0];
+                        const rawUrl = selectedAudio.url;
+                        const urlObj = new URL(rawUrl);
+                        const proxiedUrl = `https://${domain}/videoplayback${urlObj.search}`;
+                        return proxiedUrl;
+                    }
+                }
+            }
+        } catch (err) {
+            clearTimeout(timeout);
+            console.log(`Yedek Invidious başarısız (${domain}): ${err.message}`);
+        }
+    }
+    
+    throw new Error('Tüm YouTube, Cobalt ve Invidious kaynakları tükendi.');
+}
+
 async function handleMusicBotCommand(msg) {
     const text = (msg.message || '').trim();
     const groupId = msg.group_id;
@@ -2702,7 +2802,12 @@ async function handleMusicBotCommand(msg) {
                 cleanAudioUrl = (directAudioUrl || '').trim();
             } catch (ytdlErr) {
                 console.warn('⚠️ youtube-dl-exec engellendi. Cobalt API yedek kanalı deneniyor...', ytdlErr.message);
-                cleanAudioUrl = await getCobaltFallbackUrl(video.url);
+                try {
+                    cleanAudioUrl = await getCobaltFallbackUrl(video.url);
+                } catch (cobaltErr) {
+                    console.warn('⚠️ Cobalt API de başarısız oldu. Invidious API proxy kanalı deneniyor...', cobaltErr.message);
+                    cleanAudioUrl = await getInvidiousFallbackUrl(video.url);
+                }
             }
 
             if (!cleanAudioUrl) {
