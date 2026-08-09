@@ -2450,6 +2450,98 @@ async function initMusicBot() {
     }
 }
 
+async function getCobaltFallbackUrl(youtubeUrl) {
+    try {
+        console.log('🔄 Aktif Cobalt sunucuları listesi çekiliyor...');
+        const response = await fetch('https://instances.cobalt.best/api/v1/instances');
+        if (response.ok) {
+            const instances = await response.json();
+            // Durumu online olan sunucuları filtrele
+            const onlineInstances = instances.filter(inst => inst.url && inst.status && inst.status.online);
+            console.log(`🔍 ${onlineInstances.length} online Cobalt sunucusu bulundu.`);
+            
+            for (const inst of onlineInstances) {
+                const apiEndpoint = inst.url.endsWith('/') ? inst.url : inst.url + '/';
+                console.log(`Cobalt deneniyor: ${apiEndpoint}`);
+                
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 6000);
+                try {
+                    const res = await fetch(apiEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            url: youtubeUrl,
+                            downloadMode: 'audio',
+                            audioFormat: 'mp3'
+                        }),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeout);
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.url) {
+                            console.log(`✅ Cobalt üzerinden müzik adresi alındı: ${apiEndpoint}`);
+                            return data.url;
+                        }
+                    }
+                } catch (err) {
+                    clearTimeout(timeout);
+                    console.log(`Cobalt sunucusu başarısız (${apiEndpoint}): ${err.message}`);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Cobalt listesi çekilemedi:', e.message);
+    }
+    
+    // Sabit yedek sunucular
+    const hardcoded = [
+        'https://cobalt.moe/',
+        'https://cobalt.q1.to/',
+        'https://cobalt.k0.tf/',
+        'https://cobalt.vvx.bar/',
+        'https://cobalt.synestia.pl/'
+    ];
+    
+    for (const apiEndpoint of hardcoded) {
+        console.log(`Yedek Cobalt deneniyor: ${apiEndpoint}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
+        try {
+            const res = await fetch(apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: youtubeUrl,
+                    downloadMode: 'audio',
+                    audioFormat: 'mp3'
+                }),
+                signal: controller.signal
+            });
+            clearTimeout(timeout);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.url) {
+                    return data.url;
+                }
+            }
+        } catch (err) {
+            clearTimeout(timeout);
+            console.log(`Yedek sunucu başarısız (${apiEndpoint}): ${err.message}`);
+        }
+    }
+    
+    throw new Error('Tüm indirme sunucuları ve alternatif kanallar başarısız oldu.');
+}
+
 async function handleMusicBotCommand(msg) {
     const text = (msg.message || '').trim();
     const groupId = msg.group_id;
@@ -2579,16 +2671,22 @@ async function handleMusicBotCommand(msg) {
             const video = searchResult.videos[0];
 
             // youtube-dl-exec (yt-dlp) ile doğrudan ses akışı adresini al (Bypass bot checks)
-            const youtubedl = require('youtube-dl-exec');
-            const directAudioUrl = await youtubedl(video.url, { 
-                getUrl: true, 
-                format: 'bestaudio',
-                extractorArgs: 'youtube:clients=android,ios',
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                noWarnings: true,
-                rmCacheDir: true
-            });
-            const cleanAudioUrl = (directAudioUrl || '').trim();
+            let cleanAudioUrl = '';
+            try {
+                const youtubedl = require('youtube-dl-exec');
+                const directAudioUrl = await youtubedl(video.url, { 
+                    getUrl: true, 
+                    format: 'bestaudio',
+                    extractorArgs: 'youtube:clients=android,ios',
+                    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    noWarnings: true,
+                    rmCacheDir: true
+                });
+                cleanAudioUrl = (directAudioUrl || '').trim();
+            } catch (ytdlErr) {
+                console.warn('⚠️ youtube-dl-exec engellendi. Cobalt API yedek kanalı deneniyor...', ytdlErr.message);
+                cleanAudioUrl = await getCobaltFallbackUrl(video.url);
+            }
 
             if (!cleanAudioUrl) {
                 throw new Error("Müzik akış adresi alınamadı.");
