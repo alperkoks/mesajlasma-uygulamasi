@@ -2457,10 +2457,16 @@ async function getCobaltFallbackUrl(youtubeUrl) {
         if (response.ok) {
             const instances = await response.json();
             // Durumu online olan sunucuları filtrele
-            const onlineInstances = instances.filter(inst => inst.url && inst.status && inst.status.online);
-            console.log(`🔍 ${onlineInstances.length} online Cobalt sunucusu bulundu.`);
+            let onlineInstances = instances.filter(inst => inst.url && inst.status && inst.status.online);
+            console.log(`🔍 Toplam ${onlineInstances.length} online Cobalt sunucusu bulundu.`);
             
-            for (const inst of onlineInstances) {
+            // Sunucuları karıştır (load-balance) ve en fazla 5 tanesini dene
+            onlineInstances.sort(() => Math.random() - 0.5);
+            const selectedInstances = onlineInstances.slice(0, 5);
+            console.log(`🚀 Seçilen 5 rastgele sunucu denenecek...`);
+            
+            for (const inst of selectedInstances) {
+                // Cobalt v10 standardı API adresleri için POST genellikle doğrudan kök URL'ye (/) yapılır
                 const apiEndpoint = inst.url.endsWith('/') ? inst.url : inst.url + '/';
                 console.log(`Cobalt deneniyor: ${apiEndpoint}`);
                 
@@ -2475,17 +2481,22 @@ async function getCobaltFallbackUrl(youtubeUrl) {
                         },
                         body: JSON.stringify({
                             url: youtubeUrl,
-                            downloadMode: 'audio',
-                            audioFormat: 'mp3'
+                            downloadMode: 'audio', // v7
+                            audioFormat: 'mp3',   // v7
+                            audioOnly: true,       // v10
+                            aFormat: 'mp3'        // v10
                         }),
                         signal: controller.signal
                     });
                     clearTimeout(timeout);
                     
+                    const responseText = await res.text();
+                    console.log(`Cobalt Yanıtı (${apiEndpoint}): Durum ${res.status} - Gövde: ${responseText.substring(0, 200)}`);
+                    
                     if (res.ok) {
-                        const data = await res.json();
+                        const data = JSON.parse(responseText);
                         if (data.url) {
-                            console.log(`✅ Cobalt üzerinden müzik adresi alındı: ${apiEndpoint}`);
+                            console.log(`✅ Cobalt üzerinden müzik adresi başarıyla alındı: ${apiEndpoint}`);
                             return data.url;
                         }
                     }
@@ -2499,7 +2510,7 @@ async function getCobaltFallbackUrl(youtubeUrl) {
         console.error('Cobalt listesi çekilemedi:', e.message);
     }
     
-    // Sabit yedek sunucular
+    // Sabit yedek sunucular (V7 ve V10 birleşik gövde kullanarak)
     const hardcoded = [
         'https://cobalt.moe/',
         'https://cobalt.q1.to/',
@@ -2521,14 +2532,20 @@ async function getCobaltFallbackUrl(youtubeUrl) {
                 },
                 body: JSON.stringify({
                     url: youtubeUrl,
-                    downloadMode: 'audio',
-                    audioFormat: 'mp3'
+                    downloadMode: 'audio', // v7
+                    audioFormat: 'mp3',   // v7
+                    audioOnly: true,       // v10
+                    aFormat: 'mp3'        // v10
                 }),
                 signal: controller.signal
             });
             clearTimeout(timeout);
+            
+            const responseText = await res.text();
+            console.log(`Yedek Cobalt Yanıtı (${apiEndpoint}): Durum ${res.status} - Gövde: ${responseText.substring(0, 200)}`);
+            
             if (res.ok) {
-                const data = await res.json();
+                const data = JSON.parse(responseText);
                 if (data.url) {
                     return data.url;
                 }
