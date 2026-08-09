@@ -2578,9 +2578,16 @@ async function handleMusicBotCommand(msg) {
 
             const video = searchResult.videos[0];
 
-            // youtube-dl-exec (yt-dlp) ile doğrudan ses akışı adresini al
+            // youtube-dl-exec (yt-dlp) ile doğrudan ses akışı adresini al (Bypass bot checks)
             const youtubedl = require('youtube-dl-exec');
-            const directAudioUrl = await youtubedl(video.url, { getUrl: true, format: 'bestaudio' });
+            const directAudioUrl = await youtubedl(video.url, { 
+                getUrl: true, 
+                format: 'bestaudio',
+                extractorArgs: 'youtube:clients=android,ios',
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                noWarnings: true,
+                rmCacheDir: true
+            });
             const cleanAudioUrl = (directAudioUrl || '').trim();
 
             if (!cleanAudioUrl) {
