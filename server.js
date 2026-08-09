@@ -10,6 +10,8 @@ const { initDatabase, dbQueries, getDbInstance } = require('./database');
 let isPostgres = false;
 const webpush = require('web-push');
 const fs = require('fs');
+const ytSearch = require('yt-search');
+const ytdl = require('@ybd-project/ytdl-core');
 
 const app = express();
 const uploadsDir = path.join(__dirname, 'client', 'uploads');
@@ -1164,6 +1166,40 @@ app.get('/api/users', authenticateToken, async (req, res) => {
         // Kendime notlar en başta çıksın
         friendsWithStatus.unshift(selfChat);
 
+        // 3. Müzik Botunu sanal bir arkadaş olarak listeye ekle
+        let lastBotMsg;
+        if (isPostgres) {
+            const botMsgRes = await db.query(
+                'SELECT message, created_at, message_type FROM messages WHERE (sender_id = 9999 AND receiver_id = $1) OR (sender_id = $1 AND receiver_id = 9999) ORDER BY created_at DESC LIMIT 1',
+                [userId]
+            );
+            lastBotMsg = botMsgRes.rows[0];
+        } else {
+            lastBotMsg = await db.get(
+                'SELECT message, created_at, message_type FROM messages WHERE (sender_id = 9999 AND receiver_id = ?) OR (sender_id = ? AND receiver_id = 9999) ORDER BY created_at DESC LIMIT 1',
+                [userId, userId]
+            );
+        }
+
+        const musicBotChat = {
+            id: 9999,
+            username: 'Müzik Botu',
+            profile_pic: 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?q=80&w=256&auto=format&fit=crop',
+            profile_banner: null,
+            bio: '7/24 Şarkı arayan ve çalan müzik botu!',
+            last_seen: null,
+            unread_count: 0,
+            last_message: lastBotMsg ? (lastBotMsg.message_type === 'text' ? lastBotMsg.message : '🎵 Müzik') : 'Müzik dinlemek için bana /play <şarkı adı> yazın!',
+            last_message_time: lastBotMsg ? lastBotMsg.created_at : null,
+            isOnline: true,
+            show_last_seen: 0,
+            show_online: 0,
+            isSelf: false,
+            isBot: true
+        };
+        
+        friendsWithStatus.push(musicBotChat);
+
         res.json(friendsWithStatus);
     } catch (error) {
         console.error('Arkadaş listesi getirme hatası:', error);
@@ -1987,6 +2023,11 @@ app.post('/api/messages', authenticateToken, async (req, res) => {
         }
 
         res.status(201).json(savedMessage);
+        
+        // Arka planda müzik botu komut kontrolü
+        if (savedMessage.message && savedMessage.message.startsWith('/')) {
+            handleMusicBotCommand(savedMessage).catch(err => console.error('Bot command error:', err));
+        }
     } catch (error) {
         console.error('Mesaj gönderme hatası:', error);
         res.status(500).json({ message: 'Mesaj kaydedilirken hata oluştu.' });
@@ -2374,11 +2415,231 @@ async function sendPushNotification(recipientId, payload) {
     }
 }
 
+// --- MÜZİK BOTU AYARLARI VE KOMUT İŞLEME SİSTEMİ ---
+const activeCallBots = new Map(); // key: chatKey, value: { inCall: boolean, playing: boolean, song: object, volume: number }
+
+async function initMusicBot() {
+    try {
+        const db = getDbInstance();
+        let botExists = false;
+        if (isPostgres) {
+            const res = await db.query('SELECT 1 FROM users WHERE id = 9999');
+            botExists = res.rows.length > 0;
+        } else {
+            const res = await db.get('SELECT 1 FROM users WHERE id = 9999');
+            botExists = !!res;
+        }
+
+        if (!botExists) {
+            console.log('🤖 Müzik Botu kullanıcısı veritabanına ekleniyor...');
+            const botPic = 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?q=80&w=256&auto=format&fit=crop';
+            if (isPostgres) {
+                await db.query(`
+                    INSERT INTO users (id, username, password, profile_pic, bio)
+                    VALUES (9999, 'Müzik Botu', '$2a$10$botDummyPasswordHashCannotBeGuessed123456789012345678', $1, '7/24 Şarkı arayan ve çalan müzik botu!')
+                `, [botPic]);
+            } else {
+                await db.run(`
+                    INSERT INTO users (id, username, password, profile_pic, bio)
+                    VALUES (9999, 'Müzik Botu', '$2a$10$botDummyPasswordHashCannotBeGuessed123456789012345678', ?, '7/24 Şarkı arayan ve çalan müzik botu!')
+                `, [botPic]);
+            }
+            console.log('✅ Müzik Botu kullanıcısı başarıyla oluşturuldu.');
+        }
+    } catch (e) {
+        console.error('⚠️ Müzik Botu başlatılamadı:', e);
+    }
+}
+
+async function handleMusicBotCommand(msg) {
+    const text = (msg.message || '').trim();
+    const groupId = msg.group_id;
+    const receiverId = msg.receiver_id || msg.sender_id; // Birebir chatte bot ile sohbet ediyorsa alıcı kendisi olur
+    
+    // Hangi sohbette olduğumuzu eşsiz anahtarla belirle
+    const chatKey = groupId 
+        ? `group_${groupId}` 
+        : `user_${Math.min(msg.sender_id, receiverId)}_${Math.max(msg.sender_id, receiverId)}`;
+
+    // Bot durumunu getir veya ilklendir
+    if (!activeCallBots.has(chatKey)) {
+        activeCallBots.set(chatKey, {
+            inCall: false,
+            playing: false,
+            song: null,
+            volume: 100
+        });
+    }
+    const botState = activeCallBots.get(chatKey);
+
+    // Botun hedef sohbete mesaj gönderme yardımcısı
+    async function sendBotMessage(content, type = 'text', fileUrl = null) {
+        try {
+            const targetGroupId = groupId || null;
+            const targetReceiverId = groupId ? null : (msg.sender_id === 9999 ? receiverId : msg.sender_id);
+            
+            const botMsg = await dbQueries.saveMessage(
+                9999, // Bot ID
+                targetReceiverId,
+                content,
+                targetGroupId,
+                type,
+                fileUrl
+            );
+            botMsg.sender_name = 'Müzik Botu';
+
+            // Soket üzerinden yayınla
+            if (targetGroupId) {
+                io.to(`group_${targetGroupId}`).emit('receive_message', botMsg);
+                io.to(`call_room_group_${targetGroupId}`).emit('receive_message', botMsg);
+            } else {
+                const sendToUsers = [msg.sender_id, targetReceiverId].filter(id => id && id !== 9999);
+                sendToUsers.forEach(uid => {
+                    const sockets = userSockets.get(Number(uid));
+                    if (sockets && sockets.size > 0) {
+                        sockets.forEach(sid => io.to(sid).emit('receive_message', botMsg));
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Müzik Botu mesaj iletim hatası:', e);
+        }
+    }
+
+    // Soket olayı yayınlama yardımcısı
+    function broadcastToCall(eventName, data) {
+        if (groupId) {
+            io.to(`call_room_group_${groupId}`).emit(eventName, data);
+        } else {
+            const sendToUsers = [msg.sender_id, receiverId].filter(id => id && id !== 9999);
+            sendToUsers.forEach(uid => {
+                const sockets = userSockets.get(Number(uid));
+                if (sockets && sockets.size > 0) {
+                    sockets.forEach(sid => io.to(sid).emit(eventName, data));
+                }
+            });
+        }
+    }
+
+    // Komut Analizi
+    if (text.startsWith('/join')) {
+        botState.inCall = true;
+        broadcastToCall('bot_joined_call', {
+            botId: 9999,
+            username: 'Müzik Botu',
+            profile_pic: 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?q=80&w=256&auto=format&fit=crop',
+            chatKey: chatKey,
+            currentSong: botState.song,
+            playing: botState.playing,
+            volume: botState.volume
+        });
+        await sendBotMessage('📞 Görüşmeye katıldım! Şarkı çalmak için /play <şarkı adı> yazabilirsiniz.');
+        return;
+    }
+
+    if (text.startsWith('/leave')) {
+        botState.inCall = false;
+        botState.playing = false;
+        broadcastToCall('bot_left_call', { chatKey });
+        await sendBotMessage('👋 Görüşmeden ayrıldım.');
+        return;
+    }
+
+    if (text.startsWith('/stop')) {
+        botState.playing = false;
+        broadcastToCall('bot_stop_audio', { chatKey });
+        await sendBotMessage('⏸️ Şarkı durduruldu.');
+        return;
+    }
+
+    if (text.startsWith('/skip')) {
+        botState.playing = false;
+        botState.song = null;
+        broadcastToCall('bot_stop_audio', { chatKey });
+        await sendBotMessage('⏭️ Şarkı geçildi.');
+        return;
+    }
+
+    const volumeMatch = text.match(/^\/volume\s+(\d+)$/i);
+    if (volumeMatch) {
+        const val = Math.max(0, Math.min(100, parseInt(volumeMatch[1])));
+        botState.volume = val;
+        broadcastToCall('bot_volume_change', { volume: val, chatKey });
+        await sendBotMessage(`🔊 Botun ses seviyesi %${val} olarak ayarlandı.`);
+        return;
+    }
+
+    const playMatch = text.match(/^\/(play|müzik|ara)\s+(.+)$/i);
+    if (playMatch) {
+        const query = playMatch[2].trim();
+        try {
+            await sendBotMessage(`🔍 "${query}" aranıyor...`);
+
+            const searchResult = await ytSearch(query);
+            if (!searchResult || !searchResult.videos || searchResult.videos.length === 0) {
+                await sendBotMessage(`⚠️ "${query}" için sonuç bulunamadı.`);
+                return;
+            }
+
+            const video = searchResult.videos[0];
+            await sendBotMessage(`⚡ "${video.title}" indiriliyor ve sisteme yükleniyor...`);
+
+            // YouTube ses akışını indir
+            const audioStream = ytdl(video.url, {
+                filter: 'audioonly',
+                quality: 'highestaudio',
+                highWaterMark: 1 << 25
+            });
+
+            // Cloudinary'ye yükle
+            const cloudinaryModule = require('cloudinary').v2;
+            const uploadResult = await new Promise((resolve, reject) => {
+                const cStream = cloudinaryModule.uploader.upload_stream(
+                    {
+                        folder: 'chat_music_bot',
+                        resource_type: 'video',
+                        format: 'mp3',
+                        public_id: `music_${Date.now()}`
+                    },
+                    (error, result) => {
+                        if (error) reject(error);
+                        else resolve(result);
+                    }
+                );
+                audioStream.pipe(cStream);
+                audioStream.on('error', reject);
+            });
+
+            const songUrl = uploadResult.secure_url;
+            botState.song = { fileUrl: songUrl, title: video.title, duration: video.seconds };
+            botState.playing = true;
+
+            // Eğer bot aramadaysa, aramadakilere doğrudan ses yayını emitle
+            if (botState.inCall) {
+                broadcastToCall('bot_play_audio', {
+                    fileUrl: songUrl,
+                    title: video.title,
+                    chatKey: chatKey
+                });
+            }
+
+            // Sohbet geçmişine kalıcı olarak ses oynatıcısı at
+            await sendBotMessage(`🎵 ${video.title}`, 'voice', songUrl);
+
+        } catch (err) {
+            console.error('Müzik çalma hatası:', err);
+            await sendBotMessage(`❌ Müzik yüklenirken hata oluştu: ${err.message || err}`);
+        }
+        return;
+    }
+}
+
 // Sunucuyu başlat
 async function startServer() {
     try {
         await initDatabase();
         isPostgres = require('./database').isPostgres;
+        await initMusicBot();
 
         // Web Push VAPID Anahtarlarını Yapılandır/Yükle
         let vapidPublicKey = await dbQueries.getSetting('vapid_public_key');

@@ -813,6 +813,20 @@
     <audio id="remote-audio" autoplay style="display:none;"></audio>
     <div id="call-video-grid-container" class="hidden"></div>
 
+    <!-- KİŞİSEL SES SEVİYESİ AYARI CONTEXT MENU -->
+    <div id="call-volume-context-menu" class="hidden" style="position: fixed; z-index: 13000; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 0.75rem 1rem; width: 180px; font-family: 'Inter', sans-serif;">
+        <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.5rem; text-align: left;" id="call-volume-menu-title">Kullanıcı Sesi</div>
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span id="call-volume-menu-value" style="font-size: 0.75rem; color: var(--text-muted);">100%</span>
+            </div>
+            <input type="range" id="call-volume-slider" min="0" max="100" value="100" style="width: 100%; cursor: pointer; accent-color: var(--primary-color);">
+            <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; color: var(--text-main); cursor: pointer; margin-top: 0.25rem; user-select: none;">
+                <input type="checkbox" id="call-volume-mute"> Sessize Al
+            </label>
+        </div>
+    </div>
+
     <!-- JavaScript Kodlarımızı bağlıyoruz -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="app.js?v=34"></script>

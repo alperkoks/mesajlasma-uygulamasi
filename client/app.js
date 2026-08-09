@@ -339,6 +339,14 @@ const msgInfoReadList = document.getElementById('msg-info-read-list');
 const forwardModal = document.getElementById('forward-modal');
 const closeForwardModal = document.getElementById('close-forward-modal');
 const forwardTargetsList = document.getElementById('forward-targets-list');
+
+// GÖRÜŞME SES SEVİYESİ CONTEXT MENU ELEMENTLERİ
+const callVolumeContextMenu = document.getElementById('call-volume-context-menu');
+const callVolumeMenuTitle = document.getElementById('call-volume-menu-title');
+const callVolumeMenuValue = document.getElementById('call-volume-menu-value');
+const callVolumeSlider = document.getElementById('call-volume-slider');
+const callVolumeMute = document.getElementById('call-volume-mute');
+let activeVolumePeerId = null;
 const btnAddSticker = document.getElementById('btn-add-sticker');
 const stickerFileInput = document.getElementById('sticker-file-input');
 const stickersContainer = document.getElementById('stickers-container');
@@ -687,7 +695,7 @@ function addParticipantVideo(peerId, username, stream) {
         audioEl.style.display = 'none';
         document.body.appendChild(audioEl);
     }
-    audioEl.srcObject = stream;
+    if (stream) audioEl.srcObject = stream;
     
     let wrapper = document.getElementById(`video-wrapper-${peerId}`);
     if (!wrapper) {
@@ -698,12 +706,13 @@ function addParticipantVideo(peerId, username, stream) {
         const video = document.createElement('video');
         video.autoplay = true;
         video.playsInline = true;
-        video.srcObject = stream;
+        if (stream) video.srcObject = stream;
         
         // Avatar placeholder for voice-only
         const avatarPlaceholder = document.createElement('div');
         avatarPlaceholder.className = 'call-avatar-placeholder';
-        avatarPlaceholder.innerHTML = `<div class="avatar-circle">${username ? username.substring(0,2).toUpperCase() : 'U'}</div>`;
+        const avatarText = peerId === 'bot' ? '🤖' : (username ? username.substring(0,2).toUpperCase() : 'U');
+        avatarPlaceholder.innerHTML = `<div class="avatar-circle">${avatarText}</div>`;
         
         const label = document.createElement('div');
         label.className = 'call-video-label';
@@ -713,9 +722,15 @@ function addParticipantVideo(peerId, username, stream) {
         wrapper.appendChild(avatarPlaceholder);
         wrapper.appendChild(label);
         container.appendChild(wrapper);
+        
+        // Sağ Tık Ses Seviyesi Kontrolü
+        wrapper.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            openVolumeMenu(e.clientX, e.clientY, peerId, username);
+        });
     } else {
         const video = wrapper.querySelector('video');
-        if (video) video.srcObject = stream;
+        if (video && stream) video.srcObject = stream;
     }
     
     // Toggle video visibility based on active video tracks
@@ -732,7 +747,9 @@ function addParticipantVideo(peerId, username, stream) {
     }
     
     // Setup audio speaking detection for this peer
-    setupAudioAnalysis(peerId, stream, wrapper);
+    if (stream) {
+        setupAudioAnalysis(peerId, stream, wrapper);
+    }
     
     rearrangeVideoGrid();
 }
@@ -3630,7 +3647,10 @@ function initPeerConnection(partnerId) {
 if (btnAcceptCall) {
     btnAcceptCall.addEventListener('click', async () => {
         stopRingtone();
-        if (!currentCallPartnerId || !incomingOfferSignal) return;
+        
+        const isGroupCall = !!activeCallRoomId;
+        if (!isGroupCall && (!currentCallPartnerId || !incomingOfferSignal)) return;
+        
         incomingCallButtons.classList.add('hidden');
         activeCallButtons.classList.remove('hidden');
         callStatus.textContent = currentLanguage === 'tr' ? 'Bağlanıyor...' : 'Connecting...';
@@ -3648,25 +3668,37 @@ if (btnAcceptCall) {
             startBackgroundAudioKeepAlive();
             setupAudioAnalysis('local', localStream, callPartnerAvatar);
             
-            initPeerConnection(currentCallPartnerId);
-            
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOfferSignal));
-            processQueuedIceCandidates();
-            
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            
-            socket.emit('accept_call', {
-                targetUserId: currentCallPartnerId,
-                signalData: answer
-            });
+            if (isGroupCall) {
+                // Grup görüşmesi: Odaya katıl, sinyalleşme dinamik olarak başlayacaktır
+                socket.emit('join_call_room', {
+                    roomId: activeCallRoomId,
+                    isVideoCall: isVideoCallActive
+                });
+                callStatus.textContent = currentLanguage === 'tr' ? 'Grup Görüşmesi' : 'Group Call';
+            } else {
+                // 1e1 görüşme: Standart PeerConnection kurulumu
+                initPeerConnection(currentCallPartnerId);
+                
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingOfferSignal));
+                processQueuedIceCandidates();
+                
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                socket.emit('accept_call', {
+                    targetUserId: currentCallPartnerId,
+                    signalData: answer
+                });
+            }
             
             callActive = true;
             startCallDurationTimer();
             updateCallVideosContainerVisibility();
         } catch (err) {
             console.error('Arama kabul edilme hatası:', err);
-            socket.emit('reject_call', { targetUserId: currentCallPartnerId });
+            if (!isGroupCall) {
+                socket.emit('reject_call', { targetUserId: currentCallPartnerId });
+            }
             endCallSession();
         }
     });
@@ -4046,6 +4078,76 @@ async function initApp() {
             if (msg) {
                 msg.is_read = 1;
                 renderMessages();
+            }
+        });
+
+        // --- MÜZİK BOTU ARAMA SOKET DİNLEYİCİLERİ ---
+        socket.on('bot_joined_call', (data) => {
+            console.log('🤖 Müzik Botu görüşmeye katıldı:', data);
+            addParticipantVideo('bot', 'Müzik Botu', null);
+            
+            let botAudio = document.getElementById('bot-call-audio');
+            if (!botAudio) {
+                botAudio = document.createElement('audio');
+                botAudio.id = 'bot-call-audio';
+                botAudio.autoplay = true;
+                document.body.appendChild(botAudio);
+            }
+            
+            if (data.currentSong && data.playing) {
+                botAudio.src = data.currentSong.fileUrl;
+                botAudio.volume = (data.volume || 100) / 100;
+                botAudio.play().catch(e => console.warn('Bot audio play failed:', e));
+                
+                const label = document.querySelector(`#video-wrapper-bot .call-video-label`);
+                if (label) label.textContent = `Müzik Botu (▶️ ${data.currentSong.title})`;
+            } else {
+                botAudio.src = '';
+            }
+        });
+
+        socket.on('bot_left_call', (data) => {
+            console.log('🤖 Müzik Botu görüşmeden ayrıldı');
+            const wrapper = document.getElementById('video-wrapper-bot');
+            if (wrapper) wrapper.remove();
+            
+            const botAudio = document.getElementById('bot-call-audio');
+            if (botAudio) botAudio.remove();
+            
+            rearrangeVideoGrid();
+        });
+
+        socket.on('bot_play_audio', (data) => {
+            console.log('🤖 Müzik Botu şarkı çalıyor:', data.title);
+            let botAudio = document.getElementById('bot-call-audio');
+            if (!botAudio) {
+                botAudio = document.createElement('audio');
+                botAudio.id = 'bot-call-audio';
+                botAudio.autoplay = true;
+                document.body.appendChild(botAudio);
+            }
+            botAudio.src = data.fileUrl;
+            botAudio.play().catch(e => console.warn('Bot audio play failed:', e));
+            
+            const label = document.querySelector(`#video-wrapper-bot .call-video-label`);
+            if (label) label.textContent = `Müzik Botu (▶️ ${data.title})`;
+        });
+
+        socket.on('bot_stop_audio', (data) => {
+            console.log('🤖 Müzik Botu şarkıyı durdurdu');
+            const botAudio = document.getElementById('bot-call-audio');
+            if (botAudio) {
+                botAudio.pause();
+            }
+            const label = document.querySelector(`#video-wrapper-bot .call-video-label`);
+            if (label) label.textContent = `Müzik Botu (⏸️ Durduruldu)`;
+        });
+
+        socket.on('bot_volume_change', (data) => {
+            console.log('🤖 Müzik Botu ses seviyesi değişti:', data.volume);
+            const botAudio = document.getElementById('bot-call-audio');
+            if (botAudio) {
+                botAudio.volume = data.volume / 100;
             }
         });
 
@@ -7387,5 +7489,98 @@ function openMessageInfoById(msgId) {
     }
 }
 window.openMessageInfoById = openMessageInfoById;
+
+// --- SAĞ TIK SES SEVİYESİ KONTROL YORDAMLARI ---
+function openVolumeMenu(x, y, peerId, displayName) {
+    if (!callVolumeContextMenu) return;
+    activeVolumePeerId = peerId;
+    callVolumeMenuTitle.textContent = displayName || `Kullanıcı ${peerId}`;
+    
+    let audioEl = null;
+    if (peerId === 'bot') {
+        audioEl = document.getElementById('bot-call-audio');
+    } else if (peerId === 'remote') {
+        audioEl = document.getElementById('remote-audio');
+    } else {
+        audioEl = document.getElementById(`audio-peer-${peerId}`);
+    }
+    
+    if (audioEl) {
+        const vol = Math.round(audioEl.volume * 100);
+        callVolumeSlider.value = vol;
+        callVolumeMenuValue.textContent = `${vol}%`;
+        callVolumeMute.checked = audioEl.muted;
+    } else {
+        callVolumeSlider.value = 100;
+        callVolumeMenuValue.textContent = '100%';
+        callVolumeMute.checked = false;
+    }
+    
+    callVolumeContextMenu.style.left = `${x}px`;
+    callVolumeContextMenu.style.top = `${y}px`;
+    callVolumeContextMenu.classList.remove('hidden');
+}
+
+// Click anywhere to hide call volume context menu
+document.addEventListener('click', (e) => {
+    if (callVolumeContextMenu && !callVolumeContextMenu.contains(e.target)) {
+        callVolumeContextMenu.classList.add('hidden');
+    }
+});
+
+if (callVolumeSlider) {
+    callVolumeSlider.addEventListener('input', (e) => {
+        const vol = parseInt(e.target.value);
+        if (callVolumeMenuValue) callVolumeMenuValue.textContent = `${vol}%`;
+        
+        let audioEl = null;
+        if (activeVolumePeerId === 'bot') {
+            audioEl = document.getElementById('bot-call-audio');
+        } else if (activeVolumePeerId === 'remote') {
+            audioEl = document.getElementById('remote-audio');
+        } else {
+            audioEl = document.getElementById(`audio-peer-${activeVolumePeerId}`);
+        }
+        
+        if (audioEl) {
+            audioEl.volume = vol / 100;
+        }
+    });
+}
+
+if (callVolumeMute) {
+    callVolumeMute.addEventListener('change', (e) => {
+        const isMuted = e.target.checked;
+        
+        let audioEl = null;
+        if (activeVolumePeerId === 'bot') {
+            audioEl = document.getElementById('bot-call-audio');
+        } else if (activeVolumePeerId === 'remote') {
+            audioEl = document.getElementById('remote-audio');
+        } else {
+            audioEl = document.getElementById(`audio-peer-${activeVolumePeerId}`);
+        }
+        
+        if (audioEl) {
+            audioEl.muted = isMuted;
+        }
+    });
+}
+
+// 1e1 aramalarda sağ tık bağlama
+if (remoteVideo) {
+    remoteVideo.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const partnerName = callPartnerUsername ? callPartnerUsername.textContent : 'Katılımcı';
+        openVolumeMenu(e.clientX, e.clientY, 'remote', partnerName);
+    });
+}
+if (callPartnerAvatar) {
+    callPartnerAvatar.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const partnerName = callPartnerUsername ? callPartnerUsername.textContent : 'Katılımcı';
+        openVolumeMenu(e.clientX, e.clientY, 'remote', partnerName);
+    });
+}
 
 initApp();
