@@ -11,7 +11,6 @@ let isPostgres = false;
 const webpush = require('web-push');
 const fs = require('fs');
 const ytSearch = require('yt-search');
-const ytdl = require('@ybd-project/ytdl-core');
 
 const app = express();
 const uploadsDir = path.join(__dirname, 'client', 'uploads');
@@ -2533,7 +2532,6 @@ async function handleMusicBotCommand(msg) {
             playing: botState.playing,
             volume: botState.volume
         });
-        await sendBotMessage('📞 Görüşmeye katıldım! Şarkı çalmak için /play <şarkı adı> yazabilirsiniz.');
         return;
     }
 
@@ -2541,14 +2539,12 @@ async function handleMusicBotCommand(msg) {
         botState.inCall = false;
         botState.playing = false;
         broadcastToCall('bot_left_call', { chatKey });
-        await sendBotMessage('👋 Görüşmeden ayrıldım.');
         return;
     }
 
     if (text.startsWith('/stop')) {
         botState.playing = false;
         broadcastToCall('bot_stop_audio', { chatKey });
-        await sendBotMessage('⏸️ Şarkı durduruldu.');
         return;
     }
 
@@ -2556,7 +2552,6 @@ async function handleMusicBotCommand(msg) {
         botState.playing = false;
         botState.song = null;
         broadcastToCall('bot_stop_audio', { chatKey });
-        await sendBotMessage('⏭️ Şarkı geçildi.');
         return;
     }
 
@@ -2565,7 +2560,6 @@ async function handleMusicBotCommand(msg) {
         const val = Math.max(0, Math.min(100, parseInt(volumeMatch[1])));
         botState.volume = val;
         broadcastToCall('bot_volume_change', { volume: val, chatKey });
-        await sendBotMessage(`🔊 Botun ses seviyesi %${val} olarak ayarlandı.`);
         return;
     }
 
@@ -2573,41 +2567,33 @@ async function handleMusicBotCommand(msg) {
     if (playMatch) {
         const query = playMatch[2].trim();
         try {
-            await sendBotMessage(`🔍 "${query}" aranıyor...`);
-
+            // YouTube'da ara
             const searchResult = await ytSearch(query);
             if (!searchResult || !searchResult.videos || searchResult.videos.length === 0) {
-                await sendBotMessage(`⚠️ "${query}" için sonuç bulunamadı.`);
+                if (!botState.inCall) {
+                    await sendBotMessage(`⚠️ "${query}" için sonuç bulunamadı.`);
+                }
                 return;
             }
 
             const video = searchResult.videos[0];
-            await sendBotMessage(`⚡ "${video.title}" indiriliyor ve sisteme yükleniyor...`);
 
-            // YouTube ses akışını indir
-            const audioStream = ytdl(video.url, {
-                filter: 'audioonly',
-                quality: 'highestaudio',
-                highWaterMark: 1 << 25
-            });
+            // youtube-dl-exec (yt-dlp) ile doğrudan ses akışı adresini al
+            const youtubedl = require('youtube-dl-exec');
+            const directAudioUrl = await youtubedl(video.url, { getUrl: true, format: 'bestaudio' });
+            const cleanAudioUrl = (directAudioUrl || '').trim();
+
+            if (!cleanAudioUrl) {
+                throw new Error("Müzik akış adresi alınamadı.");
+            }
 
             // Cloudinary'ye yükle
             const cloudinaryModule = require('cloudinary').v2;
-            const uploadResult = await new Promise((resolve, reject) => {
-                const cStream = cloudinaryModule.uploader.upload_stream(
-                    {
-                        folder: 'chat_music_bot',
-                        resource_type: 'video',
-                        format: 'mp3',
-                        public_id: `music_${Date.now()}`
-                    },
-                    (error, result) => {
-                        if (error) reject(error);
-                        else resolve(result);
-                    }
-                );
-                audioStream.pipe(cStream);
-                audioStream.on('error', reject);
+            const uploadResult = await cloudinaryModule.uploader.upload(cleanAudioUrl, {
+                folder: 'chat_music_bot',
+                resource_type: 'video',
+                format: 'mp3',
+                public_id: `music_${Date.now()}`
             });
 
             const songUrl = uploadResult.secure_url;
@@ -2621,14 +2607,16 @@ async function handleMusicBotCommand(msg) {
                     title: video.title,
                     chatKey: chatKey
                 });
+            } else {
+                // Sohbet geçmişine kalıcı olarak ses oynatıcısı at (Sadece aramada değilse!)
+                await sendBotMessage(`🎵 ${video.title}`, 'voice', songUrl);
             }
-
-            // Sohbet geçmişine kalıcı olarak ses oynatıcısı at
-            await sendBotMessage(`🎵 ${video.title}`, 'voice', songUrl);
 
         } catch (err) {
             console.error('Müzik çalma hatası:', err);
-            await sendBotMessage(`❌ Müzik yüklenirken hata oluştu: ${err.message || err}`);
+            if (!botState.inCall) {
+                await sendBotMessage(`❌ Müzik çalınırken hata oluştu: ${err.message || err}`);
+            }
         }
         return;
     }

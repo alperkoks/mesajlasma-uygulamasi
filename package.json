@@ -12,7 +12,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@ybd-project/ytdl-core": "^6.0.8",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.2.0",
     "cors": "^2.8.5",
@@ -21,10 +20,12 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.13",
     "pg": "^8.11.5",
+    "play-dl": "^1.9.7",
     "socket.io": "^4.7.5",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "web-push": "^3.6.7",
+    "youtube-dl-exec": "^3.1.12",
     "yt-search": "^2.13.1"
   },
   "devDependencies": {
